@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // @resvg/resvg-js is a native (N-API) addon — it must run as real Node.js code,
+  // not get bundled by Turbopack/webpack.
+  serverExternalPackages: ["@resvg/resvg-js", "satori", "harfbuzzjs", "better-sqlite3"],
+  turbopack: {
+    root: path.join(__dirname),
+  },
 };
 
 export default nextConfig;
