@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const MANUAL_SLIDE_BREAK = "///";
+const GLUE_MARKER = "&&";
 
 export default function EditablePostText({
   postId,
@@ -20,15 +21,15 @@ export default function EditablePostText({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function insertSplitMarker() {
+  function insertMarker(marker: string) {
     const textarea = textareaRef.current;
     if (!textarea) return;
     const { selectionStart, selectionEnd, value, scrollTop } = textarea;
-    const next = value.slice(0, selectionStart) + MANUAL_SLIDE_BREAK + value.slice(selectionEnd);
+    const next = value.slice(0, selectionStart) + marker + value.slice(selectionEnd);
     setRawText(next);
     requestAnimationFrame(() => {
       textarea.focus();
-      const pos = selectionStart + MANUAL_SLIDE_BREAK.length;
+      const pos = selectionStart + marker.length;
       textarea.setSelectionRange(pos, pos);
       textarea.scrollTop = scrollTop;
     });
@@ -69,19 +70,35 @@ export default function EditablePostText({
         className="rounded-lg border p-3 text-base"
       />
       {hasSplitTarget && (
-        <div className="flex items-center gap-3">
-          <p className="text-xs text-neutral-500">
-            סימון חילוק לעמוד (קרוסלה) / משפט (ריל) חדש:{" "}
-            <code className="bg-neutral-200 px-1 rounded">{MANUAL_SLIDE_BREAK}</code>
-          </p>
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={insertSplitMarker}
-            className="shrink-0 rounded-md border px-2 py-1 text-xs hover:bg-neutral-100"
-          >
-            + סימון חילוק
-          </button>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-neutral-500">
+              סימון חילוק לעמוד (קרוסלה) / משפט (ריל) חדש:{" "}
+              <code className="bg-neutral-200 px-1 rounded">{MANUAL_SLIDE_BREAK}</code>
+            </p>
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => insertMarker(MANUAL_SLIDE_BREAK)}
+              className="shrink-0 rounded-md border px-2 py-1 text-xs hover:bg-neutral-100"
+            >
+              + סימון חילוק
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-neutral-500">
+              במצב אוטומטי: שני משפטים שחייבים להישאר יחד (לא להיפרד) —{" "}
+              <code className="bg-neutral-200 px-1 rounded">{GLUE_MARKER}</code> ביניהם
+            </p>
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => insertMarker(GLUE_MARKER)}
+              className="shrink-0 rounded-md border px-2 py-1 text-xs hover:bg-neutral-100"
+            >
+              + סימון הדבקה
+            </button>
+          </div>
         </div>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}

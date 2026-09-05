@@ -7,6 +7,7 @@ import { readNdjsonStream, estimateRemainingSeconds } from "@/lib/ndjsonStream";
 import ReelProgress from "@/components/ReelProgress";
 
 const MANUAL_SLIDE_BREAK = "///";
+const GLUE_MARKER = "&&";
 const DRAFT_STORAGE_KEY = "newPostDraft";
 
 interface DraftShape {
@@ -52,19 +53,28 @@ export default function NewPostPage() {
     window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
   }, [rawText, selectedTargets, splitMode, manualHashtags]);
 
-  function insertSplitMarker() {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+  function insertMarkerAt(
+    textarea: HTMLTextAreaElement,
+    marker: string,
+    setValue: (next: string) => void
+  ) {
     const { selectionStart, selectionEnd, value, scrollTop } = textarea;
-    const insertion = `${MANUAL_SLIDE_BREAK}`;
-    const next = value.slice(0, selectionStart) + insertion + value.slice(selectionEnd);
-    setRawText(next);
+    const next = value.slice(0, selectionStart) + marker + value.slice(selectionEnd);
+    setValue(next);
     requestAnimationFrame(() => {
       textarea.focus();
-      const pos = selectionStart + insertion.length;
+      const pos = selectionStart + marker.length;
       textarea.setSelectionRange(pos, pos);
       textarea.scrollTop = scrollTop;
     });
+  }
+
+  function insertSplitMarker() {
+    if (textareaRef.current) insertMarkerAt(textareaRef.current, MANUAL_SLIDE_BREAK, setRawText);
+  }
+
+  function insertGlueMarker() {
+    if (textareaRef.current) insertMarkerAt(textareaRef.current, GLUE_MARKER, setRawText);
   }
 
   function toggleTarget(target: SelectedTarget) {
@@ -208,6 +218,22 @@ export default function NewPostPage() {
               className="shrink-0 rounded-md border px-2 py-1 text-xs hover:bg-neutral-100"
             >
               + סימון חילוק
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-neutral-500">
+              במצב אוטומטי: אם יש שני משפטים שחייבים להישאר יחד באותו עמוד/כתובית
+              (למשל הקדמה ופאנץ׳ליין), הציבו את הסמן ביניהם ולחצו כאן (
+              <code className="bg-neutral-200 px-1 rounded">{GLUE_MARKER}</code>) — לא יופרדו בשום מקרה,
+              גם אם זה חורג מהאורך הרגיל לעמוד.
+            </p>
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={insertGlueMarker}
+              className="shrink-0 rounded-md border px-2 py-1 text-xs hover:bg-neutral-100"
+            >
+              + סימון הדבקה
             </button>
           </div>
         </div>
