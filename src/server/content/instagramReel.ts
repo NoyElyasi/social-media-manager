@@ -5,7 +5,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import type { StorageService } from "../storage/types";
-import { splitIntoSlides, stripSlideMarkers } from "./instagramCarousel";
+import { splitIntoSlides, type SplitMode } from "./instagramCarousel";
 import { buildReelFrameNode, REEL_WIDTH, REEL_HEIGHT } from "./render/reelFrame";
 import { renderNodeToPng } from "./render/renderImage";
 import { pickBackgroundColor } from "./render/palette";
@@ -18,10 +18,12 @@ const MAX_CHARS_PER_CAPTION = 50;
 // קצב "כתיבה בלייב" של מילה חדשה על המסך — לא קצב קריאה, רק אפקט חזותי.
 const WORD_REVEAL_SECONDS = 0.28;
 // כמה זמן לוקח לאדם ממוצע לקרוא מילה אחת בנוחות (לא ממהר) — קובע כמה זמן
-// כל כתובית *נשארת* על המסך אחרי שנכתבה במלואה, לפי בקשה מפורשת "לא בקצב
-// מהיר כדי שאנשים יספיקו לקרוא".
-const READ_SECONDS_PER_WORD = 0.5;
-const MIN_CAPTION_SECONDS = 1.4;
+// כל כתובית *נשארת* על המסך אחרי שנכתבה במלואה. הקבועים כאן נמוכים בכוונה
+// (לא פרופורציונליים בצורה נוקשה): כתוביות קצרות מתקצרות הרבה יותר באופן
+// יחסי מכתוביות ארוכות, לפי בקשה מפורשת — "אם המשפט קצר, שתהיה קצרה
+// [בהרבה]; אם ארוך, שתהיה כמו עכשיו או טיפה פחות".
+const READ_SECONDS_PER_WORD = 0.42;
+const MIN_CAPTION_SECONDS = 0.7;
 
 export interface InstagramReelResult {
   file: string;
@@ -30,20 +32,45 @@ export interface InstagramReelResult {
   altText: string;
 }
 
+/** נזרקת כשהיצירה בוטלה במפורש (signal) באמצע — לא שגיאה אמיתית. */
+export class ReelCancelledError extends Error {
+  constructor() {
+    super("reel generation cancelled");
+    this.name = "ReelCancelledError";
+  }
+}
+
 export interface PrepareReelParams {
   rawText: string;
   seed: string;
   folderPath: string;
   storage: StorageService;
+  /** "auto" (ברירת מחדל) — אריזה אוטומטית, עם /// כגבול חילוק נוסף שנכבד.
+   * "manual" — רק /// קובע איפה עוברים לכתובית הבאה. */
+  splitMode?: SplitMode;
+  /** תבנית רקע קבועה (תמונה) לסרטון — אם לא סופקה, נבחר צבע רקע אוטומטי. */
+  backgroundImageDataUri?: string | null;
+  /** מאפשר עצירה מבוקשת מהלקוח (כפתור "עצור") — נבדק בין מסגרת למסגרת. */
+  signal?: AbortSignal;
+  /** התקדמות רינדור המסגרות, לצורך אינדיקציית זמן משוער בממשק. */
+  onProgress?: (renderedFrames: number, totalFrames: number) => void;
+}
+
+function countTotalWords(captions: string[]): number {
+  return captions.reduce((sum, c) => sum + c.split(/\s+/).filter(Boolean).length, 0);
 }
 
 async function renderCaptionFrames(
   captions: string[],
   backgroundHex: string,
-  framesDir: string
+  backgroundImageDataUri: string | null | undefined,
+  framesDir: string,
+  signal: AbortSignal | undefined,
+  onProgress: ((renderedFrames: number, totalFrames: number) => void) | undefined
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
+  const totalFrames = countTotalWords(captions);
   let frameIndex = 0;
 
   for (const caption of captions) {
@@ -55,8 +82,13 @@ async function renderCaptionFrames(
     const holdExtraSeconds = Math.max(0, targetCaptionSeconds - revealSeconds);
 
     for (let i = 0; i < words.length; i++) {
-      const visibleText = words.slice(0, i + 1).join(" ");
-      const png = await renderNodeToPng(buildReelFrameNode({ visibleText, backgroundHex }), REEL_WIDTH, REEL_HEIGHT);
+      if (signal?.aborted) throw new ReelCancelledError();
+
+      const png = await renderNodeToPng(
+        buildReelFrameNode({ fullText: caption, revealedWordCount: i + 1, backgroundHex, backgroundImageDataUri }),
+        REEL_WIDTH,
+        REEL_HEIGHT
+      );
       const fileName = `frame-${String(frameIndex).padStart(5, "0")}.png`;
       const filePath = path.join(framesDir, fileName);
       await fs.writeFile(filePath, png);
@@ -65,6 +97,7 @@ async function renderCaptionFrames(
       framePaths.push(filePath);
       durations.push(isLastWord ? WORD_REVEAL_SECONDS + holdExtraSeconds : WORD_REVEAL_SECONDS);
       frameIndex++;
+      onProgress?.(frameIndex, totalFrames);
     }
   }
 
@@ -98,13 +131,22 @@ async function encodeVideo(framePaths: string[], durations: number[], outputPath
 }
 
 export async function prepareInstagramReel(params: PrepareReelParams): Promise<InstagramReelResult> {
-  const cleanText = stripSlideMarkers(params.rawText);
-  const captions = splitIntoSlides(cleanText, "auto", MAX_CHARS_PER_CAPTION);
+  // חשוב: מפצלים על rawText המקורי (עם סימוני ///), לא על טקסט מנוקה —
+  // splitIntoSlides בעצמו אחראי על הטיפול בסימונים (ראו instagramCarousel.ts).
+  const captions = splitIntoSlides(params.rawText, params.splitMode ?? "auto", MAX_CHARS_PER_CAPTION);
   const backgroundHex = pickBackgroundColor(params.seed + "-reel");
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "reel-"));
   try {
-    const { framePaths, durations } = await renderCaptionFrames(captions, backgroundHex, workDir);
+    const { framePaths, durations } = await renderCaptionFrames(
+      captions,
+      backgroundHex,
+      params.backgroundImageDataUri,
+      workDir,
+      params.signal,
+      params.onProgress
+    );
+    if (params.signal?.aborted) throw new ReelCancelledError();
     const outputPath = path.join(workDir, "reel.mp4");
     await encodeVideo(framePaths, durations, outputPath);
 

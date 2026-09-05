@@ -36,4 +36,7 @@ export class GoogleDriveStorageService implements StorageService {
   async readFile(): Promise<Buffer> {
     throw new Error("not implemented");
   }
+  async deleteFolder(): Promise<void> {
+    throw new Error("not implemented");
+  }
 }

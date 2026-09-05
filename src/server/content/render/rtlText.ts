@@ -21,14 +21,18 @@ import { h, type SatoriNode } from "./h";
  */
 const HEBREW_RUN_REGEX = new RegExp("[\\u0590-\\u05FF]+|[^\\u0590-\\u05FF]+", "g");
 
-function renderWordNode(word: string): SatoriNode {
+// revealed=false לא מציג את המילה (opacity:0) אבל שומר לה מקום מלא בפריסה —
+// כך שמילים לא-חשופות עדיין תופסות את המקום הסופי שלהן, ומילים חשופות לא
+// "זזות" כשמילה חדשה מצטרפת (ראו buildReelFrameNode / אפקט הכתיבה בריל).
+function renderWordNode(word: string, revealed: boolean = true): SatoriNode {
+  const visibility = revealed ? {} : { opacity: 0 };
   const segments = word.match(HEBREW_RUN_REGEX);
   if (!segments || segments.length <= 1) {
-    return h("div", { style: { display: "flex" } }, word);
+    return h("div", { style: { display: "flex", ...visibility } }, word);
   }
   return h(
     "div",
-    { style: { display: "flex", flexDirection: "row-reverse", flexWrap: "nowrap", gap: 0 } },
+    { style: { display: "flex", flexDirection: "row-reverse", flexWrap: "nowrap", gap: 0, ...visibility } },
     ...segments.map((seg) => h("div", { style: { display: "flex" } }, seg))
   );
 }
@@ -37,13 +41,16 @@ const HAS_HEBREW_REGEX = new RegExp("[\\u0590-\\u05FF]");
 
 export function buildWordRowNode(
   words: string[],
-  style: Record<string, unknown>
+  style: Record<string, unknown>,
+  /** דגלי חשיפה למילה, באותו סדר לוגי כמו words (index 0 = המילה הראשונה שנקראת). ברירת מחדל: הכל חשוף. */
+  revealedFlags?: boolean[]
 ): SatoriNode {
   // row-reverse מציג את המילה הראשונה במערך בקצה הימני — נכון לעברית (RTL).
   // אם אין אף אות עברית במילים (למשל שם תצוגה לטיני כמו "Noy Elyasi"),
   // הופכים את סדר המערך כדי ש-row-reverse "יתקן את עצמו" בחזרה לסדר LTR טבעי.
   const hasHebrew = words.some((w) => HAS_HEBREW_REGEX.test(w));
-  const orderedWords = hasHebrew ? words : [...words].reverse();
+  const indices = words.map((_, i) => i);
+  const orderedIndices = hasHebrew ? indices : [...indices].reverse();
 
   return h(
     "div",
@@ -60,7 +67,7 @@ export function buildWordRowNode(
         ...style,
       },
     },
-    ...orderedWords.map(renderWordNode)
+    ...orderedIndices.map((i) => renderWordNode(words[i], revealedFlags ? revealedFlags[i] : true))
   );
 }
 
@@ -138,15 +145,25 @@ export function prepareRtlWordLines(
 /**
  * מרנדרת מערך שורות (מ-prepareRtlWordLines) לרשימת satori nodes: שורת מילים
  * רגילה, או רווח אנכי במקום שורה ריקה (ירידת שורה/פסקה שהמשתמשת הכניסה).
+ *
+ * revealedWordCount (אופציונלי): כמה מילים "חשופות" בסך הכול, נספר לפי הסדר
+ * הלוגי על פני כל השורות (למשל אפקט כתיבה בריל — ראו buildReelFrameNode).
+ * אם לא סופק, כל המילים חשופות (ברירת המחדל, שקולה להתנהגות הקודמת).
  */
 export function renderPreparedLines(
   lines: (string[] | null)[],
-  style: Record<string, unknown>
+  style: Record<string, unknown>,
+  revealedWordCount?: number
 ): SatoriNode[] {
   const fontSize = typeof style.fontSize === "number" ? style.fontSize : 16;
-  return lines.map((entry) =>
-    entry === null
-      ? h("div", { style: { display: "flex", height: Math.round(fontSize * 0.6) } })
-      : buildWordRowNode(entry, style)
-  );
+  let consumed = 0;
+  return lines.map((entry) => {
+    if (entry === null) {
+      return h("div", { style: { display: "flex", height: Math.round(fontSize * 0.6) } });
+    }
+    const flags =
+      revealedWordCount === undefined ? undefined : entry.map((_, idx) => consumed + idx < revealedWordCount);
+    consumed += entry.length;
+    return buildWordRowNode(entry, style, flags);
+  });
 }

@@ -25,31 +25,16 @@ export function stripSlideMarkers(text: string): string {
 }
 
 /**
- * מחלק את הטקסט לעמודי קרוסלה (סעיף 4.2).
- * "auto" — לפי כמות תוכן הגיונית לעמוד (אורך טקסט).
- * "manual" — לפי המקומות שהמשתמשת סימנה בעצמה עם MANUAL_SLIDE_BREAK.
+ * ארוזת משפטים אוטומטית לתוך "עמודים" לפי אורך תוכן הגיוני, על קטע טקסט
+ * בודד (בלי סימוני /// — אלה מטופלים כבר לפני קריאה לפונקציה הזו).
+ * שומרת את המפריד המדויק (רווח בודד / ירידת שורה / שורה ריקה) שהיה בין כל
+ * שני משפטים — כדי שירידות שורה ופסקאות שהמשתמשת כתבה לא יתמזגו לרווח בודד.
  */
-export function splitIntoSlides(
-  text: string,
-  mode: SplitMode = "auto",
-  maxChars = MAX_CHARS_PER_SLIDE
-): string[] {
-  if (mode === "manual" && text.includes(MANUAL_SLIDE_BREAK)) {
-    const parts = text
-      .split(MANUAL_SLIDE_BREAK)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    return parts.length > 0 ? parts : [text.trim()];
-  }
-
-  // מפרקים למשפטים, אבל שומרים את המפריד המדויק (רווח בודד / ירידת שורה /
-  // שורה ריקה) שהיה בין כל שני משפטים — כדי שכשמארזים משפטים לתוך עמוד,
-  // ירידות שורה ופסקאות שהמשתמשת כתבה לא יתמזגו לרווח בודד.
-  const cleaned = text.replaceAll(MANUAL_SLIDE_BREAK, " ");
+function autoPackSentences(text: string, maxChars: number): string[] {
   const sentenceRegex = /([^.!?\n]*[.!?]+|[^.!?\n]+)(\s*)/g;
   const pieces: { content: string; sep: string }[] = [];
   let match: RegExpExecArray | null;
-  while ((match = sentenceRegex.exec(cleaned)) !== null) {
+  while ((match = sentenceRegex.exec(text)) !== null) {
     if (match[0] === "") {
       sentenceRegex.lastIndex++;
       continue;
@@ -57,23 +42,51 @@ export function splitIntoSlides(
     if (match[1]) pieces.push({ content: match[1], sep: match[2] });
   }
 
-  const slides: string[] = [];
+  const packed: string[] = [];
   let current = "";
 
   for (let i = 0; i < pieces.length; i++) {
     const { content, sep } = pieces[i];
     const candidate = current + content;
     if (candidate.length > maxChars && current) {
-      slides.push(current.trim());
+      packed.push(current.trim());
       current = content;
     } else {
       current = candidate;
     }
     if (i < pieces.length - 1) current += sep;
   }
-  if (current.trim()) slides.push(current.trim());
+  if (current.trim()) packed.push(current.trim());
 
-  return slides.length > 0 ? slides : [text];
+  return packed.length > 0 ? packed : [text];
+}
+
+/**
+ * מחלק את הטקסט לעמודי קרוסלה / כתוביות ריל (סעיף 4.2).
+ * "auto" — אריזה אוטומטית לפי אורך תוכן הגיוני לעמוד; אם יש סימוני ///
+ *   בטקסט, הם נשמרים כגבול חילוק *נוסף* שנכפה (לא נדרס), אבל כל שאר
+ *   הפיצול האוטומטי בתוך כל קטע ביניהם ממשיך לפעול כרגיל — לפי בקשה
+ *   מפורשת לא "לדרוס" פיצולים אוטומטיים שהמשתמשת אוהבת.
+ * "manual" — רק המקומות שהמשתמשת סימנה בעצמה עם MANUAL_SLIDE_BREAK
+ *   קובעים חילוק; בלי סימונים בכלל, כל הטקסט הוא עמוד/כתובית אחת.
+ */
+export function splitIntoSlides(
+  text: string,
+  mode: SplitMode = "auto",
+  maxChars = MAX_CHARS_PER_SLIDE
+): string[] {
+  const segments = text
+    .split(MANUAL_SLIDE_BREAK)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (segments.length === 0) return [text.trim()];
+
+  if (mode === "manual") {
+    return segments;
+  }
+
+  return segments.flatMap((segment) => autoPackSentences(segment, maxChars));
 }
 
 export interface InstagramCarouselResult {

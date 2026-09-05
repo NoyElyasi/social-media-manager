@@ -18,6 +18,9 @@ export default async function SettingsPage() {
           profileImageUrl: profile.profileImagePath
             ? buildFileUrlFromPath(profile.profileImagePath)
             : null,
+          reelBackgroundImageUrl: profile.reelBackgroundImagePath
+            ? buildFileUrlFromPath(profile.reelBackgroundImagePath)
+            : null,
         }}
       />
     </div>

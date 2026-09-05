@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ALWAYS_FIRST_HASHTAG, SELECTABLE_TARGETS, type SelectedTarget } from "@/lib/labels";
+import { readNdjsonStream, estimateRemainingSeconds } from "@/lib/ndjsonStream";
+import ReelProgress from "./ReelProgress";
 
 export default function PostExtras({
   postId,
@@ -18,6 +20,9 @@ export default function PostExtras({
   const [savingHashtags, setSavingHashtags] = useState(false);
   const [addingTarget, setAddingTarget] = useState<SelectedTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
+  const startedAtRef = useRef<number | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const missingTargets = SELECTABLE_TARGETS.filter((t) => !existingTypes.includes(t.value));
 
@@ -36,24 +41,54 @@ export default function PostExtras({
     }
   }
 
+  function cancelAddTarget() {
+    abortControllerRef.current?.abort();
+  }
+
   async function addTarget(target: SelectedTarget) {
     setAddingTarget(target);
     setError(null);
+    setProgress(null);
+    startedAtRef.current = Date.now();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const res = await fetch(`/api/posts/${postId}/targets`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data?.error?.formErrors?.[0] ?? "שגיאה בהוספת היעד");
       }
-      router.refresh();
+
+      let succeeded = false;
+      await readNdjsonStream(res, (event) => {
+        if (event.type === "progress" && event.total) {
+          setProgress({ rendered: event.rendered ?? 0, total: event.total });
+        } else if (event.type === "done") {
+          succeeded = true;
+        } else if (event.type === "cancelled") {
+          setError("ההוספה בוטלה");
+        } else if (event.type === "error") {
+          setError(event.message ?? "שגיאה בהוספת היעד");
+        }
+      });
+
+      if (succeeded) router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה לא צפויה");
+      if (controller.signal.aborted) {
+        setError("ההוספה בוטלה");
+      } else {
+        setError(err instanceof Error ? err.message : "שגיאה לא צפויה");
+      }
     } finally {
       setAddingTarget(null);
+      setProgress(null);
+      abortControllerRef.current = null;
     }
   }
 
@@ -101,6 +136,16 @@ export default function PostExtras({
           </div>
         </div>
       )}
+
+      {progress && startedAtRef.current && (
+        <ReelProgress
+          rendered={progress.rendered}
+          total={progress.total}
+          etaSeconds={estimateRemainingSeconds(progress.rendered, progress.total, startedAtRef.current)}
+          onCancel={cancelAddTarget}
+        />
+      )}
+
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );

@@ -7,6 +7,7 @@ export interface InitialProfile {
   displayName: string;
   highlights: string[];
   profileImageUrl: string | null;
+  reelBackgroundImageUrl: string | null;
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -21,6 +22,7 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
   const [displayName, setDisplayName] = useState(initial.displayName);
   const [highlightsText, setHighlightsText] = useState(initial.highlights.join(", "));
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [reelBackgroundFile, setReelBackgroundFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -43,10 +45,26 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
       profileImageExt = imageFile.name.split(".").pop()?.toLowerCase();
     }
 
+    let reelBackgroundImageBase64: string | undefined;
+    let reelBackgroundImageExt: string | undefined;
+
+    if (reelBackgroundFile) {
+      const buffer = await reelBackgroundFile.arrayBuffer();
+      reelBackgroundImageBase64 = arrayBufferToBase64(buffer);
+      reelBackgroundImageExt = reelBackgroundFile.name.split(".").pop()?.toLowerCase();
+    }
+
     await fetch("/api/settings/profile", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ displayName, highlights, profileImageBase64, profileImageExt }),
+      body: JSON.stringify({
+        displayName,
+        highlights,
+        profileImageBase64,
+        profileImageExt,
+        reelBackgroundImageBase64,
+        reelBackgroundImageExt,
+      }),
     });
 
     setSaving(false);
@@ -73,6 +91,23 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
           <img src={initial.profileImageUrl} alt="" className="h-20 w-20 rounded-full object-cover" />
         )}
         <input type="file" accept="image/png,image/jpeg" onChange={(e) => setImageFile(e.target.files?.[0] ?? null)} />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium">תבנית רקע לריל (אופציונלי — אחרת נבחר צבע רקע אוטומטי)</label>
+        {initial.reelBackgroundImageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={initial.reelBackgroundImageUrl}
+            alt=""
+            className="h-40 w-[90px] rounded-md object-cover border"
+          />
+        )}
+        <input
+          type="file"
+          accept="image/png,image/jpeg"
+          onChange={(e) => setReelBackgroundFile(e.target.files?.[0] ?? null)}
+        />
       </div>
 
       <div className="flex flex-col gap-2">

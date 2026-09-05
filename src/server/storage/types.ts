@@ -17,4 +17,7 @@ export interface StorageService {
 
   /** קורא קובץ בינארי לצורך תצוגה מקדימה בממשק */
   readFile(folderPath: string, fileName: string): Promise<Buffer>;
+
+  /** מוחקת תיקייה (ותכולתה) — לדוגמה ניקוי פוסט שיצירתו בוטלה באמצע. */
+  deleteFolder(folderPath: string): Promise<void>;
 }

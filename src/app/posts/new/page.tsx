@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SELECTABLE_TARGETS, ALWAYS_FIRST_HASHTAG, type SelectedTarget } from "@/lib/labels";
+import { readNdjsonStream, estimateRemainingSeconds } from "@/lib/ndjsonStream";
+import ReelProgress from "@/components/ReelProgress";
 
 const MANUAL_SLIDE_BREAK = "///";
 const DRAFT_STORAGE_KEY = "newPostDraft";
@@ -10,7 +12,7 @@ const DRAFT_STORAGE_KEY = "newPostDraft";
 interface DraftShape {
   rawText: string;
   selectedTargets: SelectedTarget[];
-  carouselSplitMode: "auto" | "manual";
+  splitMode: "auto" | "manual";
   manualHashtags: string;
 }
 
@@ -36,18 +38,19 @@ export default function NewPostPage() {
   const [selectedTargets, setSelectedTargets] = useState<SelectedTarget[]>(
     () => loadDraft().selectedTargets ?? ["instagram_carousel"]
   );
-  const [carouselSplitMode, setCarouselSplitMode] = useState<"auto" | "manual">(
-    () => loadDraft().carouselSplitMode ?? "auto"
-  );
+  const [splitMode, setSplitMode] = useState<"auto" | "manual">(() => loadDraft().splitMode ?? "auto");
   const [manualHashtags, setManualHashtags] = useState(() => loadDraft().manualHashtags ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
+  const startedAtRef = useRef<number | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // שומר את הטיוטה בכל שינוי.
   useEffect(() => {
-    const draft: DraftShape = { rawText, selectedTargets, carouselSplitMode, manualHashtags };
+    const draft: DraftShape = { rawText, selectedTargets, splitMode, manualHashtags };
     window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-  }, [rawText, selectedTargets, carouselSplitMode, manualHashtags]);
+  }, [rawText, selectedTargets, splitMode, manualHashtags]);
 
   function insertSplitMarker() {
     const textarea = textareaRef.current;
@@ -70,6 +73,10 @@ export default function NewPostPage() {
     );
   }
 
+  function handleCancel() {
+    abortControllerRef.current?.abort();
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -84,6 +91,11 @@ export default function NewPostPage() {
     }
 
     setSubmitting(true);
+    setProgress(null);
+    startedAtRef.current = Date.now();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const res = await fetch("/api/posts", {
         method: "POST",
@@ -91,9 +103,10 @@ export default function NewPostPage() {
         body: JSON.stringify({
           rawText,
           selectedTargets,
-          carouselSplitMode,
+          splitMode,
           manualHashtags: manualHashtags.trim() ? manualHashtags.trim().split(/\s+/) : null,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -101,13 +114,33 @@ export default function NewPostPage() {
         throw new Error(data?.error?.formErrors?.[0] ?? "שגיאה בהכנת הפוסט");
       }
 
-      const { post } = await res.json();
-      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-      router.push(`/posts/${post.id}`);
+      let redirectId: string | null = null;
+      await readNdjsonStream(res, (event) => {
+        if (event.type === "progress" && event.total) {
+          setProgress({ rendered: event.rendered ?? 0, total: event.total });
+        } else if (event.type === "done") {
+          redirectId = (event.post as { id: string }).id;
+        } else if (event.type === "cancelled") {
+          setError("היצירה בוטלה");
+        } else if (event.type === "error") {
+          setError(event.message ?? "שגיאה בהכנת הפוסט");
+        }
+      });
+
+      if (redirectId) {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+        router.push(`/posts/${redirectId}`);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה לא צפויה");
+      if (controller.signal.aborted) {
+        setError("היצירה בוטלה");
+      } else {
+        setError(err instanceof Error ? err.message : "שגיאה לא צפויה");
+      }
     } finally {
       setSubmitting(false);
+      setProgress(null);
+      abortControllerRef.current = null;
     }
   }
 
@@ -140,45 +173,43 @@ export default function NewPostPage() {
         />
       </div>
 
-      {selectedTargets.includes("instagram_carousel") && (
+      {(selectedTargets.includes("instagram_carousel") || selectedTargets.includes("instagram_reel")) && (
         <div className="flex flex-col gap-2 rounded-lg border p-3 bg-neutral-50">
-          <label className="font-medium text-sm">חילוק לעמודים בקרוסלה</label>
+          <label className="font-medium text-sm">חילוק לעמודים בקרוסלה / למשפטים בריל</label>
           <div className="flex gap-4 text-sm">
             <label className="flex items-center gap-2">
               <input
                 type="radio"
                 name="splitMode"
-                checked={carouselSplitMode === "auto"}
-                onChange={() => setCarouselSplitMode("auto")}
+                checked={splitMode === "auto"}
+                onChange={() => setSplitMode("auto")}
               />
-              אוטומטי (לפי כמות טקסט לעמוד)
+              אוטומטי (לפי כמות טקסט; אפשר גם להוסיף ‎///‎ לחילוק נוסף בנקודה מסוימת)
             </label>
             <label className="flex items-center gap-2">
               <input
                 type="radio"
                 name="splitMode"
-                checked={carouselSplitMode === "manual"}
-                onChange={() => setCarouselSplitMode("manual")}
+                checked={splitMode === "manual"}
+                onChange={() => setSplitMode("manual")}
               />
-              ידני (אני בוחרת איפה מתחיל עמוד חדש)
+              ידני (רק ‎///‎ קובע איפה מתחיל עמוד/משפט חדש)
             </label>
           </div>
-          {carouselSplitMode === "manual" && (
-            <div className="flex items-center gap-3">
-              <p className="text-xs text-neutral-500">
-                הציבו את הסמן בטקסט במקום שבו יתחיל עמוד חדש, ולחצו על הכפתור להוספת סימון (
-                <code className="bg-neutral-200 px-1 rounded">{MANUAL_SLIDE_BREAK}</code>).
-              </p>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={insertSplitMarker}
-                className="shrink-0 rounded-md border px-2 py-1 text-xs hover:bg-neutral-100"
-              >
-                + סימון חילוק
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-neutral-500">
+              הציבו את הסמן בטקסט במקום שבו רוצים לפצל, ולחצו על הכפתור להוספת סימון (
+              <code className="bg-neutral-200 px-1 rounded">{MANUAL_SLIDE_BREAK}</code>).
+            </p>
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={insertSplitMarker}
+              className="shrink-0 rounded-md border px-2 py-1 text-xs hover:bg-neutral-100"
+            >
+              + סימון חילוק
+            </button>
+          </div>
         </div>
       )}
 
@@ -201,6 +232,15 @@ export default function NewPostPage() {
           </label>
         </div>
       </div>
+
+      {progress && startedAtRef.current && (
+        <ReelProgress
+          rendered={progress.rendered}
+          total={progress.total}
+          etaSeconds={estimateRemainingSeconds(progress.rendered, progress.total, startedAtRef.current)}
+          onCancel={handleCancel}
+        />
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 

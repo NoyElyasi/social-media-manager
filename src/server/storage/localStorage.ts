@@ -48,4 +48,8 @@ export class LocalFileStorageService implements StorageService {
   async readFile(folderPath: string, fileName: string): Promise<Buffer> {
     return fs.readFile(this.resolve(folderPath, fileName));
   }
+
+  async deleteFolder(folderPath: string): Promise<void> {
+    await fs.rm(this.resolve(folderPath), { recursive: true, force: true });
+  }
 }

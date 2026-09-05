@@ -17,6 +17,9 @@ const updateSchema = z.object({
   // תמונת פרופיל כ-base64 (סעיף 6) — אופציונלי
   profileImageBase64: z.string().optional(),
   profileImageExt: z.enum(["png", "jpg", "jpeg"]).optional(),
+  // תבנית רקע קבועה לריל — אופציונלי
+  reelBackgroundImageBase64: z.string().optional(),
+  reelBackgroundImageExt: z.enum(["png", "jpg", "jpeg"]).optional(),
 });
 
 export async function PUT(req: NextRequest) {
@@ -28,19 +31,28 @@ export async function PUT(req: NextRequest) {
   }
 
   let profileImagePath: string | undefined;
+  let reelBackgroundImagePath: string | undefined;
+  const storage = getStorageService();
 
   if (parsed.data.profileImageBase64 && parsed.data.profileImageExt) {
-    const storage = getStorageService();
     const fileName = `avatar.${parsed.data.profileImageExt}`;
     const buffer = Buffer.from(parsed.data.profileImageBase64, "base64");
     await storage.saveFile("פרופיל", fileName, buffer);
     profileImagePath = path.join("פרופיל", fileName);
   }
 
+  if (parsed.data.reelBackgroundImageBase64 && parsed.data.reelBackgroundImageExt) {
+    const fileName = `רקע-ריל.${parsed.data.reelBackgroundImageExt}`;
+    const buffer = Buffer.from(parsed.data.reelBackgroundImageBase64, "base64");
+    await storage.saveFile("פרופיל", fileName, buffer);
+    reelBackgroundImagePath = path.join("פרופיל", fileName);
+  }
+
   const updated = await updateProfileSettings({
     displayName: parsed.data.displayName,
     highlights: parsed.data.highlights,
     profileImagePath,
+    reelBackgroundImagePath,
   });
 
   return NextResponse.json({ profile: updated });

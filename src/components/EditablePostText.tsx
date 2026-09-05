@@ -8,11 +8,11 @@ const MANUAL_SLIDE_BREAK = "///";
 export default function EditablePostText({
   postId,
   initialRawText,
-  hasCarousel,
+  hasSplitTarget,
 }: {
   postId: string;
   initialRawText: string;
-  hasCarousel: boolean;
+  hasSplitTarget: boolean;
 }) {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -68,10 +68,10 @@ export default function EditablePostText({
         rows={6}
         className="rounded-lg border p-3 text-base"
       />
-      {hasCarousel && (
+      {hasSplitTarget && (
         <div className="flex items-center gap-3">
           <p className="text-xs text-neutral-500">
-            סימון חילוק לעמוד חדש בקרוסלה:{" "}
+            סימון חילוק לעמוד (קרוסלה) / משפט (ריל) חדש:{" "}
             <code className="bg-neutral-200 px-1 rounded">{MANUAL_SLIDE_BREAK}</code>
           </p>
           <button

@@ -49,7 +49,9 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
           <EditablePostText
             postId={post.id}
             initialRawText={post.rawText}
-            hasCarousel={post.platformContents.some((pc) => pc.type === "instagram_carousel")}
+            hasSplitTarget={visiblePlatformContents.some(
+              (pc) => pc.type === "instagram_carousel" || pc.type === "instagram_reel"
+            )}
           />
           <PostExtras
             postId={post.id}
