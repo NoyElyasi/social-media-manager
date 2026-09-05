@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { readNdjsonStream, estimateRemainingSeconds } from "@/lib/ndjsonStream";
+import ReelProgress from "@/components/ReelProgress";
 
 const MANUAL_SLIDE_BREAK = "///";
 const GLUE_MARKER = "&&";
@@ -20,6 +22,9 @@ export default function EditablePostText({
   const [rawText, setRawText] = useState(initialRawText);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
+  const startedAtRef = useRef<number | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   function insertMarker(marker: string) {
     const textarea = textareaRef.current;
@@ -35,6 +40,10 @@ export default function EditablePostText({
     });
   }
 
+  function handleCancel() {
+    abortControllerRef.current?.abort();
+  }
+
   async function handleUpdate() {
     setError(null);
     if (!rawText.trim()) {
@@ -42,21 +51,47 @@ export default function EditablePostText({
       return;
     }
     setSaving(true);
+    setProgress(null);
+    startedAtRef.current = Date.now();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const res = await fetch(`/api/posts/${postId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rawText }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data?.error?.formErrors?.[0] ?? "שגיאה בעדכון הפוסט");
       }
-      router.refresh();
+
+      let succeeded = false;
+      await readNdjsonStream(res, (event) => {
+        if (event.type === "progress" && event.total) {
+          setProgress({ rendered: event.rendered ?? 0, total: event.total });
+        } else if (event.type === "done") {
+          succeeded = true;
+        } else if (event.type === "cancelled") {
+          setError("העדכון בוטל");
+        } else if (event.type === "error") {
+          setError(event.message ?? "שגיאה בעדכון הפוסט");
+        }
+      });
+
+      if (succeeded) router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה לא צפויה");
+      if (controller.signal.aborted) {
+        setError("העדכון בוטל");
+      } else {
+        setError(err instanceof Error ? err.message : "שגיאה לא צפויה");
+      }
     } finally {
       setSaving(false);
+      setProgress(null);
+      abortControllerRef.current = null;
     }
   }
 
@@ -100,6 +135,14 @@ export default function EditablePostText({
             </button>
           </div>
         </div>
+      )}
+      {progress && startedAtRef.current && (
+        <ReelProgress
+          rendered={progress.rendered}
+          total={progress.total}
+          etaSeconds={estimateRemainingSeconds(progress.rendered, progress.total, startedAtRef.current)}
+          onCancel={handleCancel}
+        />
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button

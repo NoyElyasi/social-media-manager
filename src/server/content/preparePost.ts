@@ -192,8 +192,14 @@ export async function createAndPreparePost(input: CreatePostInput) {
  * מעדכנת את הטקסט הגולמי של פוסט קיים, ומרנדרת מחדש את כל התכנים שכבר
  * נוצרו לו (טקסט, תמונות) — כדי שלא יישארו לא מסונכרנים עם הטקסט החדש.
  * משתמשת בתגיות המשותפות הקיימות של הפוסט (לא חוזרת להצעה האוטומטית).
+ * signal/onProgress מאפשרים עצירה מבוקשת ואינדיקציית זמן משוער, כמו ביצירת
+ * פוסט חדש — רלוונטי כשיש בין התכנים ריל (השלב היחיד שאיטי).
  */
-export async function updatePostRawText(postId: string, newRawText: string) {
+export async function updatePostRawText(
+  postId: string,
+  newRawText: string,
+  options?: { signal?: AbortSignal; onProgress?: (renderedFrames: number, totalFrames: number) => void }
+) {
   const storage = getStorageService();
   const profile = await getProfileSettings();
 
@@ -268,6 +274,8 @@ export async function updatePostRawText(postId: string, newRawText: string) {
         splitMode,
         backgroundImageDataUri: reelBackgroundImageDataUri,
         hashtags: sharedHashtags,
+        signal: options?.signal,
+        onProgress: options?.onProgress,
       });
       await prisma.platformContent.update({
         where: { id: content.id },
