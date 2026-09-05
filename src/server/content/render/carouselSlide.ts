@@ -13,7 +13,9 @@ const FB_LINK_COLOR = "#385898";
 const FB_AVATAR_BG = "#E4E6EB";
 
 // גודל פונט קבוע לטקסט הגוף — לא תלוי באורך הטקסט (זה נראה כמו טעות אם זה קופץ בין עמודים).
-const BODY_FONT_SIZE = MIN_FONT_SIZE_CAROUSEL + 4;
+// גדול במפורש מהמינימום הבסיסי — לפי משוב שהטקסט היה קטן מכדי לקרוא בלי זום.
+const BODY_FONT_SIZE = MIN_FONT_SIZE_CAROUSEL + 14;
+const BODY_LINE_GAP = 20;
 
 export interface CarouselSlideInput {
   bodyText: string;
@@ -116,7 +118,7 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
             display: "flex",
             flexDirection: "column",
             alignItems: "flex-end",
-            gap: 10,
+            gap: BODY_LINE_GAP,
           },
         },
         ...(input.hashtags.length > 0 && input.pageIndex === 1

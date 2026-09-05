@@ -5,7 +5,12 @@ import { prepareRtlWordLines, renderPreparedLines } from "./rtlText";
 export const REEL_WIDTH = 1080;
 export const REEL_HEIGHT = 1920; // יחס 9:16
 const HORIZONTAL_PADDING = 80;
-const REEL_FONT_SIZE = MIN_FONT_SIZE_REEL + 8;
+// גדול במפורש מהמינימום הבסיסי — לפי משוב שהטקסט היה קטן מכדי לקרוא בלי זום.
+const REEL_FONT_SIZE = MIN_FONT_SIZE_REEL + 20;
+const REEL_LINE_GAP = 14;
+const HASHTAG_FONT_SIZE = REEL_FONT_SIZE - 16;
+// מרחק מלמעלה שמפנה מקום ללוגו/חותמת שמוטבעים בתבנית הרקע עצמה (אם יש).
+const HASHTAG_TOP_MARGIN = 300;
 
 // צבע טקסט קבוע לשימוש מעל תבנית הרקע (תמונה) — לא מחושב מהרקע (זו תמונה,
 // לא צבע אחיד), נבחר ידנית כדי להתאים לפלטת המותג הבהירה (קרם/ורוד).
@@ -20,13 +25,15 @@ export interface ReelFrameInput {
   backgroundHex: string;
   /** תבנית רקע קבועה (תמונה, מוגדרת בהגדרות) — אם קיימת, מוצגת במקום הצבע האחיד. */
   backgroundImageDataUri?: string | null;
+  /** תגיות הפוסט (בלי #אחתביום — היא מוטמעת כבר בתבנית הרקע) — מוצגות למעלה, בנפרד מהכתובית. */
+  hashtags: string[];
 }
 
 /**
- * מסגרת בודדת בסרטון: כתובית אחת, ממורכזת, על רקע צבעוני מלא או תבנית מותג.
- * אפקט "כתיבה בלייב": הפריסה (שורות/מיקום כל מילה) מחושבת פעם אחת על הטקסט
- * המלא של הכתובית, ולא משתנה בין מסגרות — כל מילה נחשפת (opacity) במקום
- * הסופי שלה בלי לזוז, לפי בקשה מפורשת "שהמילים לא זזות מהמיקום שלהן".
+ * מסגרת בודדת בסרטון: כתובית אחת, צמודה לימין, על רקע צבעוני מלא או תבנית
+ * מותג. אפקט "כתיבה בלייב": הפריסה (שורות/מיקום כל מילה) מחושבת פעם אחת על
+ * הטקסט המלא של הכתובית, ולא משתנה בין מסגרות — כל מילה נחשפת (opacity)
+ * במקום הסופי שלה בלי לזוז, לפי בקשה מפורשת "שהמילים לא זזות מהמיקום שלהן".
  */
 export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
   const hasTemplate = !!input.backgroundImageDataUri;
@@ -44,8 +51,7 @@ export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
         backgroundColor: input.backgroundHex,
         padding: 80,
         fontFamily: "Noto Sans Hebrew, Noto Sans Hebrew Latin",
-        justifyContent: "center",
-        alignItems: "center",
+        alignItems: "flex-end",
       },
     },
     hasTemplate &&
@@ -55,12 +61,31 @@ export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
         height: REEL_HEIGHT,
         style: { position: "absolute", top: 0, left: 0, width: REEL_WIDTH, height: REEL_HEIGHT, objectFit: "cover" },
       }),
+    input.hashtags.length > 0 &&
+      h(
+        "div",
+        { style: { display: "flex", position: "relative", flexDirection: "column", marginTop: HASHTAG_TOP_MARGIN } },
+        ...renderPreparedLines(
+          prepareRtlWordLines(input.hashtags.join(" "), HASHTAG_FONT_SIZE, REEL_WIDTH - 2 * HORIZONTAL_PADDING),
+          { fontSize: HASHTAG_FONT_SIZE, fontWeight: 700, color: textColor, justifyContent: "flex-end" }
+        )
+      ),
     h(
       "div",
-      { style: { display: "flex", position: "relative", flexDirection: "column" } },
+      {
+        style: {
+          display: "flex",
+          position: "relative",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          flex: 1,
+          justifyContent: "center",
+          gap: REEL_LINE_GAP,
+        },
+      },
       ...renderPreparedLines(
         prepareRtlWordLines(input.fullText, REEL_FONT_SIZE, REEL_WIDTH - 2 * HORIZONTAL_PADDING),
-        { fontSize: REEL_FONT_SIZE, fontWeight: 700, color: textColor, justifyContent: "center" },
+        { fontSize: REEL_FONT_SIZE, fontWeight: 700, color: textColor, justifyContent: "flex-end" },
         input.revealedWordCount
       )
     )

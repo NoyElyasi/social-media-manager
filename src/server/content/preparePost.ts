@@ -152,6 +152,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           storage,
           splitMode,
           backgroundImageDataUri: reelBackgroundImageDataUri,
+          hashtags: sharedHashtags,
           signal: input.signal,
           onProgress: input.onProgress,
         });
@@ -266,6 +267,7 @@ export async function updatePostRawText(postId: string, newRawText: string) {
         storage,
         splitMode,
         backgroundImageDataUri: reelBackgroundImageDataUri,
+        hashtags: sharedHashtags,
       });
       await prisma.platformContent.update({
         where: { id: content.id },
@@ -307,6 +309,7 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
 
   const splitMode = post.splitMode as SplitMode;
   const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
+  const reelBackgroundImageDataUri = await loadProfileImageDataUri(storage, profile.reelBackgroundImagePath);
 
   for (const content of post.platformContents) {
     if (content.type === "instagram_carousel") {
@@ -333,11 +336,25 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
     }
 
     if (content.type === "instagram_reel") {
-      // אין צורך לקודד מחדש את הווידאו רק בשביל עדכון התגיות — הן לא
-      // מוצגות בתוך הריל בכלל, רק נשמרות כמידע נלווה.
+      // התגיות מוטבעות בפועל בסרטון (שורה נפרדת בראש) — עדכון שלהן חייב
+      // רינדור מחדש, לא רק שמירה בשדה.
+      const result = await prepareInstagramReel({
+        rawText: post.rawText,
+        seed: post.id,
+        folderPath: content.folderPath,
+        storage,
+        splitMode,
+        backgroundImageDataUri: reelBackgroundImageDataUri,
+        hashtags: sharedHashtags,
+      });
       await prisma.platformContent.update({
         where: { id: content.id },
-        data: { hashtags: JSON.stringify(sharedHashtags) },
+        data: {
+          text: result.altText,
+          files: JSON.stringify([result.file]),
+          altText: result.altText,
+          hashtags: JSON.stringify(sharedHashtags),
+        },
       });
     }
   }
@@ -408,6 +425,7 @@ export async function addTargetToPost(
       storage,
       splitMode,
       backgroundImageDataUri: reelBackgroundImageDataUri,
+      hashtags: sharedHashtags,
       signal: options?.signal,
       onProgress: options?.onProgress,
     });

@@ -9,6 +9,7 @@ import { splitIntoSlides, type SplitMode } from "./instagramCarousel";
 import { buildReelFrameNode, REEL_WIDTH, REEL_HEIGHT } from "./render/reelFrame";
 import { renderNodeToPng } from "./render/renderImage";
 import { pickBackgroundColor } from "./render/palette";
+import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
 
 const execFileAsync = promisify(execFile);
 
@@ -50,6 +51,8 @@ export interface PrepareReelParams {
   splitMode?: SplitMode;
   /** תבנית רקע קבועה (תמונה) לסרטון — אם לא סופקה, נבחר צבע רקע אוטומטי. */
   backgroundImageDataUri?: string | null;
+  /** תגיות משותפות הפוסט — #אחתביום מסוננת אוטומטית (היא מוטמעת כבר בתבנית הרקע). */
+  hashtags?: string[];
   /** מאפשר עצירה מבוקשת מהלקוח (כפתור "עצור") — נבדק בין מסגרת למסגרת. */
   signal?: AbortSignal;
   /** התקדמות רינדור המסגרות, לצורך אינדיקציית זמן משוער בממשק. */
@@ -64,6 +67,7 @@ async function renderCaptionFrames(
   captions: string[],
   backgroundHex: string,
   backgroundImageDataUri: string | null | undefined,
+  displayHashtags: string[],
   framesDir: string,
   signal: AbortSignal | undefined,
   onProgress: ((renderedFrames: number, totalFrames: number) => void) | undefined
@@ -85,7 +89,13 @@ async function renderCaptionFrames(
       if (signal?.aborted) throw new ReelCancelledError();
 
       const png = await renderNodeToPng(
-        buildReelFrameNode({ fullText: caption, revealedWordCount: i + 1, backgroundHex, backgroundImageDataUri }),
+        buildReelFrameNode({
+          fullText: caption,
+          revealedWordCount: i + 1,
+          backgroundHex,
+          backgroundImageDataUri,
+          hashtags: displayHashtags,
+        }),
         REEL_WIDTH,
         REEL_HEIGHT
       );
@@ -135,6 +145,8 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
   // splitIntoSlides בעצמו אחראי על הטיפול בסימונים (ראו instagramCarousel.ts).
   const captions = splitIntoSlides(params.rawText, params.splitMode ?? "auto", MAX_CHARS_PER_CAPTION);
   const backgroundHex = pickBackgroundColor(params.seed + "-reel");
+  // #אחתביום לא מוצגת כאן — היא מוטמעת כבר בתבנית הרקע (אם יש), אין צורך לכפול אותה.
+  const displayHashtags = (params.hashtags ?? []).filter((tag) => tag !== ALWAYS_FIRST_HASHTAG);
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "reel-"));
   try {
@@ -142,6 +154,7 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
       captions,
       backgroundHex,
       params.backgroundImageDataUri,
+      displayHashtags,
       workDir,
       params.signal,
       params.onProgress
@@ -163,6 +176,7 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
       [
         `כתוביות (${captions.length}):`,
         captions.map((c, i) => `${i + 1}. ${c}`).join("\n"),
+        `תגיות מוטבעות בסרטון: ${displayHashtags.join(" ") || "אין"}`,
         `אורך כולל: ${durationSeconds.toFixed(1)} שניות`,
       ].join("\n\n")
     );

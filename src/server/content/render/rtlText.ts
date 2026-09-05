@@ -94,6 +94,16 @@ function stripEmoji(text: string): string {
   return text.replace(EMOJI_REGEX, "").replace(/[ \t]+/g, " ");
 }
 
+// סוגריים/מלבנים/מסולסלים הם תווים "ממוראים" (mirrored) בבידי: בטקסט RTL
+// אמיתי, "(" מוצג בצורה של ")" ולהיפך — אחרת הם "נפתחים" לכיוון הלא נכון.
+// דפדפן/מנוע bidi רגיל עושה את זה אוטומטית; אנחנו עוקפים את ה-bidi של
+// satori לחלוטין (row-reverse ידני), ולכן חייבים להחליף את התו בעצמנו —
+// אחרת הסוגריים מופיעים הפוך (פותח במקום סוגר, סוגר במקום פותח).
+const MIRROR_PAIRS: Record<string, string> = { "(": ")", ")": "(", "[": "]", "]": "[", "{": "}", "}": "{" };
+function mirrorBracketsForRtl(text: string): string {
+  return text.replace(/[()[\]{}]/g, (c) => MIRROR_PAIRS[c]);
+}
+
 /**
  * שורה ריקה (null) מייצגת ירידת שורה/הפרדת פסקאות שהמשתמשת הכניסה בעצמה —
  * מרונדרת כרווח אנכי, לא נעלמת. שורה עם תוכן (string[]) עוברת גם היא
@@ -101,7 +111,7 @@ function stripEmoji(text: string): string {
  * הבאה שהמשתמשת הפרידה בכוונה עם Enter.
  */
 export function wrapIntoWordLines(text: string, maxCharsPerLine: number): (string[] | null)[] {
-  const rawLines = stripEmoji(text).split("\n");
+  const rawLines = mirrorBracketsForRtl(stripEmoji(text)).split("\n");
   const result: (string[] | null)[] = [];
 
   for (const rawLine of rawLines) {
