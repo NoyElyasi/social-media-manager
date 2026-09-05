@@ -45,10 +45,11 @@ function renderRunNode(run: string, revealedChars: number): SatoriNode {
 // revealedChars: כמה תווים מתוך המילה (בסדר הלוגי, לא הוויזואלי) חשופים —
 // Infinity (ברירת המחדל) חושף את כל המילה. משמש גם לאפקט "מילה-מילה" (כל
 // מילה חשופה כולה או לא כלל) וגם ל"אות-אות" (מילה חלקית, תו-תו).
+// חשוב: אף פעם לא מקצרים-דרך לפני פירוק לריצות (Hebrew/non-Hebrew) — גם
+// כשהמילה חשופה במלואה — כי מילה עם פיסוק צמוד (למשל "שלום.") היא עצמה
+// כמה ריצות, וסאטורי לא שומר את הסדר הלוגי ביניהן בלי הפירוק הזה (ראו
+// ההערה בראש הקובץ). זו הייתה רגרסיה שגרמה לפיסוק להופיע לפני המילה.
 function renderWordNode(word: string, revealedChars: number = Infinity): SatoriNode {
-  if (revealedChars >= word.length) {
-    return h("div", { style: { display: "flex" } }, word);
-  }
   const segments = word.match(HEBREW_RUN_REGEX);
   if (!segments || segments.length <= 1) {
     return renderRunNode(word, revealedChars);
