@@ -6,11 +6,17 @@ export const REEL_WIDTH = 1080;
 export const REEL_HEIGHT = 1920; // יחס 9:16
 const HORIZONTAL_PADDING = 80;
 // גדול במפורש מהמינימום הבסיסי — לפי משוב שהטקסט היה קטן מכדי לקרוא בלי זום.
-const REEL_FONT_SIZE = MIN_FONT_SIZE_REEL + 20;
+const REEL_FONT_SIZE = MIN_FONT_SIZE_REEL + 36;
 const REEL_LINE_GAP = 14;
-const HASHTAG_FONT_SIZE = REEL_FONT_SIZE - 16;
+const HASHTAG_FONT_SIZE = REEL_FONT_SIZE - 28;
 // מרחק מלמעלה שמפנה מקום ללוגו/חותמת שמוטבעים בתבנית הרקע עצמה (אם יש).
 const HASHTAG_TOP_MARGIN = 300;
+// הכתובית עצמה: קצת יותר שמאלה מהצמדה מלאה לימין (לא צמודה לשוליים), וקצת
+// יותר גבוה ממרכז מדויק — לפי בקשה מפורשת. שני spacer-ים עם flex לא-שווה
+// מזיזים את הבלוק כולו למעלה בלי לקבע מיקום קבוע (עדיין מגיב לכמות השורות).
+const CAPTION_RIGHT_INSET = 70;
+const CAPTION_TOP_SPACER_FLEX = 0.8;
+const CAPTION_BOTTOM_SPACER_FLEX = 1.2;
 
 // צבע טקסט קבוע לשימוש מעל תבנית הרקע (תמונה) — לא מחושב מהרקע (זו תמונה,
 // לא צבע אחיד), נבחר ידנית כדי להתאים לפלטת המותג הבהירה (קרם/ורוד).
@@ -79,15 +85,31 @@ export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
           flexDirection: "column",
           alignItems: "flex-end",
           flex: 1,
-          justifyContent: "center",
-          gap: REEL_LINE_GAP,
         },
       },
-      ...renderPreparedLines(
-        prepareRtlWordLines(input.fullText, REEL_FONT_SIZE, REEL_WIDTH - 2 * HORIZONTAL_PADDING),
-        { fontSize: REEL_FONT_SIZE, fontWeight: 700, color: textColor, justifyContent: "flex-end" },
-        input.revealedWordCount
-      )
+      h("div", { style: { display: "flex", flex: CAPTION_TOP_SPACER_FLEX } }),
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: REEL_LINE_GAP,
+            paddingRight: CAPTION_RIGHT_INSET,
+          },
+        },
+        ...renderPreparedLines(
+          prepareRtlWordLines(
+            input.fullText,
+            REEL_FONT_SIZE,
+            REEL_WIDTH - 2 * HORIZONTAL_PADDING - CAPTION_RIGHT_INSET
+          ),
+          { fontSize: REEL_FONT_SIZE, fontWeight: 700, color: textColor, justifyContent: "flex-end" },
+          input.revealedWordCount
+        )
+      ),
+      h("div", { style: { display: "flex", flex: CAPTION_BOTTOM_SPACER_FLEX } })
     )
   );
 }
