@@ -21,29 +21,55 @@ import { h, type SatoriNode } from "./h";
  */
 const HEBREW_RUN_REGEX = new RegExp("[\\u0590-\\u05FF]+|[^\\u0590-\\u05FF]+", "g");
 
-// revealed=false לא מציג את המילה (opacity:0) אבל שומר לה מקום מלא בפריסה —
-// כך שמילים לא-חשופות עדיין תופסות את המקום הסופי שלהן, ומילים חשופות לא
-// "זזות" כשמילה חדשה מצטרפת (ראו buildReelFrameNode / אפקט הכתיבה בריל).
-function renderWordNode(word: string, revealed: boolean = true): SatoriNode {
-  const visibility = revealed ? {} : { opacity: 0 };
-  const segments = word.match(HEBREW_RUN_REGEX);
-  if (!segments || segments.length <= 1) {
-    return h("div", { style: { display: "flex", ...visibility } }, word);
+const HAS_HEBREW_REGEX = new RegExp("[\\u0590-\\u05FF]");
+
+// תו לא-חשוף עדיין תופס את המקום הסופי שלו בפריסה (opacity:0, לא display:none) —
+// כך שתווים/מילים לא-חשופים לא גורמים לתווים חשופים "לזוז" כשעוד תו מצטרף
+// (ראו buildReelFrameNode / אפקט הכתיבה בריל). כל ריצה (run) נחשפת מהתו
+// הראשון שלה בסדר הקריאה הטבעי שלה: row-reverse+סדר לוגי לריצה עברית (כך
+// שהתו הראשון יושב בקצה הימני, כמו בכתיבה בעברית), row רגיל לריצה לא-עברית.
+function renderRunNode(run: string, revealedChars: number): SatoriNode {
+  const isHebrewRun = HAS_HEBREW_REGEX.test(run);
+  const chars = Array.from(run);
+  const visibleCount = Math.max(0, Math.min(chars.length, revealedChars));
+  if (visibleCount >= chars.length) {
+    return h("div", { style: { display: "flex" } }, run);
   }
   return h(
     "div",
-    { style: { display: "flex", flexDirection: "row-reverse", flexWrap: "nowrap", gap: 0, ...visibility } },
-    ...segments.map((seg) => h("div", { style: { display: "flex" } }, seg))
+    { style: { display: "flex", flexDirection: isHebrewRun ? "row-reverse" : "row", flexWrap: "nowrap", gap: 0 } },
+    ...chars.map((ch, idx) => h("div", { style: { display: "flex", opacity: idx < visibleCount ? 1 : 0 } }, ch))
   );
 }
 
-const HAS_HEBREW_REGEX = new RegExp("[\\u0590-\\u05FF]");
+// revealedChars: כמה תווים מתוך המילה (בסדר הלוגי, לא הוויזואלי) חשופים —
+// Infinity (ברירת המחדל) חושף את כל המילה. משמש גם לאפקט "מילה-מילה" (כל
+// מילה חשופה כולה או לא כלל) וגם ל"אות-אות" (מילה חלקית, תו-תו).
+function renderWordNode(word: string, revealedChars: number = Infinity): SatoriNode {
+  if (revealedChars >= word.length) {
+    return h("div", { style: { display: "flex" } }, word);
+  }
+  const segments = word.match(HEBREW_RUN_REGEX);
+  if (!segments || segments.length <= 1) {
+    return renderRunNode(word, revealedChars);
+  }
+  let remaining = revealedChars;
+  return h(
+    "div",
+    { style: { display: "flex", flexDirection: "row-reverse", flexWrap: "nowrap", gap: 0 } },
+    ...segments.map((seg) => {
+      const node = renderRunNode(seg, remaining);
+      remaining -= seg.length;
+      return node;
+    })
+  );
+}
 
 export function buildWordRowNode(
   words: string[],
   style: Record<string, unknown>,
-  /** דגלי חשיפה למילה, באותו סדר לוגי כמו words (index 0 = המילה הראשונה שנקראת). ברירת מחדל: הכל חשוף. */
-  revealedFlags?: boolean[]
+  /** כמה תווים מכל מילה חשופים, באותו סדר לוגי כמו words. ברירת מחדל: הכל חשוף. */
+  revealedChars?: number[]
 ): SatoriNode {
   // row-reverse מציג את המילה הראשונה במערך בקצה הימני — נכון לעברית (RTL).
   // אם אין אף אות עברית במילים (למשל שם תצוגה לטיני כמו "Noy Elyasi"),
@@ -67,7 +93,7 @@ export function buildWordRowNode(
         ...style,
       },
     },
-    ...orderedIndices.map((i) => renderWordNode(words[i], revealedFlags ? revealedFlags[i] : true))
+    ...orderedIndices.map((i) => renderWordNode(words[i], revealedChars ? revealedChars[i] : Infinity))
   );
 }
 
@@ -152,28 +178,47 @@ export function prepareRtlWordLines(
   return wrapIntoWordLines(text, maxCharsPerLine);
 }
 
+export type RevealGranularity = "word" | "letter";
+
+export interface RevealState {
+  /** כמה יחידות (מילים או תווים, לפי granularity) חשופות בסך הכול, נספר לפי
+   * הסדר הלוגי על פני כל השורות (אפקט כתיבה בריל — ראו buildReelFrameNode). */
+  count: number;
+  granularity: RevealGranularity;
+}
+
 /**
  * מרנדרת מערך שורות (מ-prepareRtlWordLines) לרשימת satori nodes: שורת מילים
  * רגילה, או רווח אנכי במקום שורה ריקה (ירידת שורה/פסקה שהמשתמשת הכניסה).
  *
- * revealedWordCount (אופציונלי): כמה מילים "חשופות" בסך הכול, נספר לפי הסדר
- * הלוגי על פני כל השורות (למשל אפקט כתיבה בריל — ראו buildReelFrameNode).
- * אם לא סופק, כל המילים חשופות (ברירת המחדל, שקולה להתנהגות הקודמת).
+ * reveal (אופציונלי): מצב חשיפה הדרגתית — "word" חושף מילה שלמה בכל פעם,
+ * "letter" חושף תו בודד בכל פעם (בתוך מילה חלקית, בסדר הקריאה הטבעי שלה —
+ * ראו renderWordNode/renderRunNode). אם לא סופק, כל הטקסט חשוף (ברירת
+ * המחדל, שקולה להתנהגות הקודמת).
  */
 export function renderPreparedLines(
   lines: (string[] | null)[],
   style: Record<string, unknown>,
-  revealedWordCount?: number
+  reveal?: RevealState
 ): SatoriNode[] {
   const fontSize = typeof style.fontSize === "number" ? style.fontSize : 16;
-  let consumed = 0;
+  let consumedWords = 0;
+  let consumedChars = 0;
   return lines.map((entry) => {
     if (entry === null) {
       return h("div", { style: { display: "flex", height: Math.round(fontSize * 0.6) } });
     }
-    const flags =
-      revealedWordCount === undefined ? undefined : entry.map((_, idx) => consumed + idx < revealedWordCount);
-    consumed += entry.length;
-    return buildWordRowNode(entry, style, flags);
+    let revealedChars: number[] | undefined;
+    if (reveal?.granularity === "word") {
+      revealedChars = entry.map((word, idx) => (consumedWords + idx < reveal.count ? word.length : 0));
+    } else if (reveal?.granularity === "letter") {
+      revealedChars = entry.map((word) => {
+        const visible = Math.max(0, Math.min(word.length, reveal.count - consumedChars));
+        consumedChars += word.length;
+        return visible;
+      });
+    }
+    consumedWords += entry.length;
+    return buildWordRowNode(entry, style, revealedChars);
   });
 }

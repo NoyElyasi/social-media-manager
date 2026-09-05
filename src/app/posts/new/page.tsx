@@ -14,6 +14,7 @@ interface DraftShape {
   rawText: string;
   selectedTargets: SelectedTarget[];
   splitMode: "auto" | "manual";
+  revealMode: "word" | "letter";
   manualHashtags: string;
 }
 
@@ -40,6 +41,7 @@ export default function NewPostPage() {
     () => loadDraft().selectedTargets ?? ["instagram_carousel"]
   );
   const [splitMode, setSplitMode] = useState<"auto" | "manual">(() => loadDraft().splitMode ?? "auto");
+  const [revealMode, setRevealMode] = useState<"word" | "letter">(() => loadDraft().revealMode ?? "word");
   const [manualHashtags, setManualHashtags] = useState(() => loadDraft().manualHashtags ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,9 +51,9 @@ export default function NewPostPage() {
 
   // שומר את הטיוטה בכל שינוי.
   useEffect(() => {
-    const draft: DraftShape = { rawText, selectedTargets, splitMode, manualHashtags };
+    const draft: DraftShape = { rawText, selectedTargets, splitMode, revealMode, manualHashtags };
     window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-  }, [rawText, selectedTargets, splitMode, manualHashtags]);
+  }, [rawText, selectedTargets, splitMode, revealMode, manualHashtags]);
 
   function insertMarkerAt(
     textarea: HTMLTextAreaElement,
@@ -114,6 +116,7 @@ export default function NewPostPage() {
           rawText,
           selectedTargets,
           splitMode,
+          revealMode,
           manualHashtags: manualHashtags.trim() ? manualHashtags.trim().split(/\s+/) : null,
         }),
         signal: controller.signal,
@@ -235,6 +238,32 @@ export default function NewPostPage() {
             >
               + סימון הדבקה
             </button>
+          </div>
+        </div>
+      )}
+
+      {selectedTargets.includes("instagram_reel") && (
+        <div className="flex flex-col gap-2 rounded-lg border p-3 bg-neutral-50">
+          <label className="font-medium text-sm">אנימציית הופעת הטקסט בריל</label>
+          <div className="flex gap-4 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="revealMode"
+                checked={revealMode === "word"}
+                onChange={() => setRevealMode("word")}
+              />
+              מילה-מילה
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="revealMode"
+                checked={revealMode === "letter"}
+                onChange={() => setRevealMode("letter")}
+              />
+              אות-אות
+            </label>
           </div>
         </div>
       )}

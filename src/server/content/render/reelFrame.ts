@@ -1,6 +1,6 @@
 import { h, type SatoriNode } from "./h";
 import { pickAccessibleTextColor, MIN_FONT_SIZE_REEL } from "../accessibility";
-import { prepareRtlWordLines, renderPreparedLines } from "./rtlText";
+import { prepareRtlWordLines, renderPreparedLines, type RevealGranularity } from "./rtlText";
 
 export const REEL_WIDTH = 1080;
 export const REEL_HEIGHT = 1920; // יחס 9:16
@@ -33,10 +33,12 @@ const TEMPLATE_TEXT_COLOR = "#4A1420";
 
 export interface ReelFrameInput {
   /** הטקסט המלא של הכתובית הנוכחית — קבוע לאורך כל אנימציית הכתיבה שלה, כדי
-   * שהפריסה/מיקום השורות תמיד יחושבו על הטקסט השלם (ראו revealedWordCount). */
+   * שהפריסה/מיקום השורות תמיד יחושבו על הטקסט השלם (ראו revealedUnitCount). */
   fullText: string;
-  /** כמה מילים (מתוך fullText, בסדר הלוגי) חשופות ברגע הזה — effect כתיבה. */
-  revealedWordCount: number;
+  /** כמה יחידות (מילים או תווים, לפי revealMode) חשופות ברגע הזה — effect כתיבה. */
+  revealedUnitCount: number;
+  /** "word" (מילה-מילה) או "letter" (אות-אות) — נבחר על ידי המשתמשת ביצירת הפוסט. */
+  revealMode: RevealGranularity;
   backgroundHex: string;
   /** תבנית רקע קבועה (תמונה, מוגדרת בהגדרות) — אם קיימת, מוצגת במקום הצבע האחיד. */
   backgroundImageDataUri?: string | null;
@@ -111,7 +113,7 @@ export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
       ...renderPreparedLines(
         prepareRtlWordLines(input.fullText, REEL_FONT_SIZE, REEL_WIDTH - 2 * HORIZONTAL_PADDING - CAPTION_RIGHT_INSET),
         { fontSize: REEL_FONT_SIZE, fontWeight: 700, color: textColor, justifyContent: "flex-end" },
-        input.revealedWordCount
+        { count: input.revealedUnitCount, granularity: input.revealMode }
       )
     )
   );

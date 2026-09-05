@@ -4,7 +4,7 @@ import { getStorageService } from "../storage";
 import { scanForIdentifyingDetails } from "./privacyScanner";
 import { prepareFacebookDraft } from "./facebook";
 import { prepareInstagramCarousel, stripSlideMarkers, type SplitMode } from "./instagramCarousel";
-import { prepareInstagramReel, ReelCancelledError } from "./instagramReel";
+import { prepareInstagramReel, ReelCancelledError, type RevealMode } from "./instagramReel";
 import { getProfileSettings, loadProfileImageDataUri } from "../settings/profile";
 import { ALWAYS_FIRST_HASHTAG, type SelectedTarget } from "@/lib/labels";
 
@@ -48,6 +48,8 @@ export interface CreatePostInput {
    * היעדים כאחד.
    */
   splitMode?: SplitMode;
+  /** אנימציית החשיפה בריל: "word" (מילה-מילה, ברירת מחדל) או "letter" (אות-אות). */
+  revealMode?: RevealMode;
   /** תגיות שהמשתמשת הזינה בעצמה, במקום ההצעה האוטומטית (לכל היעדים). */
   manualHashtags?: string[] | null;
   /** מאפשר עצירה מבוקשת (כפתור "עצור") באמצע יצירת ריל. */
@@ -76,6 +78,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
   const sharedHashtags = normalizeSharedHashtags(input.manualHashtags);
 
   const splitMode: SplitMode = input.splitMode ?? "auto";
+  const revealMode: RevealMode = input.revealMode ?? "word";
 
   const post = await prisma.post.create({
     data: {
@@ -84,6 +87,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
       selectedTargets: JSON.stringify(input.selectedTargets),
       hashtags: JSON.stringify(sharedHashtags),
       splitMode,
+      revealMode,
       folderPath: postFolderPath,
       privacyFlags: JSON.stringify(privacyFlags),
     },
@@ -151,6 +155,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           folderPath: subfolder,
           storage,
           splitMode,
+          revealMode,
           backgroundImageDataUri: reelBackgroundImageDataUri,
           hashtags: sharedHashtags,
           signal: input.signal,
@@ -211,6 +216,7 @@ export async function updatePostRawText(
   const cleanText = stripSlideMarkers(newRawText);
   const privacyFlags = scanForIdentifyingDetails(cleanText);
   const splitMode = post.splitMode as SplitMode;
+  const revealMode = post.revealMode as RevealMode;
 
   await prisma.post.update({
     where: { id: postId },
@@ -272,6 +278,7 @@ export async function updatePostRawText(
         folderPath: content.folderPath,
         storage,
         splitMode,
+        revealMode,
         backgroundImageDataUri: reelBackgroundImageDataUri,
         hashtags: sharedHashtags,
         signal: options?.signal,
@@ -316,6 +323,7 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
   });
 
   const splitMode = post.splitMode as SplitMode;
+  const revealMode = post.revealMode as RevealMode;
   const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
   const reelBackgroundImageDataUri = await loadProfileImageDataUri(storage, profile.reelBackgroundImagePath);
 
@@ -352,6 +360,7 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
         folderPath: content.folderPath,
         storage,
         splitMode,
+        revealMode,
         backgroundImageDataUri: reelBackgroundImageDataUri,
         hashtags: sharedHashtags,
       });
@@ -396,6 +405,7 @@ export async function addTargetToPost(
 
   const sharedHashtags: string[] = JSON.parse(post.hashtags || "[]");
   const splitMode = post.splitMode as SplitMode;
+  const revealMode = post.revealMode as RevealMode;
   const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
   const reelBackgroundImageDataUri = await loadProfileImageDataUri(storage, profile.reelBackgroundImagePath);
   const subfolder = await storage.createSubfolder(post.folderPath, SUBFOLDER_NAMES[target]);
@@ -432,6 +442,7 @@ export async function addTargetToPost(
       folderPath: subfolder,
       storage,
       splitMode,
+      revealMode,
       backgroundImageDataUri: reelBackgroundImageDataUri,
       hashtags: sharedHashtags,
       signal: options?.signal,

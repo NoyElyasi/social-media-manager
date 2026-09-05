@@ -10,6 +10,7 @@ const createPostSchema = z.object({
     .array(z.enum(["facebook_post", "instagram_carousel", "instagram_reel"]))
     .min(1, "יש לבחור לפחות יעד אחד"),
   splitMode: z.enum(["auto", "manual"]).optional(),
+  revealMode: z.enum(["word", "letter"]).optional(),
   manualHashtags: z.array(z.string()).optional().nullable(),
 });
 

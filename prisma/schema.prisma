@@ -23,6 +23,10 @@ model Post {
   // חדשים (עדכון טקסט, הוספת יעד) ימשיכו להתייחס אליו כמו שהמשתמשת בחרה,
   // ולא ינחשו אותו מנוכחות סימוני /// בטקסט (שעכשיו יכולים להופיע גם במצב אוטומטי).
   splitMode       String   @default("auto")
+  // אנימציית החשיפה בריל: "word" (מילה-מילה) או "letter" (אות-אות) — נשמר
+  // במפורש כמו splitMode, כדי שרינדורים חדשים לפוסט הזה ימשיכו להשתמש באותה
+  // בחירה שנעשתה ביצירה.
+  revealMode      String   @default("word")
   folderPath      String // נתיב תיקיית הפוסט באחסון (מקומי היום, Google Drive בעתיד)
   privacyFlags    String // JSON array of PrivacyFlag
   createdAt       DateTime @default(now())

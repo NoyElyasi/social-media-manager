@@ -9,9 +9,13 @@ import { splitIntoSlides, type SplitMode } from "./instagramCarousel";
 import { buildReelFrameNode, REEL_WIDTH, REEL_HEIGHT } from "./render/reelFrame";
 import { renderNodeToPng } from "./render/renderImage";
 import { pickBackgroundColor } from "./render/palette";
+import type { RevealGranularity } from "./render/rtlText";
 import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
 
 const execFileAsync = promisify(execFile);
+
+/** "word" (מילה-מילה, ברירת מחדל) או "letter" (אות-אות) — אפקט הכתיבה בריל. */
+export type RevealMode = RevealGranularity;
 
 // כתוביות קצרות לריל — מסך אחד קטן וקריא, לא פסקה שלמה (סעיף 4.4).
 const MAX_CHARS_PER_CAPTION = 50;
@@ -19,6 +23,9 @@ const MAX_CHARS_PER_CAPTION = 50;
 // קצב "כתיבה בלייב" של מילה חדשה על המסך — לא קצב קריאה, רק אפקט חזותי.
 // לפי בקשה מפורשת "בקצב מהיר יותר" (היה 0.28).
 const WORD_REVEAL_SECONDS = 0.16;
+// קצב "אות-אות" — הרבה יותר קצר מקצב המילה, כי מילה ארוכה מכילה הרבה יותר
+// אותיות ממילים בממוצע; בלי קצב נפרד, מילה ארוכה הייתה נראית איטית מדי.
+const LETTER_REVEAL_SECONDS = 0.045;
 // כמה זמן לוקח לאדם ממוצע לקרוא מילה אחת בנוחות (לא ממהר) — קובע כמה זמן
 // כל כתובית *נשארת* על המסך אחרי שנכתבה במלואה (העצירה, לא הכתיבה עצמה).
 // הקבועים כאן נמוכים בכוונה (לא פרופורציונליים בצורה נוקשה): כתוביות קצרות
@@ -54,6 +61,8 @@ export interface PrepareReelParams {
   backgroundImageDataUri?: string | null;
   /** תגיות משותפות הפוסט — #אחתביום מסוננת אוטומטית (היא מוטמעת כבר בתבנית הרקע). */
   hashtags?: string[];
+  /** אנימציית החשיפה — "word" (ברירת מחדל) או "letter". */
+  revealMode?: RevealMode;
   /** מאפשר עצירה מבוקשת מהלקוח (כפתור "עצור") — נבדק בין מסגרת למסגרת. */
   signal?: AbortSignal;
   /** התקדמות רינדור המסגרות, לצורך אינדיקציית זמן משוער בממשק. */
@@ -64,35 +73,44 @@ function countTotalWords(captions: string[]): number {
   return captions.reduce((sum, c) => sum + c.split(/\s+/).filter(Boolean).length, 0);
 }
 
+/** סופרת רק תווי תוכן (בלי רווחים) — אלה היחידות שנחשפות במצב "אות-אות". */
+function countTotalChars(captions: string[]): number {
+  return captions.reduce((sum, c) => sum + c.split(/\s+/).filter(Boolean).join("").length, 0);
+}
+
 async function renderCaptionFrames(
   captions: string[],
   backgroundHex: string,
   backgroundImageDataUri: string | null | undefined,
   displayHashtags: string[],
+  revealMode: RevealMode,
   framesDir: string,
   signal: AbortSignal | undefined,
   onProgress: ((renderedFrames: number, totalFrames: number) => void) | undefined
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
-  const totalFrames = countTotalWords(captions);
+  const totalFrames = revealMode === "letter" ? countTotalChars(captions) : countTotalWords(captions);
+  const unitRevealSeconds = revealMode === "letter" ? LETTER_REVEAL_SECONDS : WORD_REVEAL_SECONDS;
   let frameIndex = 0;
 
   for (const caption of captions) {
     const words = caption.split(/\s+/).filter(Boolean);
     if (words.length === 0) continue;
+    const unitCount = revealMode === "letter" ? words.join("").length : words.length;
 
     const targetCaptionSeconds = Math.max(MIN_CAPTION_SECONDS, words.length * READ_SECONDS_PER_WORD);
-    const revealSeconds = words.length * WORD_REVEAL_SECONDS;
+    const revealSeconds = unitCount * unitRevealSeconds;
     const holdExtraSeconds = Math.max(0, targetCaptionSeconds - revealSeconds);
 
-    for (let i = 0; i < words.length; i++) {
+    for (let i = 0; i < unitCount; i++) {
       if (signal?.aborted) throw new ReelCancelledError();
 
       const png = await renderNodeToPng(
         buildReelFrameNode({
           fullText: caption,
-          revealedWordCount: i + 1,
+          revealedUnitCount: i + 1,
+          revealMode,
           backgroundHex,
           backgroundImageDataUri,
           hashtags: displayHashtags,
@@ -104,9 +122,9 @@ async function renderCaptionFrames(
       const filePath = path.join(framesDir, fileName);
       await fs.writeFile(filePath, png);
 
-      const isLastWord = i === words.length - 1;
+      const isLastUnit = i === unitCount - 1;
       framePaths.push(filePath);
-      durations.push(isLastWord ? WORD_REVEAL_SECONDS + holdExtraSeconds : WORD_REVEAL_SECONDS);
+      durations.push(isLastUnit ? unitRevealSeconds + holdExtraSeconds : unitRevealSeconds);
       frameIndex++;
       onProgress?.(frameIndex, totalFrames);
     }
@@ -162,6 +180,7 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
       backgroundHex,
       params.backgroundImageDataUri,
       displayHashtags,
+      params.revealMode ?? "word",
       workDir,
       params.signal,
       params.onProgress
