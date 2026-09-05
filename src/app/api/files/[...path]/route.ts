@@ -14,9 +14,14 @@ const EXT_TO_MIME: Record<string, string> = {
   ".txt": "text/plain; charset=utf-8",
 };
 
-/** משגש קבצים מתוך תיקיית האחסון המקומית (סעיף 9) לתצוגה בממשק. */
+/**
+ * משגש קבצים מתוך תיקיית האחסון המקומית (סעיף 9) לתצוגה בממשק.
+ * חייב לתמוך ב-HTTP Range (206 Partial Content) בשביל וידאו: בלי זה
+ * דפדפנים לא מסמנים את הסרטון כ"ניתן לחיפוש" (seekable), וגרירת הסליידר
+ * אחורה בנגן לא עושה בפועל כלום — היא רק מזיזה נקודה חזותית בלי לזוז.
+ */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path: segments } = await params;
@@ -31,7 +36,31 @@ export async function GET(
     const data = await fs.readFile(resolved);
     const ext = path.extname(resolved).toLowerCase();
     const contentType = EXT_TO_MIME[ext] ?? "application/octet-stream";
-    return new NextResponse(data, { headers: { "Content-Type": contentType } });
+
+    const range = req.headers.get("range");
+    const rangeMatch = range ? /^bytes=(\d+)-(\d*)$/.exec(range) : null;
+    if (rangeMatch) {
+      const start = Number(rangeMatch[1]);
+      const end = rangeMatch[2] ? Math.min(Number(rangeMatch[2]), data.length - 1) : data.length - 1;
+      const chunk = data.subarray(start, end + 1);
+      return new NextResponse(chunk, {
+        status: 206,
+        headers: {
+          "Content-Type": contentType,
+          "Accept-Ranges": "bytes",
+          "Content-Range": `bytes ${start}-${end}/${data.length}`,
+          "Content-Length": String(chunk.length),
+        },
+      });
+    }
+
+    return new NextResponse(data, {
+      headers: {
+        "Content-Type": contentType,
+        "Accept-Ranges": "bytes",
+        "Content-Length": String(data.length),
+      },
+    });
   } catch {
     return NextResponse.json({ error: "קובץ לא נמצא" }, { status: 404 });
   }

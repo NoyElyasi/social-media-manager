@@ -17,7 +17,8 @@ const execFileAsync = promisify(execFile);
 const MAX_CHARS_PER_CAPTION = 50;
 
 // קצב "כתיבה בלייב" של מילה חדשה על המסך — לא קצב קריאה, רק אפקט חזותי.
-const WORD_REVEAL_SECONDS = 0.28;
+// לפי בקשה מפורשת "בקצב מהיר יותר" (היה 0.28).
+const WORD_REVEAL_SECONDS = 0.16;
 // כמה זמן לוקח לאדם ממוצע לקרוא מילה אחת בנוחות (לא ממהר) — קובע כמה זמן
 // כל כתובית *נשארת* על המסך אחרי שנכתבה במלואה (העצירה, לא הכתיבה עצמה).
 // הקבועים כאן נמוכים בכוונה (לא פרופורציונליים בצורה נוקשה): כתוביות קצרות
@@ -135,6 +136,12 @@ async function encodeVideo(framePaths: string[], durations: number[], outputPath
     "-r", "30",
     "-pix_fmt", "yuv420p",
     "-c:v", "libx264",
+    // keyframe (I-frame) כל שנייה בערך — בלי זה libx264 שם keyframe רק כל
+    // 250 פריימים (~8 שניות) כברירת מחדל, ובריל קצר זה יוצר keyframe יחיד
+    // בהתחלה בלבד: גרירת הסליידר אחורה לא באמת מזיזה את הנגן, כי אין לו
+    // לאן "לחזור" חוץ מההתחלה. עם keyframe תכוף, גרירה אחורה עובדת בפועל.
+    "-g", "30",
+    "-keyint_min", "30",
     "-movflags", "+faststart",
     outputPath,
   ]);
