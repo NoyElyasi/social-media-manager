@@ -16,6 +16,9 @@ model Post {
   slug            String   @unique
   rawText         String
   selectedTargets String // JSON string array, e.g. ["facebook","instagram_carousel","instagram_story"]
+  // תגיות משותפות לכל התוכן של הפוסט (קרוסלה + סטורי) — מקור אחד, לא כפילות
+  // לכל יעד בנפרד. בלי התגית הקבועה #אחתביום, שמתווספת אוטומטית בזמן רינדור.
+  hashtags        String   @default("[]")
   folderPath      String // נתיב תיקיית הפוסט באחסון (מקומי היום, Google Drive בעתיד)
   privacyFlags    String // JSON array of PrivacyFlag
   createdAt       DateTime @default(now())
@@ -39,11 +42,6 @@ enum ContentStatus {
   published
 }
 
-enum ScheduleMode {
-  exact
-  auto
-}
-
 model PlatformContent {
   id         String       @id @default(cuid())
   postId     String
@@ -58,9 +56,8 @@ model PlatformContent {
   tags            String // JSON array
   suggestedSongs  String // JSON array of {title, artist}
   suggestedHighlight String? // לסטורי בלבד
+  backgroundColor String? // hex — רקע הסטורי (סעיף 4.6); null = נבחר אוטומטית
 
-  scheduleMode  ScheduleMode?
-  scheduledAt   DateTime?
   publishedAt   DateTime?
   status        ContentStatus @default(draft)
 

@@ -2,8 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PLATFORM_LABELS, STATUS_LABELS, STATUS_COLORS, ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
+import { PLATFORM_LABELS, STATUS_LABELS, STATUS_COLORS } from "@/lib/labels";
 import { buildFileUrl } from "@/lib/files";
+
+function isVideoFile(file: string): boolean {
+  return file.toLowerCase().endsWith(".mp4");
+}
 
 export interface NormalizedPlatformContent {
   id: string;
@@ -16,8 +20,7 @@ export interface NormalizedPlatformContent {
   tags: string[];
   suggestedSongs: { title: string; artist: string }[];
   suggestedHighlight: string | null;
-  scheduleMode: string | null;
-  scheduledAt: string | null;
+  backgroundColor: string | null;
   publishedAt: string | null;
   status: string;
   updatedAt: string;
@@ -42,15 +45,6 @@ function CopyButton({ text }: { text: string }) {
 
 export default function PlatformContentCard({ content }: { content: NormalizedPlatformContent }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"exact" | "auto">(content.scheduleMode === "exact" ? "exact" : "auto");
-  const [date, setDate] = useState(
-    content.scheduledAt ? content.scheduledAt.slice(0, 10) : new Date().toISOString().slice(0, 10)
-  );
-  const [hour, setHour] = useState(20);
-  const [minute, setMinute] = useState(0);
-  const [saving, setSaving] = useState(false);
-  const [hashtagsInput, setHashtagsInput] = useState(content.hashtags.join(" "));
-  const [regenerating, setRegenerating] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   function fileUrl(file: string) {
@@ -77,50 +71,6 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [previewIndex, content.files.length]);
 
-  async function saveSchedule() {
-    setSaving(true);
-    try {
-      await fetch(`/api/platform-content/${content.id}/schedule`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, date, exactHour: hour, exactMinute: minute }),
-      });
-      router.refresh();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function regenerateCarousel() {
-    setRegenerating(true);
-    try {
-      const hashtags = hashtagsInput.split(/\s+/).filter(Boolean);
-      await fetch(`/api/platform-content/${content.id}/regenerate`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hashtags }),
-      });
-      router.refresh();
-    } finally {
-      setRegenerating(false);
-    }
-  }
-
-  async function saveFacebookHashtags() {
-    setRegenerating(true);
-    try {
-      const hashtags = hashtagsInput.split(/\s+/).filter(Boolean);
-      await fetch(`/api/platform-content/${content.id}/hashtags`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hashtags }),
-      });
-      router.refresh();
-    } finally {
-      setRegenerating(false);
-    }
-  }
-
   async function markPublished() {
     await fetch(`/api/platform-content/${content.id}/status`, {
       method: "PATCH",
@@ -139,7 +89,27 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
         </span>
       </div>
 
-      {content.files.length > 0 && (
+      {content.files.length > 0 && content.files.every(isVideoFile) && (
+        <div className="flex flex-col gap-2">
+          {content.files.map((file) => {
+            const url = fileUrl(file);
+            return (
+              <div key={file} className="flex flex-col gap-1">
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <video src={url} controls loop className="max-w-[280px] rounded-md border" />
+                <a href={url} download={file} className="text-xs text-blue-600 hover:underline self-start">
+                  הורד סרטון
+                </a>
+              </div>
+            );
+          })}
+          <p className="text-xs text-neutral-400">
+            הסרטון נשמר גם בדיסק: ~/Desktop/social-content-manager/storage/{content.folderPath}
+          </p>
+        </div>
+      )}
+
+      {content.files.length > 0 && !content.files.every(isVideoFile) && (
         <div className="flex flex-col gap-2">
           <div className="flex gap-3 overflow-x-auto pb-2">
             {content.files.map((file, index) => {
@@ -155,7 +125,7 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
                     <img
                       src={url}
                       alt=""
-                      className="h-96 rounded-lg border object-contain bg-neutral-100"
+                      className="w-28 h-28 rounded-md object-cover"
                     />
                   </button>
                   <a
@@ -183,43 +153,26 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
         </div>
       )}
 
-      {(content.type === "instagram_carousel" || content.type === "facebook_post") && (
-        <div className="flex flex-col gap-2">
-          <label className="text-xs font-medium">
-            תגיות (תמיד לפני הטקסט — {ALWAYS_FIRST_HASHTAG} מוצעת ראשונה. הפרידו ברווח)
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={hashtagsInput}
-              onChange={(e) => setHashtagsInput(e.target.value)}
-              className="flex-1 rounded-md border text-sm p-1.5"
-              placeholder={`${ALWAYS_FIRST_HASHTAG} #תגית2`}
-            />
-            <button
-              type="button"
-              onClick={content.type === "instagram_carousel" ? regenerateCarousel : saveFacebookHashtags}
-              disabled={regenerating}
-              className="shrink-0 rounded-md border px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-50"
-            >
-              {regenerating
-                ? "שומר..."
-                : content.type === "instagram_carousel"
-                  ? "עדכן תמונות"
-                  : "שמור תגיות"}
-            </button>
-          </div>
-          {content.tags.length > 0 && (
+      {(content.type === "instagram_carousel" || content.type === "facebook_post") &&
+        (content.hashtags.length > 0 || content.tags.length > 0) && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium">
+              תגיות (משותפות לכל התוכן של הפוסט — לעריכה, למעלה בעמוד הפוסט)
+            </label>
             <div className="flex flex-wrap gap-2 text-xs">
+              {content.hashtags.map((h) => (
+                <span key={h} className="rounded-full bg-blue-50 text-blue-700 px-2 py-1">
+                  {h}
+                </span>
+              ))}
               {content.tags.map((t) => (
                 <span key={t} className="rounded-full bg-purple-50 text-purple-700 px-2 py-1">
                   @{t}
                 </span>
               ))}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
 
       {content.type !== "instagram_carousel" &&
         content.type !== "facebook_post" &&
@@ -238,7 +191,7 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
           </div>
         )}
 
-      {content.text && (
+      {content.text && content.type !== "instagram_carousel" && (
         <div className="flex flex-col gap-2">
           <p className="whitespace-pre-wrap text-sm text-neutral-800 rounded-lg bg-neutral-50 p-3">
             {content.hashtags.length > 0 && content.type === "facebook_post"
@@ -276,57 +229,6 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
       )}
 
       <div className="border-t pt-4 flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium">תזמון</label>
-          <select
-            value={mode}
-            onChange={(e) => setMode(e.target.value as "exact" | "auto")}
-            className="rounded-md border text-sm p-1"
-          >
-            <option value="exact">שעה מדויקת</option>
-            <option value="auto">תאריך + שעה אוטומטית</option>
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium">תאריך</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="rounded-md border text-sm p-1"
-          />
-        </div>
-        {mode === "exact" && (
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium">שעה</label>
-            <div className="flex gap-1">
-              <input
-                type="number"
-                min={0}
-                max={23}
-                value={hour}
-                onChange={(e) => setHour(Number(e.target.value))}
-                className="w-16 rounded-md border text-sm p-1"
-              />
-              <input
-                type="number"
-                min={0}
-                max={59}
-                value={minute}
-                onChange={(e) => setMinute(Number(e.target.value))}
-                className="w-16 rounded-md border text-sm p-1"
-              />
-            </div>
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={saveSchedule}
-          disabled={saving}
-          className="rounded-md bg-neutral-800 text-white text-sm px-3 py-1.5 hover:bg-neutral-900 disabled:opacity-50"
-        >
-          שמור תזמון
-        </button>
         <button
           type="button"
           onClick={markPublished}
@@ -334,13 +236,12 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
         >
           סמן כפורסם
         </button>
+        {content.publishedAt && (
+          <p className="text-xs text-neutral-500">
+            פורסם ב-{new Date(content.publishedAt).toLocaleString("he-IL")}
+          </p>
+        )}
       </div>
-
-      {content.scheduledAt && (
-        <p className="text-xs text-neutral-500">
-          מתוזמן לפרסום ב-{new Date(content.scheduledAt).toLocaleString("he-IL")}
-        </p>
-      )}
 
       {previewIndex !== null && (
         <div

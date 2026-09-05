@@ -10,7 +10,6 @@ const DRAFT_STORAGE_KEY = "newPostDraft";
 interface DraftShape {
   rawText: string;
   selectedTargets: SelectedTarget[];
-  storyLink: string;
   carouselSplitMode: "auto" | "manual";
   manualHashtags: string;
 }
@@ -35,9 +34,8 @@ export default function NewPostPage() {
   // בתזמון effect-ים (שרגיש ל-Strict Mode של React בפיתוח).
   const [rawText, setRawText] = useState(() => loadDraft().rawText ?? "");
   const [selectedTargets, setSelectedTargets] = useState<SelectedTarget[]>(
-    () => loadDraft().selectedTargets ?? ["facebook_post", "instagram_carousel"]
+    () => loadDraft().selectedTargets ?? ["instagram_carousel"]
   );
-  const [storyLink, setStoryLink] = useState(() => loadDraft().storyLink ?? "");
   const [carouselSplitMode, setCarouselSplitMode] = useState<"auto" | "manual">(
     () => loadDraft().carouselSplitMode ?? "auto"
   );
@@ -47,9 +45,9 @@ export default function NewPostPage() {
 
   // שומר את הטיוטה בכל שינוי.
   useEffect(() => {
-    const draft: DraftShape = { rawText, selectedTargets, storyLink, carouselSplitMode, manualHashtags };
+    const draft: DraftShape = { rawText, selectedTargets, carouselSplitMode, manualHashtags };
     window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-  }, [rawText, selectedTargets, storyLink, carouselSplitMode, manualHashtags]);
+  }, [rawText, selectedTargets, carouselSplitMode, manualHashtags]);
 
   function insertSplitMarker() {
     const textarea = textareaRef.current;
@@ -93,7 +91,6 @@ export default function NewPostPage() {
         body: JSON.stringify({
           rawText,
           selectedTargets,
-          storyLink: selectedTargets.includes("instagram_story") ? storyLink || null : null,
           carouselSplitMode,
           manualHashtags: manualHashtags.trim() ? manualHashtags.trim().split(/\s+/) : null,
         }),
@@ -200,29 +197,10 @@ export default function NewPostPage() {
           ))}
           <label className="flex items-center gap-2 text-sm text-neutral-400">
             <input type="checkbox" disabled />
-            אינסטגרם – ריל (בקרוב, שלב 3)
-          </label>
-          <label className="flex items-center gap-2 text-sm text-neutral-400">
-            <input type="checkbox" disabled />
             וואטסאפ אוטומטי (בקרוב, שלב 2)
           </label>
         </div>
       </div>
-
-      {selectedTargets.includes("instagram_story") && (
-        <div className="flex flex-col gap-2">
-          <label className="font-medium text-sm">
-            קישור לסטורי (אופציונלי — אם כבר יש לינק לפוסט)
-          </label>
-          <input
-            type="text"
-            value={storyLink}
-            onChange={(e) => setStoryLink(e.target.value)}
-            className="rounded-lg border p-2 text-sm"
-            placeholder="לדוגמה: instagram.com/p/..."
-          />
-        </div>
-      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 

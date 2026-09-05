@@ -1,13 +1,16 @@
 /** תגית קבועה שמופיעה תמיד ראשונה בכל הצעת תגיות, בכל סוגי הפוסטים. */
 export const ALWAYS_FIRST_HASHTAG = "#אחתביום";
 
-export type SelectedTarget = "facebook_post" | "instagram_carousel" | "instagram_story";
+export type SelectedTarget = "facebook_post" | "instagram_carousel" | "instagram_story" | "instagram_reel";
 
-/** יעדים נתמכים ב-MVP (שלב 1, סעיף 12) — ריל ווואטסאפ אוטומטי מתווספים בשלבים הבאים. */
+/**
+ * יעדים ניתנים לבחירה בטופס יצירת פוסט. פייסבוק וסטורי הוסרו מכאן (פייסבוק
+ * לא נמצא שימושי מספיק; הסטורי לא עבד טוב ולא נראה טוב) — אבל הטיפוס/הלוגיקה
+ * נשארים כדי שפוסטים קיימים עם תוכן כזה עדיין יוצגו נכון.
+ */
 export const SELECTABLE_TARGETS: { value: SelectedTarget; label: string }[] = [
-  { value: "facebook_post", label: "פייסבוק" },
   { value: "instagram_carousel", label: "אינסטגרם – פוסט קרוסלה" },
-  { value: "instagram_story", label: "אינסטגרם – סטורי" },
+  { value: "instagram_reel", label: "אינסטגרם – ריל" },
 ];
 
 export const PLATFORM_LABELS: Record<string, string> = {

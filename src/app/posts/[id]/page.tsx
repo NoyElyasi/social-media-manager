@@ -3,6 +3,7 @@ import { prisma } from "@/server/db";
 import { PRIVACY_FLAG_LABELS, type PrivacyFlag } from "@/server/content/privacyScanner";
 import PlatformContentCard, { type NormalizedPlatformContent } from "@/components/PlatformContentCard";
 import EditablePostText from "@/components/EditablePostText";
+import PostExtras from "@/components/PostExtras";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,11 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
 
   const privacyFlags: PrivacyFlag[] = JSON.parse(post.privacyFlags || "[]");
 
-  const contents: NormalizedPlatformContent[] = post.platformContents.map((pc) => ({
+  // הסטורי הוסר מהכלי (לא עבד טוב) — תוכן סטורי ישן, אם קיים, לא מוצג יותר
+  // (הקבצים/הרשומה נשארים בדיסק/DB, רק לא מופיעים בממשק).
+  const visiblePlatformContents = post.platformContents.filter((pc) => pc.type !== "instagram_story");
+
+  const contents: NormalizedPlatformContent[] = visiblePlatformContents.map((pc) => ({
     id: pc.id,
     type: pc.type,
     folderPath: pc.folderPath,
@@ -28,8 +33,7 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
     tags: JSON.parse(pc.tags || "[]"),
     suggestedSongs: JSON.parse(pc.suggestedSongs || "[]"),
     suggestedHighlight: pc.suggestedHighlight,
-    scheduleMode: pc.scheduleMode,
-    scheduledAt: pc.scheduledAt ? pc.scheduledAt.toISOString() : null,
+    backgroundColor: pc.backgroundColor,
     publishedAt: pc.publishedAt ? pc.publishedAt.toISOString() : null,
     status: pc.status,
     updatedAt: pc.updatedAt.toISOString(),
@@ -41,11 +45,16 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
         <p className="text-sm text-neutral-500">
           {new Date(post.createdAt).toLocaleString("he-IL")} · {post.folderPath}
         </p>
-        <div className="mt-2">
+        <div className="mt-2 flex flex-col gap-4">
           <EditablePostText
             postId={post.id}
             initialRawText={post.rawText}
             hasCarousel={post.platformContents.some((pc) => pc.type === "instagram_carousel")}
+          />
+          <PostExtras
+            postId={post.id}
+            hashtags={JSON.parse(post.hashtags || "[]")}
+            existingTypes={visiblePlatformContents.map((pc) => pc.type)}
           />
         </div>
       </div>

@@ -6,9 +6,8 @@ import { createAndPreparePost } from "@/server/content/preparePost";
 const createPostSchema = z.object({
   rawText: z.string().min(1, "יש להזין טקסט לפוסט"),
   selectedTargets: z
-    .array(z.enum(["facebook_post", "instagram_carousel", "instagram_story"]))
+    .array(z.enum(["facebook_post", "instagram_carousel", "instagram_reel"]))
     .min(1, "יש לבחור לפחות יעד אחד"),
-  storyLink: z.string().optional().nullable(),
   carouselSplitMode: z.enum(["auto", "manual"]).optional(),
   manualHashtags: z.array(z.string()).optional().nullable(),
 });

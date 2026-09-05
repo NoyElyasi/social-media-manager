@@ -48,7 +48,9 @@ export default async function HomePage() {
                 </div>
                 <p className="line-clamp-2 text-neutral-800">{post.rawText}</p>
                 <div className="flex flex-wrap gap-2">
-                  {post.platformContents.map((pc) => (
+                  {post.platformContents
+                    .filter((pc) => pc.type !== "instagram_story")
+                    .map((pc) => (
                     <span
                       key={pc.id}
                       className={`text-xs rounded-full px-2 py-1 ${STATUS_COLORS[pc.status]}`}

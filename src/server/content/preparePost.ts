@@ -4,16 +4,24 @@ import { getStorageService } from "../storage";
 import { scanForIdentifyingDetails } from "./privacyScanner";
 import { prepareFacebookDraft } from "./facebook";
 import { prepareInstagramCarousel, MANUAL_SLIDE_BREAK, stripSlideMarkers, type SplitMode } from "./instagramCarousel";
-import { prepareInstagramStory } from "./instagramStory";
+import { prepareInstagramReel } from "./instagramReel";
 import { getProfileSettings, loadProfileImageDataUri } from "../settings/profile";
-import type { SelectedTarget } from "@/lib/labels";
+import { ALWAYS_FIRST_HASHTAG, type SelectedTarget } from "@/lib/labels";
 
 export type { SelectedTarget };
+
+/** מנקה תגיות משותפות: מסירה כפילויות ואת התגית הקבועה (שמתווספת אוטומטית בזמן רינדור, לא נשמרת בקלט). */
+function normalizeSharedHashtags(hashtags: string[] | undefined | null): string[] {
+  if (!hashtags) return [];
+  const trimmed = hashtags.map((t) => t.trim()).filter(Boolean);
+  return [...new Set(trimmed)].filter((t) => t !== ALWAYS_FIRST_HASHTAG);
+}
 
 const SUBFOLDER_NAMES: Record<SelectedTarget, string> = {
   facebook_post: "פייסבוק",
   instagram_carousel: "אינסטגרם-פוסט",
   instagram_story: "אינסטגרם-סטורי",
+  instagram_reel: "אינסטגרם-ריל",
 };
 
 const NON_SLUG_CHARS = new RegExp("[^\\u0590-\\u05FFa-zA-Z0-9\\s]", "g");
@@ -25,13 +33,15 @@ function slugify(text: string): string {
     .split(/\s+/)
     .slice(0, 4);
   const base = words.join("-");
-  return base || nanoid(6);
+  // מוסיפים סיומת אקראית קצרה תמיד (לא רק כשאין מילים) — כדי שפוסטים ששני
+  // המשפטים הראשונים שלהם זהים (למשל ניסוח שחוזר על עצמו, או ניסיון חוזר
+  // אחרי שגיאה) לא יתנגשו על ה-slug הייחודי ויגרמו לכשלון ביצירת הפוסט.
+  return `${base || nanoid(6)}-${nanoid(4)}`;
 }
 
 export interface CreatePostInput {
   rawText: string;
   selectedTargets: SelectedTarget[];
-  storyLink?: string | null;
   /** אופן חילוק העמודים בקרוסלה: "auto" (לפי אורך) או "manual" (לפי סימוני /// שהמשתמשת הוסיפה). */
   carouselSplitMode?: SplitMode;
   /** תגיות שהמשתמשת הזינה בעצמה, במקום ההצעה האוטומטית (לכל היעדים). */
@@ -41,9 +51,8 @@ export interface CreatePostInput {
 export async function createAndPreparePost(input: CreatePostInput) {
   const storage = getStorageService();
   const profile = await getProfileSettings();
-  const highlights: string[] = JSON.parse(profile.highlights || "[]");
 
-  // טקסט "נקי" בלי סימוני חילוק ידני — משמש לכל מה שאינו הקרוסלה עצמה (הגהה, סקאנר פרטיות, סטורי)
+  // טקסט "נקי" בלי סימוני חילוק ידני — משמש לכל מה שאינו הקרוסלה עצמה (הגהה, סקאנר פרטיות, ריל)
   const cleanText = stripSlideMarkers(input.rawText);
 
   const privacyFlags = scanForIdentifyingDetails(cleanText);
@@ -54,11 +63,16 @@ export async function createAndPreparePost(input: CreatePostInput) {
 
   await storage.saveTextFile(postFolderPath, "טקסט-מקור.txt", input.rawText);
 
+  // תגיות משותפות לכל היעדים של הפוסט הזה (קרוסלה + סטורי יציגו בדיוק
+  // אותן תגיות) — נשמר פעם אחת ב-Post, לא בנפרד לכל PlatformContent.
+  const sharedHashtags = normalizeSharedHashtags(input.manualHashtags);
+
   const post = await prisma.post.create({
     data: {
       slug: dateSlug,
       rawText: input.rawText,
       selectedTargets: JSON.stringify(input.selectedTargets),
+      hashtags: JSON.stringify(sharedHashtags),
       folderPath: postFolderPath,
       privacyFlags: JSON.stringify(privacyFlags),
     },
@@ -96,7 +110,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
       const result = await prepareInstagramCarousel({
         rawText: input.rawText,
         splitMode: input.carouselSplitMode ?? "auto",
-        hashtags: input.manualHashtags ?? undefined,
+        hashtags: sharedHashtags,
         folderPath: subfolder,
         displayName: profile.displayName,
         profileImageDataUri,
@@ -117,27 +131,24 @@ export async function createAndPreparePost(input: CreatePostInput) {
       });
     }
 
-    if (target === "instagram_story") {
-      const result = await prepareInstagramStory({
-        rawText: cleanText,
+    if (target === "instagram_reel") {
+      const result = await prepareInstagramReel({
+        rawText: input.rawText,
         seed: post.id,
         folderPath: subfolder,
-        existingHighlights: highlights,
-        link: input.storyLink,
         storage,
       });
       await prisma.platformContent.create({
         data: {
           postId: post.id,
-          type: "instagram_story",
+          type: "instagram_reel",
           folderPath: subfolder,
-          text: result.marketingLine,
-          files: JSON.stringify(result.files),
-          altText: result.altTexts.join("\n\n"),
-          hashtags: JSON.stringify([]),
+          text: result.altText,
+          files: JSON.stringify([result.file]),
+          altText: result.altText,
+          hashtags: JSON.stringify(sharedHashtags),
           tags: JSON.stringify([]),
           suggestedSongs: JSON.stringify([]),
-          suggestedHighlight: result.suggestedHighlight,
         },
       });
     }
@@ -152,12 +163,11 @@ export async function createAndPreparePost(input: CreatePostInput) {
 /**
  * מעדכנת את הטקסט הגולמי של פוסט קיים, ומרנדרת מחדש את כל התכנים שכבר
  * נוצרו לו (טקסט, תמונות) — כדי שלא יישארו לא מסונכרנים עם הטקסט החדש.
- * שומרת על התגיות שנבחרו לכל תוכן (לא חוזרת להצעה האוטומטית).
+ * משתמשת בתגיות המשותפות הקיימות של הפוסט (לא חוזרת להצעה האוטומטית).
  */
 export async function updatePostRawText(postId: string, newRawText: string) {
   const storage = getStorageService();
   const profile = await getProfileSettings();
-  const highlights: string[] = JSON.parse(profile.highlights || "[]");
 
   const post = await prisma.post.findUniqueOrThrow({
     where: { id: postId },
@@ -175,11 +185,11 @@ export async function updatePostRawText(postId: string, newRawText: string) {
   await storage.saveTextFile(post.folderPath, "טקסט-מקור.txt", newRawText);
 
   const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
+  const sharedHashtags: string[] = JSON.parse(post.hashtags || "[]");
 
   for (const content of post.platformContents) {
     if (content.type === "facebook_post") {
-      const existingHashtags: string[] = JSON.parse(content.hashtags || "[]");
-      const draft = prepareFacebookDraft(cleanText, existingHashtags);
+      const draft = prepareFacebookDraft(cleanText, sharedHashtags);
       await storage.saveTextFile(
         content.folderPath,
         "טקסט-מוכן.txt",
@@ -198,11 +208,10 @@ export async function updatePostRawText(postId: string, newRawText: string) {
     }
 
     if (content.type === "instagram_carousel") {
-      const existingHashtags: string[] = JSON.parse(content.hashtags || "[]");
       const result = await prepareInstagramCarousel({
         rawText: newRawText,
         splitMode: inferredSplitMode,
-        hashtags: existingHashtags,
+        hashtags: sharedHashtags,
         folderPath: content.folderPath,
         displayName: profile.displayName,
         profileImageDataUri,
@@ -221,26 +230,168 @@ export async function updatePostRawText(postId: string, newRawText: string) {
       });
     }
 
-    if (content.type === "instagram_story") {
-      const result = await prepareInstagramStory({
-        rawText: cleanText,
+    if (content.type === "instagram_reel") {
+      const result = await prepareInstagramReel({
+        rawText: newRawText,
         seed: post.id,
         folderPath: content.folderPath,
-        existingHighlights: highlights,
-        link: null,
         storage,
       });
       await prisma.platformContent.update({
         where: { id: content.id },
         data: {
-          text: result.marketingLine,
-          files: JSON.stringify(result.files),
-          altText: result.altTexts.join("\n\n"),
-          suggestedHighlight: result.suggestedHighlight,
+          text: result.altText,
+          files: JSON.stringify([result.file]),
+          altText: result.altText,
+          hashtags: JSON.stringify(sharedHashtags),
         },
       });
     }
   }
+
+  return prisma.post.findUniqueOrThrow({
+    where: { id: postId },
+    include: { platformContents: true },
+  });
+}
+
+/**
+ * מעדכנת את התגיות המשותפות של הפוסט (קרוסלה + ריל — אותן תגיות בדיוק),
+ * ומרנדרת מחדש כל תוכן קיים שמשתמש בהן. #אחתביום לא נשמרת בקלט — היא
+ * מתווספת אוטומטית בכל רינדור (ראו finalizeHashtags).
+ */
+export async function updatePostHashtags(postId: string, hashtags: string[]) {
+  const storage = getStorageService();
+  const profile = await getProfileSettings();
+
+  const post = await prisma.post.findUniqueOrThrow({
+    where: { id: postId },
+    include: { platformContents: true },
+  });
+
+  const sharedHashtags = normalizeSharedHashtags(hashtags);
+  await prisma.post.update({
+    where: { id: postId },
+    data: { hashtags: JSON.stringify(sharedHashtags) },
+  });
+
+  const inferredSplitMode = post.rawText.includes(MANUAL_SLIDE_BREAK) ? "manual" : "auto";
+  const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
+
+  for (const content of post.platformContents) {
+    if (content.type === "instagram_carousel") {
+      const result = await prepareInstagramCarousel({
+        rawText: post.rawText,
+        splitMode: inferredSplitMode,
+        hashtags: sharedHashtags,
+        folderPath: content.folderPath,
+        displayName: profile.displayName,
+        profileImageDataUri,
+        storage,
+      });
+      await prisma.platformContent.update({
+        where: { id: content.id },
+        data: {
+          text: result.text,
+          files: JSON.stringify(result.files),
+          altText: result.altTexts.join("\n\n"),
+          hashtags: JSON.stringify(result.hashtags),
+          tags: JSON.stringify(result.tags),
+          suggestedSongs: JSON.stringify(result.suggestedSongs),
+        },
+      });
+    }
+
+    if (content.type === "instagram_reel") {
+      // אין צורך לקודד מחדש את הווידאו רק בשביל עדכון התגיות — הן לא
+      // מוצגות בתוך הריל בכלל, רק נשמרות כמידע נלווה.
+      await prisma.platformContent.update({
+        where: { id: content.id },
+        data: { hashtags: JSON.stringify(sharedHashtags) },
+      });
+    }
+  }
+
+  return prisma.post.findUniqueOrThrow({
+    where: { id: postId },
+    include: { platformContents: true },
+  });
+}
+
+/**
+ * מוסיפה יעד (קרוסלה/ריל) לפוסט קיים, גם אם לא נבחר בשלב היצירה הראשוני.
+ * משתמשת בטקסט ובתגיות המשותפות הקיימות של הפוסט, בדיוק כמו ביצירה.
+ */
+export async function addTargetToPost(postId: string, target: SelectedTarget) {
+  const storage = getStorageService();
+  const profile = await getProfileSettings();
+
+  const post = await prisma.post.findUniqueOrThrow({
+    where: { id: postId },
+    include: { platformContents: true },
+  });
+
+  if (post.platformContents.some((pc) => pc.type === target)) {
+    throw new Error("היעד הזה כבר קיים לפוסט הזה");
+  }
+
+  const sharedHashtags: string[] = JSON.parse(post.hashtags || "[]");
+  const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
+  const subfolder = await storage.createSubfolder(post.folderPath, SUBFOLDER_NAMES[target]);
+
+  if (target === "instagram_carousel") {
+    const inferredSplitMode = post.rawText.includes(MANUAL_SLIDE_BREAK) ? "manual" : "auto";
+    const result = await prepareInstagramCarousel({
+      rawText: post.rawText,
+      splitMode: inferredSplitMode,
+      hashtags: sharedHashtags,
+      folderPath: subfolder,
+      displayName: profile.displayName,
+      profileImageDataUri,
+      storage,
+    });
+    await prisma.platformContent.create({
+      data: {
+        postId: post.id,
+        type: "instagram_carousel",
+        folderPath: subfolder,
+        text: result.text,
+        files: JSON.stringify(result.files),
+        altText: result.altTexts.join("\n\n"),
+        hashtags: JSON.stringify(result.hashtags),
+        tags: JSON.stringify(result.tags),
+        suggestedSongs: JSON.stringify(result.suggestedSongs),
+      },
+    });
+  }
+
+  if (target === "instagram_reel") {
+    const result = await prepareInstagramReel({
+      rawText: post.rawText,
+      seed: post.id,
+      folderPath: subfolder,
+      storage,
+    });
+    await prisma.platformContent.create({
+      data: {
+        postId: post.id,
+        type: "instagram_reel",
+        folderPath: subfolder,
+        text: result.altText,
+        files: JSON.stringify([result.file]),
+        altText: result.altText,
+        hashtags: JSON.stringify(sharedHashtags),
+        tags: JSON.stringify([]),
+        suggestedSongs: JSON.stringify([]),
+      },
+    });
+  }
+
+  const existingTargets: SelectedTarget[] = JSON.parse(post.selectedTargets || "[]");
+  await prisma.post.update({
+    where: { id: postId },
+    data: { selectedTargets: JSON.stringify([...new Set([...existingTargets, target])]) },
+  });
 
   return prisma.post.findUniqueOrThrow({
     where: { id: postId },
