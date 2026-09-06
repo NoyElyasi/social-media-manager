@@ -45,7 +45,6 @@ export async function getProfileSettings() {
 export async function updateProfileSettings(input: {
   displayName?: string;
   profileImagePath?: string | null;
-  reelBackgroundImagePath?: string | null;
   highlights?: string[];
 }) {
   await getProfileSettings(); // מבטיח שהרשומה קיימת
@@ -55,10 +54,33 @@ export async function updateProfileSettings(input: {
     data: {
       ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
       ...(input.profileImagePath !== undefined ? { profileImagePath: input.profileImagePath } : {}),
-      ...(input.reelBackgroundImagePath !== undefined
-        ? { reelBackgroundImagePath: input.reelBackgroundImagePath }
-        : {}),
       ...(input.highlights !== undefined ? { highlights: JSON.stringify(input.highlights) } : {}),
     },
   });
+}
+
+export type BackgroundKind = "reel" | "carousel";
+
+const BACKGROUND_FIELD: Record<BackgroundKind, "reelBackgroundImagePaths" | "carouselBackgroundImagePaths"> = {
+  reel: "reelBackgroundImagePaths",
+  carousel: "carouselBackgroundImagePaths",
+};
+
+/** מוסיפה נתיב תבנית רקע חדשה (שהועלתה) לרשימת התבניות הזמינות לבחירה, לפי סוג (ריל/קרוסלה). */
+export async function addBackgroundImagePath(kind: BackgroundKind, filePath: string): Promise<string[]> {
+  const profile = await getProfileSettings();
+  const field = BACKGROUND_FIELD[kind];
+  const paths: string[] = JSON.parse(profile[field] || "[]");
+  paths.push(filePath);
+  await prisma.profileSettings.update({ where: { id: "default" }, data: { [field]: JSON.stringify(paths) } });
+  return paths;
+}
+
+/** מסירה נתיב תבנית רקע מרשימת הבחירה (לא מוחקת את הקובץ מהדיסק — פוסטים קיימים שכבר משתמשים בה ימשיכו לעבוד). */
+export async function removeBackgroundImagePath(kind: BackgroundKind, filePath: string): Promise<string[]> {
+  const profile = await getProfileSettings();
+  const field = BACKGROUND_FIELD[kind];
+  const paths: string[] = JSON.parse(profile[field] || "[]").filter((p: string) => p !== filePath);
+  await prisma.profileSettings.update({ where: { id: "default" }, data: { [field]: JSON.stringify(paths) } });
+  return paths;
 }

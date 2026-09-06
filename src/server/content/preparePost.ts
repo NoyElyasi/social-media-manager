@@ -50,6 +50,10 @@ export interface CreatePostInput {
   splitMode?: SplitMode;
   /** אנימציית החשיפה בריל: "word" (מילה-מילה, ברירת מחדל) או "letter" (אות-אות). */
   revealMode?: RevealMode;
+  /** תבנית רקע לקרוסלה, נבחרת מתוך הרקעים שהועלו בהגדרות — null/לא סופק = רקע לבן. */
+  carouselBackgroundPath?: string | null;
+  /** תבנית רקע לריל, נבחרת מתוך הרקעים שהועלו בהגדרות — null/לא סופק = צבע רקע אוטומטי. */
+  reelBackgroundPath?: string | null;
   /** תגיות שהמשתמשת הזינה בעצמה, במקום ההצעה האוטומטית (לכל היעדים). */
   manualHashtags?: string[] | null;
   /** מאפשר עצירה מבוקשת (כפתור "עצור") באמצע יצירת ריל. */
@@ -94,7 +98,8 @@ export async function createAndPreparePost(input: CreatePostInput) {
   });
 
   const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
-  const reelBackgroundImageDataUri = await loadProfileImageDataUri(storage, profile.reelBackgroundImagePath);
+  const carouselBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.carouselBackgroundPath);
+  const reelBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.reelBackgroundPath);
 
   try {
     for (const target of input.selectedTargets) {
@@ -131,6 +136,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           folderPath: subfolder,
           displayName: profile.displayName,
           profileImageDataUri,
+          backgroundImageDataUri: carouselBackgroundImageDataUri,
           storage,
         });
         await prisma.platformContent.create({
@@ -144,6 +150,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
             hashtags: JSON.stringify(result.hashtags),
             tags: JSON.stringify(result.tags),
             suggestedSongs: JSON.stringify(result.suggestedSongs),
+            backgroundImagePath: input.carouselBackgroundPath ?? null,
           },
         });
       }
@@ -172,6 +179,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
             hashtags: JSON.stringify(sharedHashtags),
             tags: JSON.stringify([]),
             suggestedSongs: JSON.stringify([]),
+            backgroundImagePath: input.reelBackgroundPath ?? null,
           },
         });
       }
@@ -225,7 +233,6 @@ export async function updatePostRawText(
   await storage.saveTextFile(post.folderPath, "טקסט-מקור.txt", newRawText);
 
   const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
-  const reelBackgroundImageDataUri = await loadProfileImageDataUri(storage, profile.reelBackgroundImagePath);
   const sharedHashtags: string[] = JSON.parse(post.hashtags || "[]");
 
   for (const content of post.platformContents) {
@@ -249,6 +256,7 @@ export async function updatePostRawText(
     }
 
     if (content.type === "instagram_carousel") {
+      const backgroundImageDataUri = await loadProfileImageDataUri(storage, content.backgroundImagePath);
       const result = await prepareInstagramCarousel({
         rawText: newRawText,
         splitMode,
@@ -256,6 +264,7 @@ export async function updatePostRawText(
         folderPath: content.folderPath,
         displayName: profile.displayName,
         profileImageDataUri,
+        backgroundImageDataUri,
         storage,
       });
       await prisma.platformContent.update({
@@ -272,6 +281,7 @@ export async function updatePostRawText(
     }
 
     if (content.type === "instagram_reel") {
+      const backgroundImageDataUri = await loadProfileImageDataUri(storage, content.backgroundImagePath);
       const result = await prepareInstagramReel({
         rawText: newRawText,
         seed: post.id,
@@ -279,7 +289,7 @@ export async function updatePostRawText(
         storage,
         splitMode,
         revealMode,
-        backgroundImageDataUri: reelBackgroundImageDataUri,
+        backgroundImageDataUri,
         hashtags: sharedHashtags,
         signal: options?.signal,
         onProgress: options?.onProgress,
@@ -325,10 +335,10 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
   const splitMode = post.splitMode as SplitMode;
   const revealMode = post.revealMode as RevealMode;
   const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
-  const reelBackgroundImageDataUri = await loadProfileImageDataUri(storage, profile.reelBackgroundImagePath);
 
   for (const content of post.platformContents) {
     if (content.type === "instagram_carousel") {
+      const backgroundImageDataUri = await loadProfileImageDataUri(storage, content.backgroundImagePath);
       const result = await prepareInstagramCarousel({
         rawText: post.rawText,
         splitMode,
@@ -336,6 +346,7 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
         folderPath: content.folderPath,
         displayName: profile.displayName,
         profileImageDataUri,
+        backgroundImageDataUri,
         storage,
       });
       await prisma.platformContent.update({
@@ -354,6 +365,7 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
     if (content.type === "instagram_reel") {
       // התגיות מוטבעות בפועל בסרטון (שורה נפרדת בראש) — עדכון שלהן חייב
       // רינדור מחדש, לא רק שמירה בשדה.
+      const backgroundImageDataUri = await loadProfileImageDataUri(storage, content.backgroundImagePath);
       const result = await prepareInstagramReel({
         rawText: post.rawText,
         seed: post.id,
@@ -361,7 +373,7 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
         storage,
         splitMode,
         revealMode,
-        backgroundImageDataUri: reelBackgroundImageDataUri,
+        backgroundImageDataUri,
         hashtags: sharedHashtags,
       });
       await prisma.platformContent.update({
@@ -407,7 +419,6 @@ export async function addTargetToPost(
   const splitMode = post.splitMode as SplitMode;
   const revealMode = post.revealMode as RevealMode;
   const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
-  const reelBackgroundImageDataUri = await loadProfileImageDataUri(storage, profile.reelBackgroundImagePath);
   const subfolder = await storage.createSubfolder(post.folderPath, SUBFOLDER_NAMES[target]);
 
   if (target === "instagram_carousel") {
@@ -443,7 +454,6 @@ export async function addTargetToPost(
       storage,
       splitMode,
       revealMode,
-      backgroundImageDataUri: reelBackgroundImageDataUri,
       hashtags: sharedHashtags,
       signal: options?.signal,
       onProgress: options?.onProgress,

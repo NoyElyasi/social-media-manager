@@ -11,6 +11,8 @@ const createPostSchema = z.object({
     .min(1, "יש לבחור לפחות יעד אחד"),
   splitMode: z.enum(["auto", "manual"]).optional(),
   revealMode: z.enum(["word", "letter"]).optional(),
+  carouselBackgroundPath: z.string().nullable().optional(),
+  reelBackgroundPath: z.string().nullable().optional(),
   manualHashtags: z.array(z.string()).optional().nullable(),
 });
 

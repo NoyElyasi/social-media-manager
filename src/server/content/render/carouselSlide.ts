@@ -24,6 +24,8 @@ export interface CarouselSlideInput {
   pageCount: number;
   displayName: string;
   profileImageDataUri?: string | null;
+  /** תבנית רקע שהועלתה ונבחרה בזמן יצירת הפוסט — מחליפה את הרקע הלבן לגמרי (בלי בחירה: לבן כבררת מחדל, כמו קודם). */
+  backgroundImageDataUri?: string | null;
 }
 
 function avatarNode(displayName: string, profileImageDataUri: string | null | undefined) {
@@ -65,6 +67,7 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
     {
       style: {
         display: "flex",
+        position: "relative",
         flexDirection: "column",
         width: CAROUSEL_WIDTH,
         height: CAROUSEL_HEIGHT,
@@ -73,6 +76,22 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
         fontFamily: "Noto Sans Hebrew, Noto Sans Hebrew Latin",
       },
     },
+    // תבנית רקע נבחרת (אם יש) מחליפה את הלבן לגמרי — תמונה מלאה מתחת לכל
+    // התוכן (כרטיס הפרופיל/הטקסט מצוירים אחריה ב-DOM, ולכן מעליה חזותית).
+    !!input.backgroundImageDataUri &&
+      h("img", {
+        src: input.backgroundImageDataUri,
+        width: CAROUSEL_WIDTH,
+        height: CAROUSEL_HEIGHT,
+        style: {
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: CAROUSEL_WIDTH,
+          height: CAROUSEL_HEIGHT,
+          objectFit: "cover",
+        },
+      }),
     // עוטפים את הכותרת (תמונת פרופיל + שם + תגיות) ואת גוף הטקסט יחד כיחידה אחת,
     // וממרכזים את *היחידה* אנכית בשטח הפנוי — כך שהמרחק הפנימי בין הכותרת
     // לטקסט נשאר קבוע וקטן, אבל כל הבלוק יחד יכול לזוז מעלה/מטה בעמוד.

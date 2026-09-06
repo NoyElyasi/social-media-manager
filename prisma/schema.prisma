@@ -65,6 +65,11 @@ model PlatformContent {
   suggestedSongs  String // JSON array of {title, artist}
   suggestedHighlight String? // לסטורי בלבד
   backgroundColor String? // hex — רקע הסטורי (סעיף 4.6); null = נבחר אוטומטית
+  // איזו תבנית רקע שהועלתה בהגדרות (קרוסלה או ריל, לפי type) נבחרה לתוכן הזה
+  // בזמן יצירת הפוסט — null = בלי תבנית (קרוסלה: רקע לבן; ריל: צבע אוטומטי).
+  // נשמר במפורש כדי שרינדורים חדשים לתוכן הזה (עדכון טקסט/תגיות) ימשיכו
+  // להשתמש באותה תבנית, ולא יחזרו לבררת המחדל.
+  backgroundImagePath String?
 
   publishedAt   DateTime?
   status        ContentStatus @default(draft)
@@ -75,10 +80,13 @@ model PlatformContent {
 
 // פרופיל תצוגה קבוע שמוצג בעמודי הקרוסלה/ריל
 model ProfileSettings {
-  id                      String   @id @default("default")
-  displayName             String   @default("")
-  profileImagePath        String? // נתיב לקובץ תמונת פרופיל באחסון המקומי
-  reelBackgroundImagePath String? // תבנית רקע קבועה לסרטוני הריל (נתיב לקובץ)
-  highlights              String   @default("[]") // JSON array of highlight names
-  updatedAt               DateTime @updatedAt
+  id               String @id @default("default")
+  displayName      String @default("")
+  profileImagePath String? // נתיב לקובץ תמונת פרופיל באחסון המקומי
+  // תבניות רקע שהועלו לבחירה (JSON array של נתיבי קבצים) — נבחרת אחת מהן,
+  // או אף אחת, בזמן יצירת פוסט (ראו PlatformContent.backgroundImagePath).
+  reelBackgroundImagePaths     String   @default("[]")
+  carouselBackgroundImagePaths String   @default("[]")
+  highlights                   String   @default("[]") // JSON array of highlight names
+  updatedAt                    DateTime @updatedAt
 }

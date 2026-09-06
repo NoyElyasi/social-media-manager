@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { SELECTABLE_TARGETS, ALWAYS_FIRST_HASHTAG, type SelectedTarget } from "@/lib/labels";
 import { readNdjsonStream, estimateRemainingSeconds } from "@/lib/ndjsonStream";
 import ReelProgress from "@/components/ReelProgress";
+import BackgroundPicker from "@/components/BackgroundPicker";
+import type { BackgroundItem } from "@/components/BackgroundGallery";
+import { buildFileUrlFromPath } from "@/lib/files";
 
 const MANUAL_SLIDE_BREAK = "///";
 const GLUE_MARKER = "&&";
@@ -16,6 +19,8 @@ interface DraftShape {
   splitMode: "auto" | "manual";
   revealMode: "word" | "letter";
   manualHashtags: string;
+  carouselBackgroundPath: string | null;
+  reelBackgroundPath: string | null;
 }
 
 /** קורא שדה בודד מהטיוטה השמורה מקומית. תמיד מוגן מ-SSR (window לא קיים) ומ-JSON פגום. */
@@ -43,6 +48,14 @@ export default function NewPostPage() {
   const [splitMode, setSplitMode] = useState<"auto" | "manual">(() => loadDraft().splitMode ?? "auto");
   const [revealMode, setRevealMode] = useState<"word" | "letter">(() => loadDraft().revealMode ?? "word");
   const [manualHashtags, setManualHashtags] = useState(() => loadDraft().manualHashtags ?? "");
+  const [carouselBackgroundPath, setCarouselBackgroundPath] = useState<string | null>(
+    () => loadDraft().carouselBackgroundPath ?? null
+  );
+  const [reelBackgroundPath, setReelBackgroundPath] = useState<string | null>(
+    () => loadDraft().reelBackgroundPath ?? null
+  );
+  const [carouselBackgrounds, setCarouselBackgrounds] = useState<BackgroundItem[]>([]);
+  const [reelBackgrounds, setReelBackgrounds] = useState<BackgroundItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
@@ -51,9 +64,30 @@ export default function NewPostPage() {
 
   // שומר את הטיוטה בכל שינוי.
   useEffect(() => {
-    const draft: DraftShape = { rawText, selectedTargets, splitMode, revealMode, manualHashtags };
+    const draft: DraftShape = {
+      rawText,
+      selectedTargets,
+      splitMode,
+      revealMode,
+      manualHashtags,
+      carouselBackgroundPath,
+      reelBackgroundPath,
+    };
     window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-  }, [rawText, selectedTargets, splitMode, revealMode, manualHashtags]);
+  }, [rawText, selectedTargets, splitMode, revealMode, manualHashtags, carouselBackgroundPath, reelBackgroundPath]);
+
+  // טוען את רשימת תבניות הרקע שהועלו בהגדרות, לבחירה בזמן יצירת הפוסט.
+  useEffect(() => {
+    fetch("/api/settings/profile")
+      .then((res) => res.json())
+      .then((data) => {
+        const paths: string[] = data.profile?.carouselBackgroundImagePaths ?? [];
+        const reelPaths: string[] = data.profile?.reelBackgroundImagePaths ?? [];
+        setCarouselBackgrounds(paths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
+        setReelBackgrounds(reelPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
+      })
+      .catch(() => {});
+  }, []);
 
   function insertMarkerAt(
     textarea: HTMLTextAreaElement,
@@ -118,6 +152,8 @@ export default function NewPostPage() {
           splitMode,
           revealMode,
           manualHashtags: manualHashtags.trim() ? manualHashtags.trim().split(/\s+/) : null,
+          carouselBackgroundPath,
+          reelBackgroundPath,
         }),
         signal: controller.signal,
       });
@@ -265,6 +301,30 @@ export default function NewPostPage() {
               אות-אות
             </label>
           </div>
+        </div>
+      )}
+
+      {selectedTargets.includes("instagram_carousel") && carouselBackgrounds.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border p-3 bg-neutral-50">
+          <label className="font-medium text-sm">רקע לפוסט הקרוסלה</label>
+          <BackgroundPicker
+            items={carouselBackgrounds}
+            selected={carouselBackgroundPath}
+            onSelect={setCarouselBackgroundPath}
+            noneLabel="ללא (רקע לבן)"
+          />
+        </div>
+      )}
+
+      {selectedTargets.includes("instagram_reel") && reelBackgrounds.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border p-3 bg-neutral-50">
+          <label className="font-medium text-sm">רקע לריל</label>
+          <BackgroundPicker
+            items={reelBackgrounds}
+            selected={reelBackgroundPath}
+            onSelect={setReelBackgroundPath}
+            noneLabel="ללא תבנית (רקע אוטומטי)"
+          />
         </div>
       )}
 
