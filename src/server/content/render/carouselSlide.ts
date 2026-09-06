@@ -21,7 +21,10 @@ const BODY_LINE_GAP = 20;
 // שתואמים את פלטת התבניות (קרם/ורוד/אדום), בדיוק כמו TEMPLATE_TEXT_COLOR בריל.
 const COVER_HASHTAG_COLOR = "#C41E3A";
 const COVER_UNDERLINE_COLOR = "#E7A9B8";
-const COVER_FONT_SIZE = 88;
+// גדול ועבה יותר לפי בקשה מפורשת (הועלה מ-88/700) — 900 (Black) הוא המשקל
+// הכבד ביותר שיש לגופן העברי שלנו (ראו fonts.ts), Bold (700) לא היה עבה מספיק.
+const COVER_FONT_SIZE = 120;
+const COVER_FONT_WEIGHT = 900;
 const COVER_HORIZONTAL_PADDING = 90;
 const COVER_UNDERLINE_WIDTH = 220;
 
@@ -236,7 +239,7 @@ export function buildCoverSlideNode(input: CoverSlideInput): SatoriNode {
       { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 16 } },
       ...renderPreparedLines(prepareRtlWordLines(input.hashtagText, COVER_FONT_SIZE, availableWidth), {
         fontSize: COVER_FONT_SIZE,
-        fontWeight: 700,
+        fontWeight: COVER_FONT_WEIGHT,
         color: COVER_HASHTAG_COLOR,
         justifyContent: "center",
       }),
