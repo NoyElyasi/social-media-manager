@@ -12,6 +12,7 @@ export async function GET() {
       highlights: JSON.parse(profile.highlights || "[]"),
       reelBackgroundImagePaths: JSON.parse(profile.reelBackgroundImagePaths || "[]"),
       carouselBackgroundImagePaths: JSON.parse(profile.carouselBackgroundImagePaths || "[]"),
+      coverBackgroundImagePaths: JSON.parse(profile.coverBackgroundImagePaths || "[]"),
     },
   });
 }

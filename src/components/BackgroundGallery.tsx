@@ -27,7 +27,7 @@ export default function BackgroundGallery({
   hint,
   initial,
 }: {
-  kind: "reel" | "carousel";
+  kind: "reel" | "carousel" | "cover";
   title: string;
   hint: string;
   initial: BackgroundItem[];

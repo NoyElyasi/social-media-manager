@@ -17,6 +17,14 @@ const FB_AVATAR_BG = "#E4E6EB";
 const BODY_FONT_SIZE = MIN_FONT_SIZE_CAROUSEL + 14;
 const BODY_LINE_GAP = 20;
 
+// עמוד שער: כותרת גדולה (התיוג הראשי) במרכז, מעל תבנית רקע — צבעים קבועים
+// שתואמים את פלטת התבניות (קרם/ורוד/אדום), בדיוק כמו TEMPLATE_TEXT_COLOR בריל.
+const COVER_HASHTAG_COLOR = "#C41E3A";
+const COVER_UNDERLINE_COLOR = "#E7A9B8";
+const COVER_FONT_SIZE = 88;
+const COVER_HORIZONTAL_PADDING = 90;
+const COVER_UNDERLINE_WIDTH = 220;
+
 export interface CarouselSlideInput {
   bodyText: string;
   hashtags: string[];
@@ -176,6 +184,65 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
         },
         `${input.pageIndex} / ${input.pageCount}`
       )
+    )
+  );
+}
+
+export interface CoverSlideInput {
+  /** תבנית הרקע שהועלתה ונבחרה בהגדרות לעמוד שער — מלאה, בלי fallback (בלי בחירה, אין עמוד שער בכלל). */
+  backgroundImageDataUri: string;
+  /** התיוג הראשי שיוצג גדול במרכז (בלי #אחתביום — היא כבר מוטבעת בתבנית הרקע עצמה). */
+  hashtagText: string;
+}
+
+/**
+ * עמוד שער אופציונלי לקרוסלה: תבנית רקע מלאה עם התיוג הראשי של הפוסט מוצג
+ * גדול, ממורכז, עם קו תחתון דקורטיבי — בלי כרטיס פרופיל/מספור עמודים
+ * (לא נספר ב-pageIndex/pageCount של שאר העמודים, ראו instagramCarousel.ts).
+ */
+export function buildCoverSlideNode(input: CoverSlideInput): SatoriNode {
+  const availableWidth = CAROUSEL_WIDTH - 2 * COVER_HORIZONTAL_PADDING;
+
+  return h(
+    "div",
+    {
+      style: {
+        display: "flex",
+        position: "relative",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        width: CAROUSEL_WIDTH,
+        height: CAROUSEL_HEIGHT,
+        padding: COVER_HORIZONTAL_PADDING,
+        fontFamily: "Noto Sans Hebrew, Noto Sans Hebrew Latin",
+      },
+    },
+    h("img", {
+      src: input.backgroundImageDataUri,
+      width: CAROUSEL_WIDTH,
+      height: CAROUSEL_HEIGHT,
+      style: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: CAROUSEL_WIDTH,
+        height: CAROUSEL_HEIGHT,
+        objectFit: "cover",
+      },
+    }),
+    h(
+      "div",
+      { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 16 } },
+      ...renderPreparedLines(prepareRtlWordLines(input.hashtagText, COVER_FONT_SIZE, availableWidth), {
+        fontSize: COVER_FONT_SIZE,
+        fontWeight: 700,
+        color: COVER_HASHTAG_COLOR,
+        justifyContent: "center",
+      }),
+      h("div", {
+        style: { display: "flex", width: COVER_UNDERLINE_WIDTH, height: 6, backgroundColor: COVER_UNDERLINE_COLOR },
+      })
     )
   );
 }

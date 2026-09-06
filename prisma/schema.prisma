@@ -70,6 +70,10 @@ model PlatformContent {
   // נשמר במפורש כדי שרינדורים חדשים לתוכן הזה (עדכון טקסט/תגיות) ימשיכו
   // להשתמש באותה תבנית, ולא יחזרו לבררת המחדל.
   backgroundImagePath String?
+  // תבנית רקע לעמוד שער (רק בקרוסלה) — אם קיים, נוסף עמוד ראשון נוסף (לא
+  // נספר במספור "X/Y" של שאר העמודים) עם הרקע הזה והתיוג הראשי של הפוסט
+  // מוצג עליו במרכז, גדול. null = בלי עמוד שער.
+  coverImagePath String?
 
   publishedAt   DateTime?
   status        ContentStatus @default(draft)
@@ -87,6 +91,8 @@ model ProfileSettings {
   // או אף אחת, בזמן יצירת פוסט (ראו PlatformContent.backgroundImagePath).
   reelBackgroundImagePaths     String   @default("[]")
   carouselBackgroundImagePaths String   @default("[]")
-  highlights                   String   @default("[]") // JSON array of highlight names
+  // תבניות רקע לעמוד השער (הראשון, עם התיוג הראשי במרכז) — ראו PlatformContent.coverImagePath.
+  coverBackgroundImagePaths String   @default("[]")
+  highlights                String   @default("[]") // JSON array of highlight names
   updatedAt                    DateTime @updatedAt
 }

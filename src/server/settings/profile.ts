@@ -59,11 +59,15 @@ export async function updateProfileSettings(input: {
   });
 }
 
-export type BackgroundKind = "reel" | "carousel";
+export type BackgroundKind = "reel" | "carousel" | "cover";
 
-const BACKGROUND_FIELD: Record<BackgroundKind, "reelBackgroundImagePaths" | "carouselBackgroundImagePaths"> = {
+const BACKGROUND_FIELD: Record<
+  BackgroundKind,
+  "reelBackgroundImagePaths" | "carouselBackgroundImagePaths" | "coverBackgroundImagePaths"
+> = {
   reel: "reelBackgroundImagePaths",
   carousel: "carouselBackgroundImagePaths",
+  cover: "coverBackgroundImagePaths",
 };
 
 /** מוסיפה נתיב תבנית רקע חדשה (שהועלתה) לרשימת התבניות הזמינות לבחירה, לפי סוג (ריל/קרוסלה). */

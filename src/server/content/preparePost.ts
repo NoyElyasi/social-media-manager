@@ -54,6 +54,8 @@ export interface CreatePostInput {
   carouselBackgroundPath?: string | null;
   /** תבנית רקע לריל, נבחרת מתוך הרקעים שהועלו בהגדרות — null/לא סופק = צבע רקע אוטומטי. */
   reelBackgroundPath?: string | null;
+  /** תבנית רקע לעמוד שער בקרוסלה — null/לא סופק = בלי עמוד שער. */
+  coverBackgroundPath?: string | null;
   /** תגיות שהמשתמשת הזינה בעצמה, במקום ההצעה האוטומטית (לכל היעדים). */
   manualHashtags?: string[] | null;
   /** מאפשר עצירה מבוקשת (כפתור "עצור") באמצע יצירת ריל. */
@@ -100,6 +102,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
   const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
   const carouselBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.carouselBackgroundPath);
   const reelBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.reelBackgroundPath);
+  const coverBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.coverBackgroundPath);
 
   try {
     for (const target of input.selectedTargets) {
@@ -137,6 +140,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           displayName: profile.displayName,
           profileImageDataUri,
           backgroundImageDataUri: carouselBackgroundImageDataUri,
+          coverBackgroundImageDataUri,
           storage,
         });
         await prisma.platformContent.create({
@@ -151,6 +155,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
             tags: JSON.stringify(result.tags),
             suggestedSongs: JSON.stringify(result.suggestedSongs),
             backgroundImagePath: input.carouselBackgroundPath ?? null,
+            coverImagePath: input.coverBackgroundPath ?? null,
           },
         });
       }
@@ -257,6 +262,7 @@ export async function updatePostRawText(
 
     if (content.type === "instagram_carousel") {
       const backgroundImageDataUri = await loadProfileImageDataUri(storage, content.backgroundImagePath);
+      const coverBackgroundImageDataUri = await loadProfileImageDataUri(storage, content.coverImagePath);
       const result = await prepareInstagramCarousel({
         rawText: newRawText,
         splitMode,
@@ -265,6 +271,7 @@ export async function updatePostRawText(
         displayName: profile.displayName,
         profileImageDataUri,
         backgroundImageDataUri,
+        coverBackgroundImageDataUri,
         storage,
       });
       await prisma.platformContent.update({
@@ -338,7 +345,10 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
 
   for (const content of post.platformContents) {
     if (content.type === "instagram_carousel") {
+      // אם יש עמוד שער, התיוג הראשי מוטבע בפועל בתמונה — עדכון תגיות חייב
+      // רינדור מחדש (לא רק שמירה בשדה), אחרת גם בלי עמוד שער.
       const backgroundImageDataUri = await loadProfileImageDataUri(storage, content.backgroundImagePath);
+      const coverBackgroundImageDataUri = await loadProfileImageDataUri(storage, content.coverImagePath);
       const result = await prepareInstagramCarousel({
         rawText: post.rawText,
         splitMode,
@@ -347,6 +357,7 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
         displayName: profile.displayName,
         profileImageDataUri,
         backgroundImageDataUri,
+        coverBackgroundImageDataUri,
         storage,
       });
       await prisma.platformContent.update({

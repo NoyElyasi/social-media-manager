@@ -8,10 +8,11 @@ import { getStorageService } from "@/server/storage";
 const FOLDER_BY_KIND: Record<BackgroundKind, string> = {
   reel: path.join("פרופיל", "רקעי-ריל"),
   carousel: path.join("פרופיל", "רקעי-קרוסלה"),
+  cover: path.join("פרופיל", "רקעי-שער"),
 };
 
 const addSchema = z.object({
-  kind: z.enum(["reel", "carousel"]),
+  kind: z.enum(["reel", "carousel", "cover"]),
   imageBase64: z.string().min(1),
   ext: z.enum(["png", "jpg", "jpeg"]),
 });
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
 }
 
 const removeSchema = z.object({
-  kind: z.enum(["reel", "carousel"]),
+  kind: z.enum(["reel", "carousel", "cover"]),
   path: z.string().min(1),
 });
 

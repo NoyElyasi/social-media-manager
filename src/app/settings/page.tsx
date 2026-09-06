@@ -10,6 +10,7 @@ export default async function SettingsPage() {
   const highlights: string[] = JSON.parse(profile.highlights || "[]");
   const reelBackgroundPaths: string[] = JSON.parse(profile.reelBackgroundImagePaths || "[]");
   const carouselBackgroundPaths: string[] = JSON.parse(profile.carouselBackgroundImagePaths || "[]");
+  const coverBackgroundPaths: string[] = JSON.parse(profile.coverBackgroundImagePaths || "[]");
 
   return (
     <div className="flex flex-col gap-6">
@@ -34,6 +35,12 @@ export default async function SettingsPage() {
         title="תבניות רקע לריל"
         hint="אפשר להעלות כמה תבניות ולבחור מבינהן בזמן יצירת פוסט. בלי בחירה — נבחר צבע רקע אוטומטי."
         initial={reelBackgroundPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) }))}
+      />
+      <BackgroundGallery
+        kind="cover"
+        title="תבניות רקע לעמוד שער (בקרוסלה)"
+        hint="אם בוחרים תבנית כזו ביצירת פוסט, מתווסף עמוד ראשון נוסף עם הרקע הזה והתיוג הראשי של הפוסט מוצג עליו גדול, במרכז."
+        initial={coverBackgroundPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) }))}
       />
     </div>
   );

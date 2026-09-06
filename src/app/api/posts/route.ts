@@ -13,6 +13,7 @@ const createPostSchema = z.object({
   revealMode: z.enum(["word", "letter"]).optional(),
   carouselBackgroundPath: z.string().nullable().optional(),
   reelBackgroundPath: z.string().nullable().optional(),
+  coverBackgroundPath: z.string().nullable().optional(),
   manualHashtags: z.array(z.string()).optional().nullable(),
 });
 

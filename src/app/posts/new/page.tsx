@@ -21,6 +21,7 @@ interface DraftShape {
   manualHashtags: string;
   carouselBackgroundPath: string | null;
   reelBackgroundPath: string | null;
+  coverBackgroundPath: string | null;
 }
 
 /** קורא שדה בודד מהטיוטה השמורה מקומית. תמיד מוגן מ-SSR (window לא קיים) ומ-JSON פגום. */
@@ -54,8 +55,12 @@ export default function NewPostPage() {
   const [reelBackgroundPath, setReelBackgroundPath] = useState<string | null>(
     () => loadDraft().reelBackgroundPath ?? null
   );
+  const [coverBackgroundPath, setCoverBackgroundPath] = useState<string | null>(
+    () => loadDraft().coverBackgroundPath ?? null
+  );
   const [carouselBackgrounds, setCarouselBackgrounds] = useState<BackgroundItem[]>([]);
   const [reelBackgrounds, setReelBackgrounds] = useState<BackgroundItem[]>([]);
+  const [coverBackgrounds, setCoverBackgrounds] = useState<BackgroundItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
@@ -72,9 +77,19 @@ export default function NewPostPage() {
       manualHashtags,
       carouselBackgroundPath,
       reelBackgroundPath,
+      coverBackgroundPath,
     };
     window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-  }, [rawText, selectedTargets, splitMode, revealMode, manualHashtags, carouselBackgroundPath, reelBackgroundPath]);
+  }, [
+    rawText,
+    selectedTargets,
+    splitMode,
+    revealMode,
+    manualHashtags,
+    carouselBackgroundPath,
+    reelBackgroundPath,
+    coverBackgroundPath,
+  ]);
 
   // טוען את רשימת תבניות הרקע שהועלו בהגדרות, לבחירה בזמן יצירת הפוסט.
   useEffect(() => {
@@ -83,8 +98,10 @@ export default function NewPostPage() {
       .then((data) => {
         const paths: string[] = data.profile?.carouselBackgroundImagePaths ?? [];
         const reelPaths: string[] = data.profile?.reelBackgroundImagePaths ?? [];
+        const coverPaths: string[] = data.profile?.coverBackgroundImagePaths ?? [];
         setCarouselBackgrounds(paths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
         setReelBackgrounds(reelPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
+        setCoverBackgrounds(coverPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
       })
       .catch(() => {});
   }, []);
@@ -154,6 +171,7 @@ export default function NewPostPage() {
           manualHashtags: manualHashtags.trim() ? manualHashtags.trim().split(/\s+/) : null,
           carouselBackgroundPath,
           reelBackgroundPath,
+          coverBackgroundPath,
         }),
         signal: controller.signal,
       });
@@ -312,6 +330,18 @@ export default function NewPostPage() {
             selected={carouselBackgroundPath}
             onSelect={setCarouselBackgroundPath}
             noneLabel="ללא (רקע לבן)"
+          />
+        </div>
+      )}
+
+      {selectedTargets.includes("instagram_carousel") && coverBackgrounds.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border p-3 bg-neutral-50">
+          <label className="font-medium text-sm">עמוד שער (עמוד ראשון עם התיוג הראשי במרכז)</label>
+          <BackgroundPicker
+            items={coverBackgrounds}
+            selected={coverBackgroundPath}
+            onSelect={setCoverBackgroundPath}
+            noneLabel="ללא עמוד שער"
           />
         </div>
       )}
