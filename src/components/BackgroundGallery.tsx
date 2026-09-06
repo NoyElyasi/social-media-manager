@@ -34,35 +34,43 @@ export default function BackgroundGallery({
 }) {
   const router = useRouter();
   const [items, setItems] = useState(initial);
-  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleUpload(file: File) {
+  async function uploadOne(file: File): Promise<void> {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext !== "png" && ext !== "jpg" && ext !== "jpeg") {
+      setError(`${file.name}: פורמט לא נתמך — רק PNG/JPG`);
+      return;
+    }
+    const buffer = await file.arrayBuffer();
+    const imageBase64 = arrayBufferToBase64(buffer);
+    const res = await fetch("/api/settings/backgrounds", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, imageBase64, ext }),
+    });
+    if (!res.ok) {
+      setError(`שגיאה בהעלאת ${file.name} — נסו שוב`);
+      return;
+    }
+    const { paths } = await res.json();
+    const latestPath: string = paths[paths.length - 1];
+    setItems((prev) => [...prev, { path: latestPath, url: buildFileUrlFromPath(latestPath) }]);
+  }
+
+  /** מעלה כמה קבצים ברצף — לפי בקשה מפורשת "לא רוצה להוסיף רקע-רקע", כדי לא להצטרך לבחור קובץ בכל פעם מחדש. */
+  async function handleUploadMany(files: File[]) {
     setError(null);
-    setUploading(true);
+    setUploadProgress({ done: 0, total: files.length });
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase();
-      if (ext !== "png" && ext !== "jpg" && ext !== "jpeg") {
-        setError("פורמט לא נתמך — רק PNG/JPG");
-        return;
-      }
-      const buffer = await file.arrayBuffer();
-      const imageBase64 = arrayBufferToBase64(buffer);
-      const res = await fetch("/api/settings/backgrounds", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, imageBase64, ext }),
-      });
-      if (!res.ok) {
-        setError("שגיאה בהעלאת הרקע — נסו שוב");
-        return;
+      for (let i = 0; i < files.length; i++) {
+        await uploadOne(files[i]);
+        setUploadProgress({ done: i + 1, total: files.length });
       }
       router.refresh();
-      const { paths } = await res.json();
-      const latestPath: string = paths[paths.length - 1];
-      setItems((prev) => [...prev, { path: latestPath, url: buildFileUrlFromPath(latestPath) }]);
     } finally {
-      setUploading(false);
+      setUploadProgress(null);
     }
   }
 
@@ -102,16 +110,17 @@ export default function BackgroundGallery({
           </div>
         ))}
 
-        <label className="flex h-32 w-24 items-center justify-center rounded-md border border-dashed text-xs text-neutral-500 hover:bg-neutral-50 cursor-pointer">
-          {uploading ? "מעלה..." : "+ הוספה"}
+        <label className="flex h-32 w-24 items-center justify-center rounded-md border border-dashed text-xs text-neutral-500 hover:bg-neutral-50 cursor-pointer text-center">
+          {uploadProgress ? `מעלה ${uploadProgress.done}/${uploadProgress.total}...` : "+ הוספה (אפשר לבחור כמה)"}
           <input
             type="file"
             accept="image/png,image/jpeg"
+            multiple
             className="hidden"
-            disabled={uploading}
+            disabled={!!uploadProgress}
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void handleUpload(file);
+              const files = Array.from(e.target.files ?? []);
+              if (files.length > 0) void handleUploadMany(files);
               e.target.value = "";
             }}
           />

@@ -17,6 +17,19 @@ const FB_AVATAR_BG = "#E4E6EB";
 const BODY_FONT_SIZE = MIN_FONT_SIZE_CAROUSEL + 14;
 const BODY_LINE_GAP = 20;
 
+// מיקום קבוע (לא יחסי לגובה התוכן) לתחילת הכותרת/טקסט — לפי בקשה מפורשת
+// "המיקום משתנה כל עמוד, אני רוצה שיהיה קבוע" (הגרסה הקודמת השתמשה ב-flex
+// כדי למרכז אנכית, ולכן זזה בהתאם לכמות השורות). לא גבוה מידי (יש רווח נוח
+// מהראש) ולא צמוד מידי לימין (ראו CONTENT_RIGHT_INSET, בדיוק כמו CAPTION_RIGHT_INSET בריל).
+const CONTENT_TOP_OFFSET = 320;
+const CONTENT_RIGHT_INSET = 40;
+const CONTENT_RIGHT_OFFSET = HORIZONTAL_PADDING + CONTENT_RIGHT_INSET;
+const FOOTER_BOTTOM_OFFSET = 56;
+
+// גדול יותר לפי בקשה מפורשת ("הלוגו של תמונת הפרופיל קטן מידי") — היה 84.
+const AVATAR_SIZE = 120;
+const AVATAR_NAME_FONT_SIZE = 38;
+
 // עמוד שער: כותרת גדולה (התיוג הראשי) במרכז, מעל תבנית רקע — צבעים קבועים
 // שתואמים את פלטת התבניות (קרם/ורוד/אדום), בדיוק כמו TEMPLATE_TEXT_COLOR בריל.
 const COVER_HASHTAG_COLOR = "#C41E3A";
@@ -43,8 +56,8 @@ function avatarNode(displayName: string, profileImageDataUri: string | null | un
   if (profileImageDataUri) {
     return h("img", {
       src: profileImageDataUri,
-      width: 84,
-      height: 84,
+      width: AVATAR_SIZE,
+      height: AVATAR_SIZE,
       style: { borderRadius: "50%", objectFit: "cover" },
     });
   }
@@ -54,13 +67,13 @@ function avatarNode(displayName: string, profileImageDataUri: string | null | un
     {
       style: {
         display: "flex",
-        width: 84,
-        height: 84,
+        width: AVATAR_SIZE,
+        height: AVATAR_SIZE,
         borderRadius: "50%",
         backgroundColor: FB_AVATAR_BG,
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 30,
+        fontSize: 40,
         fontWeight: 700,
         color: FB_SECONDARY_COLOR,
       },
@@ -70,7 +83,7 @@ function avatarNode(displayName: string, profileImageDataUri: string | null | un
 }
 
 export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
-  const availableWidth = CAROUSEL_WIDTH - 2 * HORIZONTAL_PADDING;
+  const availableWidth = CAROUSEL_WIDTH - 2 * HORIZONTAL_PADDING - CONTENT_RIGHT_INSET;
   const fontSize = BODY_FONT_SIZE;
 
   return h(
@@ -104,16 +117,18 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
         },
       }),
     // עוטפים את הכותרת (תמונת פרופיל + שם + תגיות) ואת גוף הטקסט יחד כיחידה אחת,
-    // וממרכזים את *היחידה* אנכית בשטח הפנוי — כך שהמרחק הפנימי בין הכותרת
-    // לטקסט נשאר קבוע וקטן, אבל כל הבלוק יחד יכול לזוז מעלה/מטה בעמוד.
+    // במיקום קבוע (position:absolute) — לא תלוי בכמות השורות בפועל, כך שכל
+    // עמוד מתחיל מאותה נקודה בדיוק (לפי בקשה מפורשת, ראו CONTENT_TOP_OFFSET).
     h(
       "div",
       {
         style: {
           display: "flex",
+          position: "absolute",
           flexDirection: "column",
-          flex: 1,
-          justifyContent: "center",
+          alignItems: "flex-end",
+          top: CONTENT_TOP_OFFSET,
+          right: CONTENT_RIGHT_OFFSET,
         },
       },
       // כותרת (תמונת פרופיל + שם) ותגיות — רק בעמוד הראשון, בדיוק כמו כותרת פוסט בפייסבוק
@@ -128,12 +143,12 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
                   flexDirection: "row-reverse",
                   alignItems: "center",
                   gap: 20,
-                  marginBottom: 20,
+                  marginBottom: 24,
                 },
               },
               avatarNode(input.displayName, input.profileImageDataUri),
               buildWordRowNode(input.displayName.split(/\s+/).filter(Boolean), {
-                fontSize: 32,
+                fontSize: AVATAR_NAME_FONT_SIZE,
                 fontWeight: 700,
                 color: FB_TEXT_COLOR,
               })
@@ -173,6 +188,10 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
       {
         style: {
           display: "flex",
+          position: "absolute",
+          bottom: FOOTER_BOTTOM_OFFSET,
+          left: 0,
+          right: 0,
           justifyContent: "center",
         },
       },

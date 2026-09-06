@@ -67,8 +67,13 @@ export default function NewPostPage() {
   const startedAtRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // שומר את הטיוטה בכל שינוי.
+  // שומר את הטיוטה בכל שינוי — אבל לא דורסים טיוטה קיימת בדיסק במצב ריק
+  // (לפני שהוקלד תוכן, או אם ה-state התאפס מסיבה כלשהי): בלי זה, כל דריסה
+  // בטעות של ה-localStorage (למשל ניקוי ידני בכלי פיתוח, או תג אחר שנקרא
+  // מהדפדפן) הופכת מיד לבלתי-הפיכה, כי ה-effect הזה כותב חזרה על גביה.
   useEffect(() => {
+    const isEmptyDraft = !rawText.trim() && !manualHashtags.trim();
+    if (isEmptyDraft) return;
     const draft: DraftShape = {
       rawText,
       selectedTargets,
