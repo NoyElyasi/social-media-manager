@@ -3,6 +3,7 @@ import { z, flattenError } from "zod";
 import { prisma } from "@/server/db";
 import { updatePostRawText } from "@/server/content/preparePost";
 import { ReelCancelledError } from "@/server/content/instagramReel";
+import { getStorageService } from "@/server/storage";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -72,4 +73,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   });
 
   return new Response(stream, { headers: { "Content-Type": "application/x-ndjson" } });
+}
+
+/** מוחקת פוסט לצמיתות — הרשומה (וכל PlatformContent שלו, במפל) וגם תיקיית הקבצים שלו על הדיסק. */
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const post = await prisma.post.findUnique({ where: { id } });
+  if (!post) {
+    return NextResponse.json({ error: "פוסט לא נמצא" }, { status: 404 });
+  }
+
+  const storage = getStorageService();
+  await storage.deleteFolder(post.folderPath);
+  await prisma.post.delete({ where: { id } });
+
+  return NextResponse.json({ ok: true });
 }
