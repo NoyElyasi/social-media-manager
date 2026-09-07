@@ -10,17 +10,22 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="he" dir="rtl" className="h-full antialiased">
-      <body className="min-h-full flex flex-col bg-neutral-50 text-neutral-900">
-        <header className="border-b bg-white">
+      <body className="min-h-full flex flex-col bg-brand-cream text-brand-maroon">
+        <header className="border-b border-brand-pink/40 bg-brand-card">
           <nav className="mx-auto max-w-4xl flex items-center justify-between px-6 py-4">
-            <Link href="/" className="font-bold text-lg">
-              ניהול פרסום 📱
+            <Link href="/" className="flex items-center gap-3">
+              <span className="rounded-md bg-brand-pink px-2 py-1 text-xs font-black leading-tight text-white">
+                #אחת
+                <br />
+                ביום
+              </span>
+              <span className="font-bold text-lg text-brand-maroon">ניהול פרסום</span>
             </Link>
-            <div className="flex gap-4 text-sm">
-              <Link href="/posts/new" className="text-blue-600 hover:underline">
+            <div className="flex gap-4 text-sm font-medium">
+              <Link href="/posts/new" className="text-brand-red hover:text-brand-red-dark">
                 פוסט חדש
               </Link>
-              <Link href="/settings" className="text-neutral-600 hover:underline">
+              <Link href="/settings" className="text-brand-maroon/70 hover:text-brand-maroon">
                 הגדרות
               </Link>
             </div>

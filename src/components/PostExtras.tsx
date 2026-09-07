@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ALWAYS_FIRST_HASHTAG, SELECTABLE_TARGETS, type SelectedTarget } from "@/lib/labels";
 import { readNdjsonStream, estimateRemainingSeconds } from "@/lib/ndjsonStream";
 import ReelProgress from "./ReelProgress";
+import HashtagBadge from "./HashtagBadge";
 
 export default function PostExtras({
   postId,
@@ -96,7 +97,7 @@ export default function PostExtras({
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
         <label className="text-xs font-medium">
-          תגיות (משותפות לכל התוכן של הפוסט. {ALWAYS_FIRST_HASHTAG}{" "}
+          תגיות (משותפות לכל התוכן של הפוסט. <HashtagBadge text={ALWAYS_FIRST_HASHTAG} />{" "}
           מתווספת אוטומטית, אין צורך לכתוב אותה)
         </label>
         <div className="flex gap-2">
@@ -104,14 +105,14 @@ export default function PostExtras({
             type="text"
             value={hashtagsInput}
             onChange={(e) => setHashtagsInput(e.target.value)}
-            className="flex-1 rounded-md border text-sm p-1.5"
+            className="flex-1 rounded-md border border-brand-pink/40 text-sm p-1.5 bg-white"
             placeholder="#תגית2 #תגית3"
           />
           <button
             type="button"
             onClick={saveHashtags}
             disabled={savingHashtags}
-            className="shrink-0 rounded-md border px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-50"
+            className="shrink-0 rounded-md border border-brand-pink/40 px-3 py-1.5 text-sm hover:bg-brand-pink/10 disabled:opacity-50"
           >
             {savingHashtags ? "מעדכן..." : "שמור תגיות לכל התוכן"}
           </button>
@@ -128,7 +129,7 @@ export default function PostExtras({
                 type="button"
                 onClick={() => addTarget(t.value)}
                 disabled={addingTarget !== null}
-                className="rounded-md border px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-50"
+                className="rounded-md border border-brand-pink/40 px-3 py-1.5 text-sm hover:bg-brand-pink/10 disabled:opacity-50"
               >
                 {addingTarget === t.value ? "מכין..." : `+ ${t.label}`}
               </button>

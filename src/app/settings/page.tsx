@@ -14,34 +14,42 @@ export default async function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">הגדרות</h1>
-      <ProfileSettingsForm
-        initial={{
-          displayName: profile.displayName,
-          highlights,
-          profileImageUrl: profile.profileImagePath
-            ? buildFileUrlFromPath(profile.profileImagePath)
-            : null,
-        }}
-      />
-      <BackgroundGallery
-        kind="carousel"
-        title="תבניות רקע לפוסט הקרוסלה"
-        hint="אפשר להעלות כמה תבניות ולבחור מבינהן בזמן יצירת פוסט. בלי בחירה — נשאר הרקע הלבן הרגיל."
-        initial={carouselBackgroundPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) }))}
-      />
-      <BackgroundGallery
-        kind="reel"
-        title="תבניות רקע לריל"
-        hint="אפשר להעלות כמה תבניות ולבחור מבינהן בזמן יצירת פוסט. בלי בחירה — נבחר צבע רקע אוטומטי."
-        initial={reelBackgroundPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) }))}
-      />
-      <BackgroundGallery
-        kind="cover"
-        title="תבניות רקע לעמוד שער (בקרוסלה)"
-        hint="אם בוחרים תבנית כזו ביצירת פוסט, מתווסף עמוד ראשון נוסף עם הרקע הזה והתיוג הראשי של הפוסט מוצג עליו גדול, במרכז."
-        initial={coverBackgroundPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) }))}
-      />
+      <h1 className="text-2xl font-bold text-brand-maroon">הגדרות</h1>
+      <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
+        <ProfileSettingsForm
+          initial={{
+            displayName: profile.displayName,
+            highlights,
+            profileImageUrl: profile.profileImagePath
+              ? buildFileUrlFromPath(profile.profileImagePath)
+              : null,
+          }}
+        />
+      </div>
+      <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
+        <BackgroundGallery
+          kind="carousel"
+          title="תבניות רקע לפוסט הקרוסלה"
+          hint="אפשר להעלות כמה תבניות ולבחור מבינהן בזמן יצירת פוסט. בלי בחירה — נשאר הרקע הלבן הרגיל."
+          initial={carouselBackgroundPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) }))}
+        />
+      </div>
+      <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
+        <BackgroundGallery
+          kind="reel"
+          title="תבניות רקע לריל"
+          hint="אפשר להעלות כמה תבניות ולבחור מבינהן בזמן יצירת פוסט. בלי בחירה — נבחר צבע רקע אוטומטי."
+          initial={reelBackgroundPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) }))}
+        />
+      </div>
+      <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
+        <BackgroundGallery
+          kind="cover"
+          title="תבניות רקע לעמוד שער (בקרוסלה)"
+          hint="אם בוחרים תבנית כזו ביצירת פוסט, מתווסף עמוד ראשון נוסף עם הרקע הזה והתיוג הראשי של הפוסט מוצג עליו גדול, במרכז."
+          initial={coverBackgroundPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) }))}
+        />
+      </div>
     </div>
   );
 }

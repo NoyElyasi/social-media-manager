@@ -98,19 +98,19 @@ export default function BackgroundGallery({
         {items.map((item) => (
           <div key={item.path} className="relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={item.url} alt="" className="h-32 w-24 rounded-md object-cover border" />
+            <img src={item.url} alt="" className="h-32 w-24 rounded-md object-cover border border-brand-pink/40" />
             <button
               type="button"
               onClick={() => handleDelete(item)}
               title="הסירי מהרשימה"
-              className="absolute -top-2 -left-2 h-6 w-6 rounded-full bg-white border text-xs text-red-600 hover:bg-red-50"
+              className="absolute -top-2 -left-2 h-6 w-6 rounded-full bg-white border border-brand-pink/40 text-xs text-red-600 hover:bg-red-50"
             >
               ✕
             </button>
           </div>
         ))}
 
-        <label className="flex h-32 w-24 items-center justify-center rounded-md border border-dashed text-xs text-neutral-500 hover:bg-neutral-50 cursor-pointer text-center">
+        <label className="flex h-32 w-24 items-center justify-center rounded-md border border-dashed border-brand-pink text-xs text-brand-maroon/70 hover:bg-brand-pink/10 cursor-pointer text-center">
           {uploadProgress ? `מעלה ${uploadProgress.done}/${uploadProgress.total}...` : "+ הוספה (אפשר לבחור כמה)"}
           <input
             type="file"

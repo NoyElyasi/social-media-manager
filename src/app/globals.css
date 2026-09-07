@@ -1,26 +1,37 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #fbf1e8;
   --foreground: #171717;
 }
 
+/* פלטת המותג #אחתביום — אותם צבעים שכבר בשימוש בתבניות התוכן שנוצרות
+   (ראו COVER_HASHTAG_COLOR/COVER_UNDERLINE_COLOR/TEMPLATE_TEXT_COLOR ב-
+   render/*.ts), כדי שממשק הכלי עצמו יתאים ויזואלית לתוכן שהוא מייצר. */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-brand-cream: #fbf1e8;
+  --color-brand-card: #fdf8f2;
+  --color-brand-pink: #e7a9b8;
+  --color-brand-pink-dark: #d6798d;
+  --color-brand-red: #c41e3a;
+  --color-brand-red-dark: #a11730;
+  --color-brand-maroon: #4a1420;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* צ'קבוקסים/רדיו נייטיביים מגיעים כחולים כברירת מחדל בדפדפן — עוקפים את
+   accent-color כדי שיתאימו לפלטת המותג, בלי לצטרך לכתוב class על כל input. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-brand-red);
 }

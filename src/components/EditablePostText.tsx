@@ -102,7 +102,7 @@ export default function EditablePostText({
         value={rawText}
         onChange={(e) => setRawText(e.target.value)}
         rows={6}
-        className="rounded-lg border p-3 text-base"
+        className="rounded-lg border border-brand-pink/40 p-3 text-base bg-white"
       />
       {hasSplitTarget && (
         <div className="flex flex-col gap-2">
@@ -115,7 +115,7 @@ export default function EditablePostText({
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => insertMarker(MANUAL_SLIDE_BREAK)}
-              className="shrink-0 rounded-md border px-2 py-1 text-xs hover:bg-neutral-100"
+              className="shrink-0 rounded-md border border-brand-pink/40 px-2 py-1 text-xs hover:bg-brand-pink/10"
             >
               + סימון חילוק
             </button>
@@ -129,7 +129,7 @@ export default function EditablePostText({
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => insertMarker(GLUE_MARKER)}
-              className="shrink-0 rounded-md border px-2 py-1 text-xs hover:bg-neutral-100"
+              className="shrink-0 rounded-md border border-brand-pink/40 px-2 py-1 text-xs hover:bg-brand-pink/10"
             >
               + סימון הדבקה
             </button>
@@ -149,7 +149,7 @@ export default function EditablePostText({
         type="button"
         onClick={handleUpdate}
         disabled={saving}
-        className="self-start rounded-lg bg-blue-600 px-4 py-2 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+        className="self-start rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium hover:bg-brand-red-dark disabled:opacity-50"
       >
         {saving ? "מעדכן ומייצר תמונות..." : "שמור טקסט"}
       </button>

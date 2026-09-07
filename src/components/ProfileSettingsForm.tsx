@@ -67,7 +67,7 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
           type="text"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          className="rounded-lg border p-2"
+          className="rounded-lg border border-brand-pink/40 p-2 bg-white"
         />
       </div>
 
@@ -88,7 +88,7 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
           type="text"
           value={highlightsText}
           onChange={(e) => setHighlightsText(e.target.value)}
-          className="rounded-lg border p-2"
+          className="rounded-lg border border-brand-pink/40 p-2 bg-white"
           placeholder="למשל: טיולים, משפחה, מתכונים"
         />
       </div>
@@ -96,7 +96,7 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
       <button
         type="submit"
         disabled={saving}
-        className="self-start rounded-lg bg-blue-600 px-4 py-2 text-white font-medium hover:bg-blue-700 disabled:opacity-50"
+        className="self-start rounded-lg bg-brand-red px-4 py-2 text-white font-medium hover:bg-brand-red-dark disabled:opacity-50"
       >
         {saving ? "שומר..." : saved ? "נשמר ✓" : "שמור הגדרות"}
       </button>

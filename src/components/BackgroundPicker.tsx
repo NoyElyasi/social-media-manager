@@ -20,7 +20,7 @@ export default function BackgroundPicker({
         type="button"
         onClick={() => onSelect(null)}
         className={`flex h-32 w-24 items-center justify-center rounded-md border p-1 text-center text-xs ${
-          selected === null ? "border-blue-600 ring-2 ring-blue-600" : "border-neutral-300 hover:bg-neutral-50"
+          selected === null ? "border-brand-red ring-2 ring-brand-red" : "border-brand-pink/40 hover:bg-brand-pink/10"
         }`}
       >
         {noneLabel}
@@ -31,7 +31,7 @@ export default function BackgroundPicker({
           type="button"
           onClick={() => onSelect(item.path)}
           className={`h-32 w-24 rounded-md border overflow-hidden ${
-            selected === item.path ? "border-blue-600 ring-2 ring-blue-600" : "border-neutral-300"
+            selected === item.path ? "border-brand-red ring-2 ring-brand-red" : "border-brand-pink/40"
           }`}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}

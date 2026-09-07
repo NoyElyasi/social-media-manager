@@ -41,8 +41,8 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <p className="text-sm text-neutral-500">
+      <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
+        <p className="text-sm text-brand-maroon/60">
           {new Date(post.createdAt).toLocaleString("he-IL")} · {post.folderPath}
         </p>
         <div className="mt-2 flex flex-col gap-4">

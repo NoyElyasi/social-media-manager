@@ -14,10 +14,10 @@ export default function ReelProgress({
   const pct = total > 0 ? Math.min(100, Math.round((rendered / total) * 100)) : 0;
 
   return (
-    <div className="flex items-center gap-3 rounded-md border bg-neutral-50 px-3 py-2">
+    <div className="flex items-center gap-3 rounded-md border border-brand-pink/40 bg-brand-pink/10 px-3 py-2">
       <div className="flex-1">
-        <div className="h-2 w-full rounded-full bg-neutral-200 overflow-hidden">
-          <div className="h-full bg-blue-600 transition-all" style={{ width: `${pct}%` }} />
+        <div className="h-2 w-full rounded-full bg-brand-pink/30 overflow-hidden">
+          <div className="h-full bg-brand-red transition-all" style={{ width: `${pct}%` }} />
         </div>
         <p className="text-xs text-neutral-500 mt-1">
           מייצרת ריל... {rendered}/{total} תמונות

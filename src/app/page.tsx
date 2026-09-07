@@ -13,10 +13,10 @@ export default async function HomePage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">הפוסטים שלי</h1>
+        <h1 className="text-2xl font-bold text-brand-maroon">הפוסטים שלי</h1>
         <Link
           href="/posts/new"
-          className="rounded-lg bg-blue-600 px-4 py-2 text-white text-sm font-medium hover:bg-blue-700"
+          className="rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium hover:bg-brand-red-dark"
         >
           + פוסט חדש
         </Link>
@@ -34,7 +34,10 @@ export default async function HomePage() {
           const privacyFlags: unknown[] = JSON.parse(post.privacyFlags || "[]");
 
           return (
-            <li key={post.id} className="rounded-xl border bg-white p-5 hover:shadow-sm transition">
+            <li
+              key={post.id}
+              className="rounded-xl border border-brand-pink/30 bg-brand-card p-5 hover:shadow-sm transition"
+            >
               <Link href={`/posts/${post.id}`} className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-neutral-500">

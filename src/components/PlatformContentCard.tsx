@@ -36,7 +36,7 @@ function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className="text-xs rounded-md border px-2 py-1 hover:bg-neutral-50"
+      className="text-xs rounded-md border border-brand-pink/40 px-2 py-1 hover:bg-brand-pink/10"
     >
       {copied ? "הועתק ✓" : "העתק טקסט"}
     </button>
@@ -81,7 +81,7 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
   }
 
   return (
-    <div className="rounded-xl border bg-white p-5 flex flex-col gap-4">
+    <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5 flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h3 className="font-bold">{PLATFORM_LABELS[content.type] ?? content.type}</h3>
         <span className={`text-xs rounded-full px-2 py-1 ${STATUS_COLORS[content.status]}`}>
@@ -96,8 +96,8 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
             return (
               <div key={file} className="flex flex-col gap-1">
                 {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <video src={url} controls loop className="max-w-[280px] rounded-md border" />
-                <a href={url} download={file} className="text-xs text-blue-600 hover:underline self-start">
+                <video src={url} controls loop className="max-w-[280px] rounded-md border border-brand-pink/40" />
+                <a href={url} download={file} className="text-xs text-brand-red hover:underline self-start">
                   הורד סרטון
                 </a>
               </div>
@@ -131,7 +131,7 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
                   <a
                     href={url}
                     download={file}
-                    className="text-xs text-blue-600 hover:underline"
+                    className="text-xs text-brand-red hover:underline"
                   >
                     הורד תמונה
                   </a>
@@ -142,7 +142,7 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
           {content.files.length > 1 && (
             <a
               href={`/api/platform-content/${content.id}/download-zip`}
-              className="self-start rounded-md border px-3 py-1.5 text-sm hover:bg-neutral-50"
+              className="self-start rounded-md border border-brand-pink/40 px-3 py-1.5 text-sm hover:bg-brand-pink/10"
             >
               הורד את כל התמונות (ZIP)
             </a>
@@ -161,7 +161,7 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
             </label>
             <div className="flex flex-wrap gap-2 text-xs">
               {content.hashtags.map((h) => (
-                <span key={h} className="rounded-full bg-blue-50 text-blue-700 px-2 py-1">
+                <span key={h} className="rounded-full bg-brand-pink/20 text-brand-maroon px-2 py-1">
                   {h}
                 </span>
               ))}
@@ -179,7 +179,7 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
         (content.hashtags.length > 0 || content.tags.length > 0) && (
           <div className="flex flex-wrap gap-2 text-xs">
             {content.hashtags.map((h) => (
-              <span key={h} className="rounded-full bg-blue-50 text-blue-700 px-2 py-1">
+              <span key={h} className="rounded-full bg-brand-pink/20 text-brand-maroon px-2 py-1">
                 {h}
               </span>
             ))}
@@ -193,7 +193,7 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
 
       {content.text && content.type !== "instagram_carousel" && (
         <div className="flex flex-col gap-2">
-          <p className="whitespace-pre-wrap text-sm text-neutral-800 rounded-lg bg-neutral-50 p-3">
+          <p className="whitespace-pre-wrap text-sm text-brand-maroon rounded-lg bg-brand-pink/10 p-3">
             {content.hashtags.length > 0 && content.type === "facebook_post"
               ? `${content.hashtags.join(" ")}\n\n${content.text}`
               : content.text}

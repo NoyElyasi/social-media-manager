@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { SELECTABLE_TARGETS, ALWAYS_FIRST_HASHTAG, type SelectedTarget } from "@/lib/labels";
 import { readNdjsonStream, estimateRemainingSeconds } from "@/lib/ndjsonStream";
 import ReelProgress from "@/components/ReelProgress";
+import HashtagBadge from "@/components/HashtagBadge";
 import BackgroundPicker from "@/components/BackgroundPicker";
 import type { BackgroundItem } from "@/components/BackgroundGallery";
 import { buildFileUrlFromPath } from "@/lib/files";
@@ -221,7 +222,7 @@ export default function NewPostPage() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">פוסט חדש</h1>
+      <h1 className="text-2xl font-bold text-brand-maroon">פוסט חדש</h1>
 
       {/* 1. הטקסט עצמו */}
       <div className="flex flex-col gap-2">
@@ -231,26 +232,27 @@ export default function NewPostPage() {
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
           rows={8}
-          className="rounded-lg border p-3 text-base"
+          className="rounded-lg border border-brand-pink/40 p-3 text-base bg-white"
           placeholder="כתבו כאן את הפוסט המקורי..."
         />
       </div>
 
       <div className="flex flex-col gap-2">
         <label className="font-medium text-sm">
-          תגיות ידניות (אופציונלי — במקום ההצעה האוטומטית. {ALWAYS_FIRST_HASHTAG} תמיד תתווסף ראשונה)
+          תגיות ידניות (אופציונלי — במקום ההצעה האוטומטית. <HashtagBadge text={ALWAYS_FIRST_HASHTAG} /> תמיד תתווסף
+          ראשונה)
         </label>
         <input
           type="text"
           value={manualHashtags}
           onChange={(e) => setManualHashtags(e.target.value)}
-          className="rounded-lg border p-2 text-sm"
+          className="rounded-lg border border-brand-pink/40 p-2 text-sm bg-white"
           placeholder={`${ALWAYS_FIRST_HASHTAG} #תגית2 #תגית3`}
         />
       </div>
 
       {/* 2. בחירת הפלט — קובע אילו קטגוריות אפשרויות יופיעו מכאן ואילך */}
-      <div className="flex flex-col gap-2 rounded-lg border p-3">
+      <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3">
         <label className="font-medium text-sm">מה הפלט שאת צריכה?</label>
         <div className="flex flex-col gap-2">
           {SELECTABLE_TARGETS.map((target) => (
@@ -272,7 +274,7 @@ export default function NewPostPage() {
 
       {/* 3. אפשרויות משותפות לקרוסלה + ריל */}
       {(showCarouselOptions || showReelOptions) && (
-        <div className="flex flex-col gap-2 rounded-lg border p-3 bg-neutral-50">
+        <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3 bg-brand-pink/10">
           <label className="font-medium text-sm">חילוק לעמודים בקרוסלה / למשפטים בריל</label>
           <div className="flex gap-4 text-sm">
             <label className="flex items-center gap-2">
@@ -329,10 +331,10 @@ export default function NewPostPage() {
 
       {/* 4. אפשרויות לקרוסלה בלבד */}
       {showCarouselOptions && (carouselBackgrounds.length > 0 || coverBackgrounds.length > 0) && (
-        <div className="flex flex-col gap-4 rounded-lg border p-3">
+        <div className="flex flex-col gap-4 rounded-lg border border-brand-pink/40 p-3">
           <h2 className="font-semibold text-sm border-b pb-2">הגדרות לפוסט הקרוסלה</h2>
           {carouselBackgrounds.length > 0 && (
-            <div className="flex flex-col gap-2 bg-neutral-50 rounded-lg p-2">
+            <div className="flex flex-col gap-2 bg-brand-pink/10 rounded-lg p-2">
               <label className="font-medium text-sm">רקע לפוסט הקרוסלה</label>
               <BackgroundPicker
                 items={carouselBackgrounds}
@@ -343,7 +345,7 @@ export default function NewPostPage() {
             </div>
           )}
           {coverBackgrounds.length > 0 && (
-            <div className="flex flex-col gap-2 bg-neutral-50 rounded-lg p-2">
+            <div className="flex flex-col gap-2 bg-brand-pink/10 rounded-lg p-2">
               <label className="font-medium text-sm">עמוד שער (עמוד ראשון עם התיוג הראשי במרכז)</label>
               <BackgroundPicker
                 items={coverBackgrounds}
@@ -358,9 +360,9 @@ export default function NewPostPage() {
 
       {/* 5. אפשרויות לריל בלבד */}
       {showReelOptions && (
-        <div className="flex flex-col gap-4 rounded-lg border p-3">
+        <div className="flex flex-col gap-4 rounded-lg border border-brand-pink/40 p-3">
           <h2 className="font-semibold text-sm border-b pb-2">הגדרות לריל</h2>
-          <div className="flex flex-col gap-2 bg-neutral-50 rounded-lg p-2">
+          <div className="flex flex-col gap-2 bg-brand-pink/10 rounded-lg p-2">
             <label className="font-medium text-sm">אנימציית הופעת הטקסט בריל</label>
             <div className="flex gap-4 text-sm">
               <label className="flex items-center gap-2">
@@ -384,7 +386,7 @@ export default function NewPostPage() {
             </div>
           </div>
           {reelBackgrounds.length > 0 && (
-            <div className="flex flex-col gap-2 bg-neutral-50 rounded-lg p-2">
+            <div className="flex flex-col gap-2 bg-brand-pink/10 rounded-lg p-2">
               <label className="font-medium text-sm">רקע לריל</label>
               <BackgroundPicker
                 items={reelBackgrounds}
@@ -411,7 +413,7 @@ export default function NewPostPage() {
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-lg bg-blue-600 px-4 py-2 text-white font-medium hover:bg-blue-700 disabled:opacity-50"
+        className="rounded-lg bg-brand-red px-4 py-2 text-white font-medium hover:bg-brand-red-dark disabled:opacity-50"
       >
         {submitting ? "מכין דראפטים..." : "הכן דראפטים"}
       </button>
