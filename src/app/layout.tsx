@@ -22,6 +22,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <span className="font-bold text-lg text-brand-maroon">ניהול פרסום</span>
             </Link>
             <div className="flex gap-4 text-sm font-medium">
+              <Link href="/" className="text-brand-maroon/70 hover:text-brand-maroon">
+                פוסטים קודמים
+              </Link>
               <Link href="/posts/new" className="text-brand-red hover:text-brand-red-dark">
                 פוסט חדש
               </Link>
