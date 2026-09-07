@@ -216,10 +216,14 @@ export default function NewPostPage() {
     }
   }
 
+  const showCarouselOptions = selectedTargets.includes("instagram_carousel");
+  const showReelOptions = selectedTargets.includes("instagram_reel");
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold">פוסט חדש</h1>
 
+      {/* 1. הטקסט עצמו */}
       <div className="flex flex-col gap-2">
         <label className="font-medium text-sm">טקסט הפוסט (גולמי)</label>
         <textarea
@@ -245,7 +249,29 @@ export default function NewPostPage() {
         />
       </div>
 
-      {(selectedTargets.includes("instagram_carousel") || selectedTargets.includes("instagram_reel")) && (
+      {/* 2. בחירת הפלט — קובע אילו קטגוריות אפשרויות יופיעו מכאן ואילך */}
+      <div className="flex flex-col gap-2 rounded-lg border p-3">
+        <label className="font-medium text-sm">מה הפלט שאת צריכה?</label>
+        <div className="flex flex-col gap-2">
+          {SELECTABLE_TARGETS.map((target) => (
+            <label key={target.value} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={selectedTargets.includes(target.value)}
+                onChange={() => toggleTarget(target.value)}
+              />
+              {target.label}
+            </label>
+          ))}
+          <label className="flex items-center gap-2 text-sm text-neutral-400">
+            <input type="checkbox" disabled />
+            וואטסאפ אוטומטי (בקרוב, שלב 2)
+          </label>
+        </div>
+      </div>
+
+      {/* 3. אפשרויות משותפות לקרוסלה + ריל */}
+      {(showCarouselOptions || showReelOptions) && (
         <div className="flex flex-col gap-2 rounded-lg border p-3 bg-neutral-50">
           <label className="font-medium text-sm">חילוק לעמודים בקרוסלה / למשפטים בריל</label>
           <div className="flex gap-4 text-sm">
@@ -301,87 +327,75 @@ export default function NewPostPage() {
         </div>
       )}
 
-      {selectedTargets.includes("instagram_reel") && (
-        <div className="flex flex-col gap-2 rounded-lg border p-3 bg-neutral-50">
-          <label className="font-medium text-sm">אנימציית הופעת הטקסט בריל</label>
-          <div className="flex gap-4 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="revealMode"
-                checked={revealMode === "word"}
-                onChange={() => setRevealMode("word")}
+      {/* 4. אפשרויות לקרוסלה בלבד */}
+      {showCarouselOptions && (carouselBackgrounds.length > 0 || coverBackgrounds.length > 0) && (
+        <div className="flex flex-col gap-4 rounded-lg border p-3">
+          <h2 className="font-semibold text-sm border-b pb-2">הגדרות לפוסט הקרוסלה</h2>
+          {carouselBackgrounds.length > 0 && (
+            <div className="flex flex-col gap-2 bg-neutral-50 rounded-lg p-2">
+              <label className="font-medium text-sm">רקע לפוסט הקרוסלה</label>
+              <BackgroundPicker
+                items={carouselBackgrounds}
+                selected={carouselBackgroundPath}
+                onSelect={setCarouselBackgroundPath}
+                noneLabel="ללא (רקע לבן)"
               />
-              מילה-מילה
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="revealMode"
-                checked={revealMode === "letter"}
-                onChange={() => setRevealMode("letter")}
+            </div>
+          )}
+          {coverBackgrounds.length > 0 && (
+            <div className="flex flex-col gap-2 bg-neutral-50 rounded-lg p-2">
+              <label className="font-medium text-sm">עמוד שער (עמוד ראשון עם התיוג הראשי במרכז)</label>
+              <BackgroundPicker
+                items={coverBackgrounds}
+                selected={coverBackgroundPath}
+                onSelect={setCoverBackgroundPath}
+                noneLabel="ללא עמוד שער"
               />
-              אות-אות
-            </label>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 5. אפשרויות לריל בלבד */}
+      {showReelOptions && (
+        <div className="flex flex-col gap-4 rounded-lg border p-3">
+          <h2 className="font-semibold text-sm border-b pb-2">הגדרות לריל</h2>
+          <div className="flex flex-col gap-2 bg-neutral-50 rounded-lg p-2">
+            <label className="font-medium text-sm">אנימציית הופעת הטקסט בריל</label>
+            <div className="flex gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="revealMode"
+                  checked={revealMode === "word"}
+                  onChange={() => setRevealMode("word")}
+                />
+                מילה-מילה
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="revealMode"
+                  checked={revealMode === "letter"}
+                  onChange={() => setRevealMode("letter")}
+                />
+                אות-אות
+              </label>
+            </div>
           </div>
-        </div>
-      )}
-
-      {selectedTargets.includes("instagram_carousel") && carouselBackgrounds.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-lg border p-3 bg-neutral-50">
-          <label className="font-medium text-sm">רקע לפוסט הקרוסלה</label>
-          <BackgroundPicker
-            items={carouselBackgrounds}
-            selected={carouselBackgroundPath}
-            onSelect={setCarouselBackgroundPath}
-            noneLabel="ללא (רקע לבן)"
-          />
-        </div>
-      )}
-
-      {selectedTargets.includes("instagram_carousel") && coverBackgrounds.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-lg border p-3 bg-neutral-50">
-          <label className="font-medium text-sm">עמוד שער (עמוד ראשון עם התיוג הראשי במרכז)</label>
-          <BackgroundPicker
-            items={coverBackgrounds}
-            selected={coverBackgroundPath}
-            onSelect={setCoverBackgroundPath}
-            noneLabel="ללא עמוד שער"
-          />
-        </div>
-      )}
-
-      {selectedTargets.includes("instagram_reel") && reelBackgrounds.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-lg border p-3 bg-neutral-50">
-          <label className="font-medium text-sm">רקע לריל</label>
-          <BackgroundPicker
-            items={reelBackgrounds}
-            selected={reelBackgroundPath}
-            onSelect={setReelBackgroundPath}
-            noneLabel="ללא תבנית (רקע אוטומטי)"
-          />
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2">
-        <label className="font-medium text-sm">אילו יעדים רלוונטיים לפוסט הזה?</label>
-        <div className="flex flex-col gap-2">
-          {SELECTABLE_TARGETS.map((target) => (
-            <label key={target.value} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={selectedTargets.includes(target.value)}
-                onChange={() => toggleTarget(target.value)}
+          {reelBackgrounds.length > 0 && (
+            <div className="flex flex-col gap-2 bg-neutral-50 rounded-lg p-2">
+              <label className="font-medium text-sm">רקע לריל</label>
+              <BackgroundPicker
+                items={reelBackgrounds}
+                selected={reelBackgroundPath}
+                onSelect={setReelBackgroundPath}
+                noneLabel="ללא תבנית (רקע אוטומטי)"
               />
-              {target.label}
-            </label>
-          ))}
-          <label className="flex items-center gap-2 text-sm text-neutral-400">
-            <input type="checkbox" disabled />
-            וואטסאפ אוטומטי (בקרוב, שלב 2)
-          </label>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {progress && startedAtRef.current && (
         <ReelProgress
