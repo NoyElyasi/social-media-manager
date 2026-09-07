@@ -4,6 +4,7 @@ import { PRIVACY_FLAG_LABELS, type PrivacyFlag } from "@/server/content/privacyS
 import PlatformContentCard, { type NormalizedPlatformContent } from "@/components/PlatformContentCard";
 import EditablePostText from "@/components/EditablePostText";
 import PostExtras from "@/components/PostExtras";
+import OpenFolderButton from "@/components/OpenFolderButton";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,8 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
           <PlatformContentCard key={content.id} content={content} />
         ))}
       </div>
+
+      <OpenFolderButton postId={post.id} />
     </div>
   );
 }
