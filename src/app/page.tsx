@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/server/db";
 import { PLATFORM_LABELS, STATUS_LABELS, STATUS_COLORS } from "@/lib/labels";
+import DeletePostIconButton from "@/components/DeletePostIconButton";
 
 export const dynamic = "force-dynamic";
 
@@ -36,8 +37,9 @@ export default async function HomePage() {
           return (
             <li
               key={post.id}
-              className="rounded-xl border border-brand-pink/30 bg-brand-card p-5 hover:shadow-sm transition"
+              className="relative rounded-xl border border-brand-pink/30 bg-brand-card p-5 hover:shadow-sm transition"
             >
+              <DeletePostIconButton postId={post.id} />
               <Link href={`/posts/${post.id}`} className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-neutral-500">
