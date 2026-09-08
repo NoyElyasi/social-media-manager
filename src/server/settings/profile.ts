@@ -45,7 +45,7 @@ export async function getProfileSettings() {
 export async function updateProfileSettings(input: {
   displayName?: string;
   profileImagePath?: string | null;
-  facebookProfileId?: string | null;
+  facebookProfileUrl?: string | null;
   highlights?: string[];
 }) {
   await getProfileSettings(); // מבטיח שהרשומה קיימת
@@ -55,7 +55,7 @@ export async function updateProfileSettings(input: {
     data: {
       ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
       ...(input.profileImagePath !== undefined ? { profileImagePath: input.profileImagePath } : {}),
-      ...(input.facebookProfileId !== undefined ? { facebookProfileId: input.facebookProfileId } : {}),
+      ...(input.facebookProfileUrl !== undefined ? { facebookProfileUrl: input.facebookProfileUrl } : {}),
       ...(input.highlights !== undefined ? { highlights: JSON.stringify(input.highlights) } : {}),
     },
   });

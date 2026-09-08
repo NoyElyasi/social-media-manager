@@ -23,8 +23,8 @@ const updateSchema = z.object({
   // תמונת פרופיל כ-base64 (סעיף 6) — אופציונלי
   profileImageBase64: z.string().optional(),
   profileImageExt: z.enum(["png", "jpg", "jpeg"]).optional(),
-  // שם משתמש/מזהה פרופיל בפייסבוק (facebook.com/<זה>) — לחיפוש תגית מוגבל לפרופיל שלה.
-  facebookProfileId: z.string().optional(),
+  // לינק מלא לפרופיל שלה בפייסבוק — פייסבוק הסירו את החיפוש-בתוך-פרופיל בקישור ישיר.
+  facebookProfileUrl: z.string().optional(),
 });
 
 export async function PUT(req: NextRequest) {
@@ -49,7 +49,7 @@ export async function PUT(req: NextRequest) {
     displayName: parsed.data.displayName,
     highlights: parsed.data.highlights,
     profileImagePath,
-    facebookProfileId: parsed.data.facebookProfileId,
+    facebookProfileUrl: parsed.data.facebookProfileUrl,
   });
 
   return NextResponse.json({ profile: updated });

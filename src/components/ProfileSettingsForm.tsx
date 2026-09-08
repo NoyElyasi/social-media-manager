@@ -7,8 +7,11 @@ export interface InitialProfile {
   displayName: string;
   highlights: string[];
   profileImageUrl: string | null;
-  facebookProfileId: string | null;
+  facebookProfileUrl: string | null;
 }
+
+// ברירת מחדל אם השדה עוד לא הוגדר בכלל — הלינק שלה עצמה, לפי בקשה מפורשת.
+const DEFAULT_FACEBOOK_PROFILE_URL = "https://www.facebook.com/noy.elyasi";
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   let binary = "";
@@ -20,7 +23,9 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 export default function ProfileSettingsForm({ initial }: { initial: InitialProfile }) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(initial.displayName);
-  const [facebookProfileId, setFacebookProfileId] = useState(initial.facebookProfileId ?? "");
+  const [facebookProfileUrl, setFacebookProfileUrl] = useState(
+    initial.facebookProfileUrl ?? DEFAULT_FACEBOOK_PROFILE_URL
+  );
   const [highlightsText, setHighlightsText] = useState(initial.highlights.join(", "));
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -53,7 +58,7 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
         highlights,
         profileImageBase64,
         profileImageExt,
-        facebookProfileId: facebookProfileId.trim(),
+        facebookProfileUrl: facebookProfileUrl.trim(),
       }),
     });
 
@@ -84,18 +89,17 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium">
-          שם משתמש/מזהה פרופיל בפייסבוק — כמו שמופיע ב-facebook.com/&lt;זה&gt;
-        </label>
+        <label className="text-sm font-medium">לינק לפרופיל שלך בפייסבוק</label>
         <input
           type="text"
-          value={facebookProfileId}
-          onChange={(e) => setFacebookProfileId(e.target.value)}
+          value={facebookProfileUrl}
+          onChange={(e) => setFacebookProfileUrl(e.target.value)}
           className="rounded-lg border border-brand-pink/40 p-2 bg-white"
-          placeholder="למשל noy.elyasi"
+          placeholder={DEFAULT_FACEBOOK_PROFILE_URL}
         />
         <p className="text-xs text-brand-maroon/60">
-          משמש לכפתור &quot;חיפוש בפייסבוק&quot; בעמוד &quot;פוסט חדש&quot;, כדי שהחיפוש יהיה בפרופיל שלך ולא בכל פייסבוק.
+          כפתור &quot;חיפוש בפייסבוק&quot; בעמוד &quot;פוסט חדש&quot; פותח את הלינק הזה — משם לוחצים על סימן החיפוש
+          בתוך הפרופיל ומחפשים את התגית (פייסבוק לא מאפשרת יותר קישור ישיר לחיפוש בתוך פרופיל).
         </p>
       </div>
 

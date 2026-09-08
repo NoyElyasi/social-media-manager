@@ -50,8 +50,6 @@ export default function NewPostPage() {
   const [splitMode, setSplitMode] = useState<"auto" | "manual">(() => loadDraft().splitMode ?? "auto");
   const [revealMode, setRevealMode] = useState<"word" | "letter">(() => loadDraft().revealMode ?? "word");
   const [manualHashtags, setManualHashtags] = useState(() => loadDraft().manualHashtags ?? "");
-  // חיפוש בפייסבוק לפי תגית — לא חלק מהטיוטה של הפוסט, רק עזר חד-פעמי לפני הכתיבה.
-  const [facebookSearchTag, setFacebookSearchTag] = useState("");
   const [carouselBackgroundPath, setCarouselBackgroundPath] = useState<string | null>(
     () => loadDraft().carouselBackgroundPath ?? null
   );
@@ -64,7 +62,7 @@ export default function NewPostPage() {
   const [carouselBackgrounds, setCarouselBackgrounds] = useState<BackgroundItem[]>([]);
   const [reelBackgrounds, setReelBackgrounds] = useState<BackgroundItem[]>([]);
   const [coverBackgrounds, setCoverBackgrounds] = useState<BackgroundItem[]>([]);
-  const [facebookProfileId, setFacebookProfileId] = useState<string | null>(null);
+  const [facebookProfileUrl, setFacebookProfileUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
@@ -111,7 +109,7 @@ export default function NewPostPage() {
         setCarouselBackgrounds(paths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
         setReelBackgrounds(reelPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
         setCoverBackgrounds(coverPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
-        setFacebookProfileId(data.profile?.facebookProfileId ?? null);
+        setFacebookProfileUrl(data.profile?.facebookProfileUrl ?? null);
       })
       .catch(() => {});
   }, []);
@@ -224,53 +222,30 @@ export default function NewPostPage() {
   const showCarouselOptions = selectedTargets.includes("instagram_carousel");
   const showReelOptions = selectedTargets.includes("instagram_reel");
 
-  function openFacebookHashtagSearch() {
-    const tag = facebookSearchTag.trim().replace(/^#/, "");
-    if (!tag) return;
-    const url = facebookProfileId
-      ? `https://www.facebook.com/${encodeURIComponent(facebookProfileId)}/search/?q=${encodeURIComponent(tag)}`
-      : `https://www.facebook.com/hashtag/${encodeURIComponent(tag)}`;
-    window.open(url, "_blank");
+  function openFacebookProfile() {
+    window.open(facebookProfileUrl || "https://www.facebook.com/", "_blank");
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold text-brand-maroon">פוסט חדש</h1>
 
-      {/* חיפוש טקסט מפוסט ישן בפייסבוק, לפי תגית — פותח טאב חיפוש בפייסבוק
-          מוגבל לפרופיל שלה (אם facebookProfileId מוגדר בהגדרות; אחרת חיפוש
-          כללי בתגית, בכל פייסבוק). ההעתקה של הטקסט הרלוונטי לתיבה שמתחת
-          נשארת ידנית (פייסבוק לא מאפשר לאפליקציות חוץ לחפש/למשוך פוסטים
-          אישיים באופן אוטומטי). */}
+      {/* מצאי טקסט מפוסט ישן בפייסבוק — פייסבוק הסירו את הקישור הישיר לחיפוש
+          בתוך פרופיל, אז זה פותח את הפרופיל עצמו; החיפוש בתגית (למשל
+          #קוטג) נעשה ידנית משם, באמצעות סימן החיפוש שבתוך הפרופיל. */}
       <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3 bg-brand-pink/10">
-        <label className="font-medium text-sm">מצאי טקסט מפוסט ישן בפייסבוק לפי תגית</label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={facebookSearchTag}
-            onChange={(e) => setFacebookSearchTag(e.target.value)}
-            className="flex-1 rounded-lg border border-brand-pink/40 p-2 text-sm bg-white"
-            placeholder="#קוטג"
-          />
-          <button
-            type="button"
-            onClick={openFacebookHashtagSearch}
-            className="shrink-0 rounded-md border border-brand-pink/40 px-3 py-2 text-sm hover:bg-white"
-          >
-            פתחו בפייסבוק 🔗
-          </button>
-        </div>
-        {facebookProfileId ? (
-          <p className="text-xs text-brand-maroon/60">
-            פותח טאב חדש עם חיפוש בתגית הזו, מוגבל לפרופיל שלך בפייסבוק — משם מעתיקים את הטקסט הרלוונטי ומדביקים
-            בתיבה שמתחת.
-          </p>
-        ) : (
-          <p className="text-xs text-brand-maroon/60">
-            כרגע החיפוש כללי (בכל פייסבוק, לא רק בפרופיל שלך) — כדי להגביל אותו לפרופיל שלך, הגדירי את שם
-            המשתמש/מזהה הפרופיל שלך בפייסבוק בעמוד ההגדרות.
-          </p>
-        )}
+        <label className="font-medium text-sm">מצאי טקסט מפוסט ישן בפייסבוק</label>
+        <button
+          type="button"
+          onClick={openFacebookProfile}
+          className="self-start rounded-md border border-brand-pink/40 px-3 py-2 text-sm hover:bg-white"
+        >
+          פתחו את הפרופיל שלי בפייסבוק 🔗
+        </button>
+        <p className="text-xs text-brand-maroon/60">
+          משם, לחצי על סימן החיפוש שבתוך הפרופיל וחפשי לפי תגית (למשל #קוטג) — פייסבוק לא מאפשרת יותר קישור ישיר
+          לחיפוש כזה. את הטקסט הרלוונטי מעתיקים ומדביקים בתיבה שמתחת.
+        </p>
       </div>
 
       {/* 1. הטקסט עצמו */}
