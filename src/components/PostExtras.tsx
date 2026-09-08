@@ -22,30 +22,8 @@ export default function PostExtras({
   const [addingTarget, setAddingTarget] = useState<SelectedTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const startedAtRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  async function deletePost() {
-    const confirmed = window.confirm(
-      "למחוק את הפוסט הזה לצמיתות? זה ימחק גם את התיקייה שלו עם כל הקבצים (תמונות/סרטון). לא ניתן לשחזר."
-    );
-    if (!confirmed) return;
-
-    setDeleting(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/posts/${postId}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data?.error ?? "שגיאה במחיקת הפוסט");
-      }
-      router.push("/");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה לא צפויה");
-      setDeleting(false);
-    }
-  }
 
   const missingTargets = SELECTABLE_TARGETS.filter((t) => !existingTypes.includes(t.value));
 
@@ -170,17 +148,6 @@ export default function PostExtras({
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-
-      <div className="border-t border-brand-pink/30 pt-3">
-        <button
-          type="button"
-          onClick={deletePost}
-          disabled={deleting}
-          className="text-sm text-red-600 hover:text-red-700 hover:underline disabled:opacity-50"
-        >
-          {deleting ? "מוחקת..." : "🗑️ מחקי פוסט (לצמיתות, כולל התיקייה)"}
-        </button>
-      </div>
     </div>
   );
 }

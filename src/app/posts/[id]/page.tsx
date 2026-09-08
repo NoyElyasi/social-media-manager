@@ -5,6 +5,7 @@ import PlatformContentCard, { type NormalizedPlatformContent } from "@/component
 import EditablePostText from "@/components/EditablePostText";
 import PostExtras from "@/components/PostExtras";
 import OpenFolderButton from "@/components/OpenFolderButton";
+import DeletePostButton from "@/components/DeletePostButton";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +85,10 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
         ))}
       </div>
 
-      <OpenFolderButton postId={post.id} />
+      <div className="flex items-center justify-between border-t border-brand-pink/30 pt-4">
+        <OpenFolderButton postId={post.id} />
+        <DeletePostButton postId={post.id} />
+      </div>
     </div>
   );
 }
