@@ -50,6 +50,8 @@ export default function NewPostPage() {
   const [splitMode, setSplitMode] = useState<"auto" | "manual">(() => loadDraft().splitMode ?? "auto");
   const [revealMode, setRevealMode] = useState<"word" | "letter">(() => loadDraft().revealMode ?? "word");
   const [manualHashtags, setManualHashtags] = useState(() => loadDraft().manualHashtags ?? "");
+  // חיפוש בפייסבוק לפי תגית — לא חלק מהטיוטה של הפוסט, רק עזר חד-פעמי לפני הכתיבה.
+  const [facebookSearchTag, setFacebookSearchTag] = useState("");
   const [carouselBackgroundPath, setCarouselBackgroundPath] = useState<string | null>(
     () => loadDraft().carouselBackgroundPath ?? null
   );
@@ -220,9 +222,41 @@ export default function NewPostPage() {
   const showCarouselOptions = selectedTargets.includes("instagram_carousel");
   const showReelOptions = selectedTargets.includes("instagram_reel");
 
+  function openFacebookHashtagSearch() {
+    const tag = facebookSearchTag.trim().replace(/^#/, "");
+    if (!tag) return;
+    window.open(`https://www.facebook.com/hashtag/${encodeURIComponent(tag)}`, "_blank");
+  }
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold text-brand-maroon">פוסט חדש</h1>
+
+      {/* חיפוש טקסט מפוסט ישן בפייסבוק, לפי תגית — פותח טאב חיפוש בפייסבוק;
+          ההעתקה של הטקסט הרלוונטי לתיבה שמתחת נשארת ידנית (פייסבוק לא מאפשר
+          לאפליקציות חוץ לחפש/למשוך פוסטים אישיים באופן אוטומטי). */}
+      <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3 bg-brand-pink/10">
+        <label className="font-medium text-sm">מצאי טקסט מפוסט ישן בפייסבוק לפי תגית</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={facebookSearchTag}
+            onChange={(e) => setFacebookSearchTag(e.target.value)}
+            className="flex-1 rounded-lg border border-brand-pink/40 p-2 text-sm bg-white"
+            placeholder="#קוטג"
+          />
+          <button
+            type="button"
+            onClick={openFacebookHashtagSearch}
+            className="shrink-0 rounded-md border border-brand-pink/40 px-3 py-2 text-sm hover:bg-white"
+          >
+            פתחו בפייסבוק 🔗
+          </button>
+        </div>
+        <p className="text-xs text-brand-maroon/60">
+          פותח טאב חדש בפייסבוק עם כל הפוסטים בתגית הזו — משם מעתיקים את הטקסט הרלוונטי ומדביקים בתיבה שמתחת.
+        </p>
+      </div>
 
       {/* 1. הטקסט עצמו */}
       <div className="flex flex-col gap-2">
