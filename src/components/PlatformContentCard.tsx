@@ -21,9 +21,123 @@ export interface NormalizedPlatformContent {
   suggestedSongs: { title: string; artist: string }[];
   suggestedHighlight: string | null;
   backgroundColor: string | null;
+  durationSeconds: number | null;
+  likesCount: number | null;
+  commentsCount: number | null;
+  viewsCount: number | null;
+  avgWatchSeconds: number | null;
+  followersReachPercent: number | null;
+  metricsUpdatedAt: string | null;
   publishedAt: string | null;
   status: string;
   updatedAt: string;
+}
+
+/** קלט מספרי קטן ל"נתוני ביצועים" — מציג "" כשהערך null, שולח undefined כשריק (לא נוגע בערך הקיים). */
+function MetricInput({
+  label,
+  value,
+  onChange,
+  step,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  step?: string;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-xs">
+      {label}
+      <input
+        type="number"
+        inputMode="decimal"
+        step={step ?? "1"}
+        min={0}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-md border border-brand-pink/40 p-1.5 text-sm bg-white"
+      />
+    </label>
+  );
+}
+
+/**
+ * נתוני ביצועים בפועל — מוזנים ידנית (אין חיבור API ל-Meta), נקראים ישירות
+ * מתובנות אינסטגרם/פייסבוק על ידי המשתמשת. משמשים בדשבורד האנליטיקס (/dashboard).
+ */
+function MetricsForm({ content }: { content: NormalizedPlatformContent }) {
+  const router = useRouter();
+  const [likesCount, setLikesCount] = useState(content.likesCount?.toString() ?? "");
+  const [commentsCount, setCommentsCount] = useState(content.commentsCount?.toString() ?? "");
+  const [viewsCount, setViewsCount] = useState(content.viewsCount?.toString() ?? "");
+  const [avgWatchSeconds, setAvgWatchSeconds] = useState(content.avgWatchSeconds?.toString() ?? "");
+  const [followersReachPercent, setFollowersReachPercent] = useState(
+    content.followersReachPercent?.toString() ?? ""
+  );
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const toNumberOrNull = (v: string) => (v.trim() === "" ? null : Number(v));
+      await fetch(`/api/platform-content/${content.id}/metrics`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          likesCount: toNumberOrNull(likesCount),
+          commentsCount: toNumberOrNull(commentsCount),
+          viewsCount: toNumberOrNull(viewsCount),
+          avgWatchSeconds: content.type === "instagram_reel" ? toNumberOrNull(avgWatchSeconds) : undefined,
+          followersReachPercent: toNumberOrNull(followersReachPercent),
+        }),
+      });
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 bg-brand-pink/10 p-3">
+      <label className="text-xs font-medium">
+        נתוני ביצועים (מוזנים ידנית מתובנות אינסטגרם/פייסבוק — לשימוש בדשבורד האנליטיקס)
+      </label>
+      <div className="flex flex-wrap gap-3">
+        <MetricInput label="לייקים" value={likesCount} onChange={setLikesCount} />
+        <MetricInput label="תגובות" value={commentsCount} onChange={setCommentsCount} />
+        <MetricInput label="צפיות/הגעה" value={viewsCount} onChange={setViewsCount} />
+        {content.type === "instagram_reel" && (
+          <MetricInput
+            label="זמן צפייה ממוצע (שניות)"
+            value={avgWatchSeconds}
+            onChange={setAvgWatchSeconds}
+            step="0.1"
+          />
+        )}
+        <MetricInput
+          label="אחוז עוקבים מהצופים"
+          value={followersReachPercent}
+          onChange={setFollowersReachPercent}
+          step="0.1"
+        />
+      </div>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="self-start rounded-md border border-brand-pink/40 px-3 py-1.5 text-xs hover:bg-white disabled:opacity-50"
+        >
+          {saving ? "שומר..." : "שמור נתונים"}
+        </button>
+        {content.metricsUpdatedAt && (
+          <span className="text-xs text-brand-maroon/50">
+            עודכן {new Date(content.metricsUpdatedAt).toLocaleDateString("he-IL")}
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -226,6 +340,10 @@ export default function PlatformContentCard({ content }: { content: NormalizedPl
 
       {content.suggestedHighlight && (
         <div className="text-xs text-neutral-600">💾 היילייט מומלץ: {content.suggestedHighlight}</div>
+      )}
+
+      {(content.type === "instagram_carousel" || content.type === "instagram_reel") && (
+        <MetricsForm content={content} />
       )}
 
       <div className="border-t pt-4 flex flex-wrap items-end gap-3">

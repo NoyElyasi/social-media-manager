@@ -25,6 +25,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/" className="text-brand-maroon/70 hover:text-brand-maroon">
                 פוסטים קודמים
               </Link>
+              <Link href="/dashboard" className="text-brand-maroon/70 hover:text-brand-maroon">
+                דשבורד
+              </Link>
               <Link href="/posts/new" className="text-brand-red hover:text-brand-red-dark">
                 פוסט חדש
               </Link>

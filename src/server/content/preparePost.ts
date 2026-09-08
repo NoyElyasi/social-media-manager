@@ -181,6 +181,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
             text: result.altText,
             files: JSON.stringify([result.file]),
             altText: result.altText,
+            durationSeconds: result.durationSeconds,
             hashtags: JSON.stringify(sharedHashtags),
             tags: JSON.stringify([]),
             suggestedSongs: JSON.stringify([]),
@@ -307,6 +308,7 @@ export async function updatePostRawText(
           text: result.altText,
           files: JSON.stringify([result.file]),
           altText: result.altText,
+          durationSeconds: result.durationSeconds,
           hashtags: JSON.stringify(sharedHashtags),
         },
       });
@@ -393,6 +395,7 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
           text: result.altText,
           files: JSON.stringify([result.file]),
           altText: result.altText,
+          durationSeconds: result.durationSeconds,
           hashtags: JSON.stringify(sharedHashtags),
         },
       });
@@ -477,6 +480,7 @@ export async function addTargetToPost(
         text: result.altText,
         files: JSON.stringify([result.file]),
         altText: result.altText,
+        durationSeconds: result.durationSeconds,
         hashtags: JSON.stringify(sharedHashtags),
         tags: JSON.stringify([]),
         suggestedSongs: JSON.stringify([]),

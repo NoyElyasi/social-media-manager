@@ -75,6 +75,19 @@ model PlatformContent {
   // מוצג עליו במרכז, גדול. null = בלי עמוד שער.
   coverImagePath String?
 
+  // אורך הריל בשניות — מחושב אוטומטית ברינדור (לא הזנה ידנית), לצורך
+  // השוואות באורך בדשבורד האנליטיקס (ראו /dashboard). null לקרוסלה.
+  durationSeconds Float?
+
+  // נתוני ביצועים בפועל — מוזנים ידנית (המשתמשת קוראת אותם ישירות מאינסטגרם/
+  // פייסבוק), אין כרגע חיבור API ל-Meta. null = עדיין לא הוזן.
+  likesCount             Int?
+  commentsCount          Int?
+  viewsCount             Int? // "plays"/reach לפי הפלטפורמה
+  avgWatchSeconds        Float? // רק לריל — זמן צפייה ממוצע, כמו שמופיע בתובנות אינסטגרם
+  followersReachPercent  Float? // אחוז מהצופים/מהגעה שהיו עוקבים כבר (0-100)
+  metricsUpdatedAt       DateTime?
+
   publishedAt   DateTime?
   status        ContentStatus @default(draft)
 
