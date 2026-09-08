@@ -7,6 +7,7 @@ export interface InitialProfile {
   displayName: string;
   highlights: string[];
   profileImageUrl: string | null;
+  facebookProfileId: string | null;
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -19,6 +20,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 export default function ProfileSettingsForm({ initial }: { initial: InitialProfile }) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(initial.displayName);
+  const [facebookProfileId, setFacebookProfileId] = useState(initial.facebookProfileId ?? "");
   const [highlightsText, setHighlightsText] = useState(initial.highlights.join(", "));
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -51,6 +53,7 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
         highlights,
         profileImageBase64,
         profileImageExt,
+        facebookProfileId: facebookProfileId.trim(),
       }),
     });
 
@@ -78,6 +81,22 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
           <img src={initial.profileImageUrl} alt="" className="h-20 w-20 rounded-full object-cover" />
         )}
         <input type="file" accept="image/png,image/jpeg" onChange={(e) => setImageFile(e.target.files?.[0] ?? null)} />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium">
+          שם משתמש/מזהה פרופיל בפייסבוק — כמו שמופיע ב-facebook.com/&lt;זה&gt;
+        </label>
+        <input
+          type="text"
+          value={facebookProfileId}
+          onChange={(e) => setFacebookProfileId(e.target.value)}
+          className="rounded-lg border border-brand-pink/40 p-2 bg-white"
+          placeholder="למשל noy.elyasi"
+        />
+        <p className="text-xs text-brand-maroon/60">
+          משמש לכפתור &quot;חיפוש בפייסבוק&quot; בעמוד &quot;פוסט חדש&quot;, כדי שהחיפוש יהיה בפרופיל שלך ולא בכל פייסבוק.
+        </p>
       </div>
 
       <div className="flex flex-col gap-2">

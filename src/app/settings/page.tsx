@@ -23,6 +23,7 @@ export default async function SettingsPage() {
             profileImageUrl: profile.profileImagePath
               ? buildFileUrlFromPath(profile.profileImagePath)
               : null,
+            facebookProfileId: profile.facebookProfileId,
           }}
         />
       </div>

@@ -64,6 +64,7 @@ export default function NewPostPage() {
   const [carouselBackgrounds, setCarouselBackgrounds] = useState<BackgroundItem[]>([]);
   const [reelBackgrounds, setReelBackgrounds] = useState<BackgroundItem[]>([]);
   const [coverBackgrounds, setCoverBackgrounds] = useState<BackgroundItem[]>([]);
+  const [facebookProfileId, setFacebookProfileId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
@@ -110,6 +111,7 @@ export default function NewPostPage() {
         setCarouselBackgrounds(paths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
         setReelBackgrounds(reelPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
         setCoverBackgrounds(coverPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
+        setFacebookProfileId(data.profile?.facebookProfileId ?? null);
       })
       .catch(() => {});
   }, []);
@@ -225,16 +227,21 @@ export default function NewPostPage() {
   function openFacebookHashtagSearch() {
     const tag = facebookSearchTag.trim().replace(/^#/, "");
     if (!tag) return;
-    window.open(`https://www.facebook.com/hashtag/${encodeURIComponent(tag)}`, "_blank");
+    const url = facebookProfileId
+      ? `https://www.facebook.com/${encodeURIComponent(facebookProfileId)}/search/?q=${encodeURIComponent(tag)}`
+      : `https://www.facebook.com/hashtag/${encodeURIComponent(tag)}`;
+    window.open(url, "_blank");
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold text-brand-maroon">פוסט חדש</h1>
 
-      {/* חיפוש טקסט מפוסט ישן בפייסבוק, לפי תגית — פותח טאב חיפוש בפייסבוק;
-          ההעתקה של הטקסט הרלוונטי לתיבה שמתחת נשארת ידנית (פייסבוק לא מאפשר
-          לאפליקציות חוץ לחפש/למשוך פוסטים אישיים באופן אוטומטי). */}
+      {/* חיפוש טקסט מפוסט ישן בפייסבוק, לפי תגית — פותח טאב חיפוש בפייסבוק
+          מוגבל לפרופיל שלה (אם facebookProfileId מוגדר בהגדרות; אחרת חיפוש
+          כללי בתגית, בכל פייסבוק). ההעתקה של הטקסט הרלוונטי לתיבה שמתחת
+          נשארת ידנית (פייסבוק לא מאפשר לאפליקציות חוץ לחפש/למשוך פוסטים
+          אישיים באופן אוטומטי). */}
       <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3 bg-brand-pink/10">
         <label className="font-medium text-sm">מצאי טקסט מפוסט ישן בפייסבוק לפי תגית</label>
         <div className="flex gap-2">
@@ -253,9 +260,17 @@ export default function NewPostPage() {
             פתחו בפייסבוק 🔗
           </button>
         </div>
-        <p className="text-xs text-brand-maroon/60">
-          פותח טאב חדש בפייסבוק עם כל הפוסטים בתגית הזו — משם מעתיקים את הטקסט הרלוונטי ומדביקים בתיבה שמתחת.
-        </p>
+        {facebookProfileId ? (
+          <p className="text-xs text-brand-maroon/60">
+            פותח טאב חדש עם חיפוש בתגית הזו, מוגבל לפרופיל שלך בפייסבוק — משם מעתיקים את הטקסט הרלוונטי ומדביקים
+            בתיבה שמתחת.
+          </p>
+        ) : (
+          <p className="text-xs text-brand-maroon/60">
+            כרגע החיפוש כללי (בכל פייסבוק, לא רק בפרופיל שלך) — כדי להגביל אותו לפרופיל שלך, הגדירי את שם
+            המשתמש/מזהה הפרופיל שלך בפייסבוק בעמוד ההגדרות.
+          </p>
+        )}
       </div>
 
       {/* 1. הטקסט עצמו */}

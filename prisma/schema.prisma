@@ -87,6 +87,9 @@ model ProfileSettings {
   id               String @id @default("default")
   displayName      String @default("")
   profileImagePath String? // נתיב לקובץ תמונת פרופיל באחסון המקומי
+  // שם המשתמש/מזהה הפרופיל בפייסבוק (facebook.com/<זה>) — לחיפוש תגית
+  // מוגבל לפרופיל שלה, ולא בכל פייסבוק (ראו posts/new/page.tsx).
+  facebookProfileId String?
   // תבניות רקע שהועלו לבחירה (JSON array של נתיבי קבצים) — נבחרת אחת מהן,
   // או אף אחת, בזמן יצירת פוסט (ראו PlatformContent.backgroundImagePath).
   reelBackgroundImagePaths     String   @default("[]")
