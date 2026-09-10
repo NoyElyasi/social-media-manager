@@ -21,6 +21,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 const updatePostSchema = z.object({
   rawText: z.string().min(1, "יש להזין טקסט לפוסט"),
+  // undefined = לא לשנות תבנית; null = בלי תבנית; string = תבנית חדשה.
+  carouselBackgroundPath: z.string().nullable().optional(),
+  reelBackgroundPath: z.string().nullable().optional(),
+  coverBackgroundPath: z.string().nullable().optional(),
 });
 
 /**
@@ -57,6 +61,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const post = await updatePostRawText(id, parsed.data.rawText, {
           signal: req.signal,
           onProgress: (rendered, total) => send({ type: "progress", rendered, total }),
+          carouselBackgroundPath: parsed.data.carouselBackgroundPath,
+          reelBackgroundPath: parsed.data.reelBackgroundPath,
+          coverBackgroundPath: parsed.data.coverBackgroundPath,
         });
         send({ type: "done", post });
       } catch (err) {

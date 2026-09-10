@@ -217,7 +217,14 @@ export async function createAndPreparePost(input: CreatePostInput) {
 export async function updatePostRawText(
   postId: string,
   newRawText: string,
-  options?: { signal?: AbortSignal; onProgress?: (renderedFrames: number, totalFrames: number) => void }
+  options?: {
+    signal?: AbortSignal;
+    onProgress?: (renderedFrames: number, totalFrames: number) => void;
+    /** undefined = לא לשנות (משאירים את התבנית הקיימת); null = בלי תבנית; string = תבנית חדשה. */
+    carouselBackgroundPath?: string | null;
+    reelBackgroundPath?: string | null;
+    coverBackgroundPath?: string | null;
+  }
 ) {
   const storage = getStorageService();
   const profile = await getProfileSettings();
@@ -262,8 +269,11 @@ export async function updatePostRawText(
     }
 
     if (content.type === "instagram_carousel") {
-      const backgroundImageDataUri = await loadProfileImageDataUri(storage, content.backgroundImagePath);
-      const coverBackgroundImageDataUri = await loadProfileImageDataUri(storage, content.coverImagePath);
+      const backgroundPath =
+        options?.carouselBackgroundPath !== undefined ? options.carouselBackgroundPath : content.backgroundImagePath;
+      const coverPath = options?.coverBackgroundPath !== undefined ? options.coverBackgroundPath : content.coverImagePath;
+      const backgroundImageDataUri = await loadProfileImageDataUri(storage, backgroundPath);
+      const coverBackgroundImageDataUri = await loadProfileImageDataUri(storage, coverPath);
       const result = await prepareInstagramCarousel({
         rawText: newRawText,
         splitMode,
@@ -284,12 +294,16 @@ export async function updatePostRawText(
           hashtags: JSON.stringify(result.hashtags),
           tags: JSON.stringify(result.tags),
           suggestedSongs: JSON.stringify(result.suggestedSongs),
+          backgroundImagePath: backgroundPath,
+          coverImagePath: coverPath,
         },
       });
     }
 
     if (content.type === "instagram_reel") {
-      const backgroundImageDataUri = await loadProfileImageDataUri(storage, content.backgroundImagePath);
+      const backgroundPath =
+        options?.reelBackgroundPath !== undefined ? options.reelBackgroundPath : content.backgroundImagePath;
+      const backgroundImageDataUri = await loadProfileImageDataUri(storage, backgroundPath);
       const result = await prepareInstagramReel({
         rawText: newRawText,
         seed: post.id,
@@ -310,6 +324,7 @@ export async function updatePostRawText(
           altText: result.altText,
           durationSeconds: result.durationSeconds,
           hashtags: JSON.stringify(sharedHashtags),
+          backgroundImagePath: backgroundPath,
         },
       });
     }
@@ -415,7 +430,11 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
 export async function addTargetToPost(
   postId: string,
   target: SelectedTarget,
-  options?: { signal?: AbortSignal; onProgress?: (renderedFrames: number, totalFrames: number) => void }
+  options?: {
+    signal?: AbortSignal;
+    onProgress?: (renderedFrames: number, totalFrames: number) => void;
+    reelBackgroundPath?: string | null;
+  }
 ) {
   const storage = getStorageService();
   const profile = await getProfileSettings();
@@ -461,6 +480,7 @@ export async function addTargetToPost(
   }
 
   if (target === "instagram_reel") {
+    const backgroundImageDataUri = await loadProfileImageDataUri(storage, options?.reelBackgroundPath);
     const result = await prepareInstagramReel({
       rawText: post.rawText,
       seed: post.id,
@@ -468,6 +488,7 @@ export async function addTargetToPost(
       storage,
       splitMode,
       revealMode,
+      backgroundImageDataUri,
       hashtags: sharedHashtags,
       signal: options?.signal,
       onProgress: options?.onProgress,
@@ -484,6 +505,7 @@ export async function addTargetToPost(
         hashtags: JSON.stringify(sharedHashtags),
         tags: JSON.stringify([]),
         suggestedSongs: JSON.stringify([]),
+        backgroundImagePath: options?.reelBackgroundPath ?? null,
       },
     });
   }

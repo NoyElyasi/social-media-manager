@@ -7,6 +7,7 @@ import { ReelCancelledError } from "@/server/content/instagramReel";
 /** מוסיף יעד (קרוסלה/ריל) לפוסט קיים, גם אם לא נבחר ביצירה הראשונית. */
 const addTargetSchema = z.object({
   target: z.enum(["instagram_carousel", "instagram_reel"]),
+  reelBackgroundPath: z.string().nullable().optional(),
 });
 
 /** זרם NDJSON, כמו ב-POST /api/posts — כדי לשדר התקדמות ריל ולאפשר ביטול. */
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const post = await addTargetToPost(id, parsed.data.target, {
           signal: req.signal,
           onProgress: (rendered, total) => send({ type: "progress", rendered, total }),
+          reelBackgroundPath: parsed.data.reelBackgroundPath,
         });
         send({ type: "done", post });
       } catch (err) {

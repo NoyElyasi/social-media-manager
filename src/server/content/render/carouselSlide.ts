@@ -21,7 +21,7 @@ const BODY_LINE_GAP = 20;
 // "המיקום משתנה כל עמוד, אני רוצה שיהיה קבוע" (הגרסה הקודמת השתמשה ב-flex
 // כדי למרכז אנכית, ולכן זזה בהתאם לכמות השורות). לא גבוה מידי (יש רווח נוח
 // מהראש) ולא צמוד מידי לימין (ראו CONTENT_RIGHT_INSET, בדיוק כמו CAPTION_RIGHT_INSET בריל).
-const CONTENT_TOP_OFFSET = 420;
+const CONTENT_TOP_OFFSET = 380;
 const CONTENT_RIGHT_INSET = 40;
 const CONTENT_RIGHT_OFFSET = HORIZONTAL_PADDING + CONTENT_RIGHT_INSET;
 const FOOTER_BOTTOM_OFFSET = 56;

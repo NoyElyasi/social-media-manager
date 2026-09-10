@@ -3,6 +3,7 @@ export interface StreamEvent {
   rendered?: number;
   total?: number;
   post?: unknown;
+  result?: unknown;
   message?: string;
 }
 

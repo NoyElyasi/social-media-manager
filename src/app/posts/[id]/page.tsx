@@ -6,6 +6,7 @@ import EditablePostText from "@/components/EditablePostText";
 import PostExtras from "@/components/PostExtras";
 import OpenFolderButton from "@/components/OpenFolderButton";
 import DeletePostButton from "@/components/DeletePostButton";
+import AiLabelBadge from "@/components/AiLabelBadge";
 
 export const dynamic = "force-dynamic";
 
@@ -34,15 +35,9 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
     hashtags: JSON.parse(pc.hashtags || "[]"),
     tags: JSON.parse(pc.tags || "[]"),
     suggestedSongs: JSON.parse(pc.suggestedSongs || "[]"),
-    suggestedHighlight: pc.suggestedHighlight,
-    backgroundColor: pc.backgroundColor,
     durationSeconds: pc.durationSeconds,
-    likesCount: pc.likesCount,
-    commentsCount: pc.commentsCount,
-    viewsCount: pc.viewsCount,
-    avgWatchSeconds: pc.avgWatchSeconds,
-    followersReachPercent: pc.followersReachPercent,
-    metricsUpdatedAt: pc.metricsUpdatedAt ? pc.metricsUpdatedAt.toISOString() : null,
+    instagramMediaId: pc.instagramMediaId,
+    instagramPermalink: pc.instagramPermalink,
     publishedAt: pc.publishedAt ? pc.publishedAt.toISOString() : null,
     status: pc.status,
     updatedAt: pc.updatedAt.toISOString(),
@@ -51,9 +46,12 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
   return (
     <div className="flex flex-col gap-6">
       <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
-        <p className="text-sm text-brand-maroon/60">
-          {new Date(post.createdAt).toLocaleString("he-IL")} · {post.folderPath}
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm text-brand-maroon/60">
+            {new Date(post.createdAt).toLocaleString("he-IL")} · {post.folderPath}
+          </p>
+          <AiLabelBadge theme={post.aiTheme} format={post.aiFormat} tone={post.aiTone} />
+        </div>
         <div className="mt-2 flex flex-col gap-4">
           <EditablePostText
             postId={post.id}
@@ -61,6 +59,17 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
             hasSplitTarget={visiblePlatformContents.some(
               (pc) => pc.type === "instagram_carousel" || pc.type === "instagram_reel"
             )}
+            hasCarousel={visiblePlatformContents.some((pc) => pc.type === "instagram_carousel")}
+            hasReel={visiblePlatformContents.some((pc) => pc.type === "instagram_reel")}
+            initialCarouselBackgroundPath={
+              visiblePlatformContents.find((pc) => pc.type === "instagram_carousel")?.backgroundImagePath ?? null
+            }
+            initialReelBackgroundPath={
+              visiblePlatformContents.find((pc) => pc.type === "instagram_reel")?.backgroundImagePath ?? null
+            }
+            initialCoverBackgroundPath={
+              visiblePlatformContents.find((pc) => pc.type === "instagram_carousel")?.coverImagePath ?? null
+            }
           />
           <PostExtras
             postId={post.id}

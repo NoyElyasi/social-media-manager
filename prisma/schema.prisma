@@ -32,6 +32,13 @@ model Post {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  // תיוג AI (ניתוח טקסט הפוסט המקורי, לא תלוי בפרסום בפועל) — לשימוש בפילטור
+  // בעמוד "הפוסטים שלי" ובהשוואות בדשבורד (רק לפוסטים שגם קושרו לאינסטגרם).
+  aiTheme        String? // נושא/רגש מרכזי, למשל "פחד", "קנאה", "אהבה" — קטגוריה חופשית מתוך רשימת מועמדים
+  aiFormat       String? // "letter" (מכתב/פנייה ישירה) או "regular"
+  aiTone         String? // "realistic" או "absurd"
+  aiClassifiedAt DateTime?
+
   platformContents PlatformContent[]
 }
 
@@ -85,14 +92,57 @@ model PlatformContent {
   commentsCount          Int?
   viewsCount             Int? // "plays"/reach לפי הפלטפורמה
   avgWatchSeconds        Float? // רק לריל — זמן צפייה ממוצע, כמו שמופיע בתובנות אינסטגרם
-  followersReachPercent  Float? // אחוז מהצופים/מהגעה שהיו עוקבים כבר (0-100)
+  followersReachPercent  Float? // אחוז מהצופים/מהגעה שהיו עוקבים כבר (0-100) — עדיין ידני, לא נשלף אוטומטית
   metricsUpdatedAt       DateTime?
+
+  // קישור לפוסט המקביל באינסטגרם בפועל (נבחר ידנית מרשימת הפוסטים שלה) —
+  // מאפשר סנכרון אוטומטי של likesCount/commentsCount/viewsCount/avgWatchSeconds
+  // דרך Graph API, במקום הזנה ידנית.
+  instagramMediaId   String?
+  instagramPermalink String?
 
   publishedAt   DateTime?
   status        ContentStatus @default(draft)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// עותק מקומי (cache) של פוסטים אמיתיים מאינסטגרם, נשלף ישירות מ-Graph API —
+// עצמאי לגמרי מ-Post/PlatformContent. משמש כמקור הנתונים היחיד לדשבורד
+// האנליטיקס (/dashboard), כדי שהדשבורד ישקף את כל הנוכחות שלה באינסטגרם ולא
+// רק פוסטים שנוצרו בכלי הזה.
+model InstagramMedia {
+  id                String   @id // ה-ID האמיתי של הפוסט באינסטגרם
+  caption           String?
+  timestamp         DateTime
+  permalink         String
+  mediaType         String // IMAGE / VIDEO / CAROUSEL_ALBUM
+  mediaProductType  String?
+  thumbnailUrl      String?
+  // נגזרים מהכיתוב האמיתי באינסטגרם (לא מהטקסט בכלי) — לצורך ממדי השוואה
+  // שמבוססים רק על מידע מהרשת.
+  captionWordCount  Int
+  hashtagCount      Int
+  likesCount        Int?
+  commentsCount     Int?
+  viewsCount        Int? // "views" — סך הצפיות/הפעמים שהפוסט נפתח (יכול לכלול צפיות חוזרות)
+  reachCount        Int? // "reach" — כמות חשבונות ייחודיים שנחשפו לפוסט
+  // "saved"/"shares" — סימני חיבוב אלגוריתם חזקים משמעותית מלייקים (לפי
+  // ההצהרות הפומביות של מטא על שיקולי דירוג) — מוצגים כברירת מחדל בהשוואות.
+  savedCount        Int?
+  sharesCount       Int?
+  avgWatchSeconds   Float?
+  // אורך הריל בשניות — Graph API לא חושף את זה, אז זה מגיע (אופציונלי, רק אם
+  // קיים) מה-PlatformContent המקומי המקושר (אם הפוסט נוצר בכלי הזה). null
+  // לפוסטים שלא נוצרו בכלי או שלא קושרו — לא נדרש לשום פונקציונליות אחרת.
+  durationSeconds   Float?
+  // תיוג AI — גם זה לא חשוף ב-API, מגיע (אופציונלי) מה-Post המקומי המקושר,
+  // רק אם הפוסט גם נוצר בכלי וגם סווג. null אחרת — לא חובה לשום השוואה אחרת.
+  aiTheme           String?
+  aiFormat          String?
+  aiTone            String?
+  syncedAt          DateTime @updatedAt
 }
 
 // פרופיל תצוגה קבוע שמוצג בעמודי הקרוסלה/ריל
@@ -111,5 +161,27 @@ model ProfileSettings {
   // תבניות רקע לעמוד השער (הראשון, עם התיוג הראשי במרכז) — ראו PlatformContent.coverImagePath.
   coverBackgroundImagePaths String   @default("[]")
   highlights                String   @default("[]") // JSON array of highlight names
+  // רשימת נושאים לתיוג ידני של פוסטים (ראו InstagramMediaLabelEditor) —
+  // ניתנת לעריכה בהגדרות (הוספה/הסרה), לא קבועה בקוד.
+  aiThemeOptions String @default("[\"פחד\",\"קנאה\",\"אהבה\",\"כעס\",\"געגוע\",\"בדידות\",\"בושה\",\"אשמה\",\"שמחה\",\"תסכול\",\"נוסטלגיה\",\"ביקורת חברתית\",\"אחר\"]")
+
+  // חיבור ל-Meta Graph API (אינסטגרם/פייסבוק) — לשליפת נתוני ביצועים אמיתיים
+  // בלי הרשאה מיוחדת ממטא (Standard Access, חשבון עצמי בלבד). הטוקן ארוך-הטווח
+  // (60 יום) נוצר ע"י המרה של טוקן קצר-טווח שמודבק מ-Graph API Explorer בהגדרות.
+  metaAccessToken               String?
+  metaTokenExpiresAt            DateTime?
+  metaPageId                    String?
+  metaPageName                  String?
+  metaInstagramBusinessAccountId String?
+  // מתי הופעל לאחרונה סנכרון הדשבורד בפועל (ראו syncInstagramMediaSince) —
+  // שונה מה"טווח" שמסונכרן (התאריך העדכני ביותר בין הפוסטים עצמם).
+  lastDashboardSyncAt DateTime?
+
+  // תמונת מצב של דמוגרפיית העוקבים (גיל/מין/מדינה) — לא היסטוריה, רק המצב
+  // העדכני בזמן הסנכרון האחרון. JSON arrays של {label, value}.
+  audienceGenderJson  String?
+  audienceAgeJson     String?
+  audienceCountryJson String?
+
   updatedAt                    DateTime @updatedAt
 }

@@ -9,22 +9,22 @@ export async function GET() {
   return NextResponse.json({
     profile: {
       ...profile,
-      highlights: JSON.parse(profile.highlights || "[]"),
       reelBackgroundImagePaths: JSON.parse(profile.reelBackgroundImagePaths || "[]"),
       carouselBackgroundImagePaths: JSON.parse(profile.carouselBackgroundImagePaths || "[]"),
       coverBackgroundImagePaths: JSON.parse(profile.coverBackgroundImagePaths || "[]"),
+      aiThemeOptions: JSON.parse(profile.aiThemeOptions || "[]"),
     },
   });
 }
 
 const updateSchema = z.object({
   displayName: z.string().min(1).optional(),
-  highlights: z.array(z.string()).optional(),
   // תמונת פרופיל כ-base64 (סעיף 6) — אופציונלי
   profileImageBase64: z.string().optional(),
   profileImageExt: z.enum(["png", "jpg", "jpeg"]).optional(),
   // לינק מלא לפרופיל שלה בפייסבוק — פייסבוק הסירו את החיפוש-בתוך-פרופיל בקישור ישיר.
   facebookProfileUrl: z.string().optional(),
+  aiThemeOptions: z.array(z.string()).optional(),
 });
 
 export async function PUT(req: NextRequest) {
@@ -47,9 +47,9 @@ export async function PUT(req: NextRequest) {
 
   const updated = await updateProfileSettings({
     displayName: parsed.data.displayName,
-    highlights: parsed.data.highlights,
     profileImagePath,
     facebookProfileUrl: parsed.data.facebookProfileUrl,
+    aiThemeOptions: parsed.data.aiThemeOptions,
   });
 
   return NextResponse.json({ profile: updated });

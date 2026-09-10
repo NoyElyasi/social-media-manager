@@ -1,9 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { readNdjsonStream, estimateRemainingSeconds } from "@/lib/ndjsonStream";
 import ReelProgress from "@/components/ReelProgress";
+import BackgroundPicker from "@/components/BackgroundPicker";
+import type { BackgroundItem } from "@/components/BackgroundGallery";
+import { buildFileUrlFromPath } from "@/lib/files";
 
 const MANUAL_SLIDE_BREAK = "///";
 const GLUE_MARKER = "&&";
@@ -12,10 +15,20 @@ export default function EditablePostText({
   postId,
   initialRawText,
   hasSplitTarget,
+  hasCarousel,
+  hasReel,
+  initialCarouselBackgroundPath,
+  initialReelBackgroundPath,
+  initialCoverBackgroundPath,
 }: {
   postId: string;
   initialRawText: string;
   hasSplitTarget: boolean;
+  hasCarousel: boolean;
+  hasReel: boolean;
+  initialCarouselBackgroundPath: string | null;
+  initialReelBackgroundPath: string | null;
+  initialCoverBackgroundPath: string | null;
 }) {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -25,6 +38,28 @@ export default function EditablePostText({
   const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
   const startedAtRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const [showBackgroundEditor, setShowBackgroundEditor] = useState(false);
+  const [carouselBackgrounds, setCarouselBackgrounds] = useState<BackgroundItem[]>([]);
+  const [reelBackgrounds, setReelBackgrounds] = useState<BackgroundItem[]>([]);
+  const [coverBackgrounds, setCoverBackgrounds] = useState<BackgroundItem[]>([]);
+  const [carouselBackgroundPath, setCarouselBackgroundPath] = useState<string | null>(initialCarouselBackgroundPath);
+  const [reelBackgroundPath, setReelBackgroundPath] = useState<string | null>(initialReelBackgroundPath);
+  const [coverBackgroundPath, setCoverBackgroundPath] = useState<string | null>(initialCoverBackgroundPath);
+
+  useEffect(() => {
+    if (!showBackgroundEditor) return;
+    fetch("/api/settings/profile")
+      .then((r) => r.json())
+      .then((data) => {
+        const carouselPaths: string[] = data.profile?.carouselBackgroundImagePaths ?? [];
+        const reelPaths: string[] = data.profile?.reelBackgroundImagePaths ?? [];
+        const coverPaths: string[] = data.profile?.coverBackgroundImagePaths ?? [];
+        setCarouselBackgrounds(carouselPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
+        setReelBackgrounds(reelPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
+        setCoverBackgrounds(coverPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
+      });
+  }, [showBackgroundEditor]);
 
   function insertMarker(marker: string) {
     const textarea = textareaRef.current;
@@ -60,7 +95,11 @@ export default function EditablePostText({
       const res = await fetch(`/api/posts/${postId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rawText }),
+        body: JSON.stringify({
+          rawText,
+          ...(hasCarousel ? { carouselBackgroundPath, coverBackgroundPath } : {}),
+          ...(hasReel ? { reelBackgroundPath } : {}),
+        }),
         signal: controller.signal,
       });
       if (!res.ok) {
@@ -134,6 +173,57 @@ export default function EditablePostText({
               + סימון הדבקה
             </button>
           </div>
+        </div>
+      )}
+      {(hasCarousel || hasReel) && (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => setShowBackgroundEditor((v) => !v)}
+            className="self-start text-xs text-brand-red hover:underline"
+          >
+            {showBackgroundEditor ? "סגרי בחירת רקע/שער" : "החליפי רקע/שער לפני שמירה"}
+          </button>
+          {showBackgroundEditor && (
+            <div className="flex flex-col gap-4 rounded-lg border border-brand-pink/40 bg-brand-pink/10 p-3">
+              {hasCarousel && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium">רקע לקרוסלה</label>
+                  <BackgroundPicker
+                    items={carouselBackgrounds}
+                    selected={carouselBackgroundPath}
+                    onSelect={setCarouselBackgroundPath}
+                    noneLabel="בלי תבנית (לבן)"
+                  />
+                </div>
+              )}
+              {hasCarousel && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium">עמוד שער</label>
+                  <BackgroundPicker
+                    items={coverBackgrounds}
+                    selected={coverBackgroundPath}
+                    onSelect={setCoverBackgroundPath}
+                    noneLabel="בלי עמוד שער"
+                  />
+                </div>
+              )}
+              {hasReel && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium">רקע לריל</label>
+                  <BackgroundPicker
+                    items={reelBackgrounds}
+                    selected={reelBackgroundPath}
+                    onSelect={setReelBackgroundPath}
+                    noneLabel="בלי תבנית (צבע אוטומטי)"
+                  />
+                </div>
+              )}
+              <p className="text-xs text-brand-maroon/60">
+                הבחירה כאן תיכנס לתוקף רק בלחיצה על &quot;שמור טקסט&quot; למטה.
+              </p>
+            </div>
+          )}
         </div>
       )}
       {progress && startedAtRef.current && (

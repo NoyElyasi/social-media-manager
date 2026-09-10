@@ -8,8 +8,8 @@ const HORIZONTAL_PADDING = 80;
 // גדול במפורש מהמינימום הבסיסי — לפי משוב שהטקסט היה קטן מכדי לקרוא בלי זום.
 const REEL_FONT_SIZE = MIN_FONT_SIZE_REEL + 36;
 const REEL_LINE_GAP = 14;
-// קטנה וקבועה בכוונה — לא פרופורציונלית לגודל הכתובית.
-const HASHTAG_FONT_SIZE = 34;
+// לפי משוב שהתגית הייתה קטנה מדי ביחס לכתובית.
+const HASHTAG_FONT_SIZE = 50;
 
 // הכתובית: קצת יותר שמאלה מהצמדה מלאה לימין (לא צמודה לשוליים).
 const CAPTION_RIGHT_INSET = 70;

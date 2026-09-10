@@ -28,10 +28,44 @@ const HAS_HEBREW_REGEX = new RegExp("[\\u0590-\\u05FF]");
 // (ראו buildReelFrameNode / אפקט הכתיבה בריל). כל ריצה (run) נחשפת מהתו
 // הראשון שלה בסדר הקריאה הטבעי שלה: row-reverse+סדר לוגי לריצה עברית (כך
 // שהתו הראשון יושב בקצה הימני, כמו בכתיבה בעברית), row רגיל לריצה לא-עברית.
+// פיסוק בסוף ריצה לא-עברית (למשל "9:00." או "9:00,") לא נחצה על ידי
+// HEBREW_RUN_REGEX — הוא ותוכן "הליבה" (המספר) הם ריצה לא-עברית אחת
+// שלמה. "row" רגיל (לא הפוך) שם את התו האחרון במערך בקצה הימני של
+// התיבה שלה — ובגלל שהתיבה הזאת ממוקמת *לפני* (משמאל ל)- המילה העברית
+// הקודמת ב-row-reverse החוץ, התו האחרון (הפיסוק) מסתיים צמוד לאותה
+// מילה עברית, ונקרא לפניה. הפתרון: מפרידים פיסוק סוגר מהליבה לתיבה
+// נפרדת, ומציבים את שתיהן ב-row-reverse (ליבה מימין, פיסוק משמאל).
+const TRAILING_PUNCT_REGEX = /[.,!?;]+$/;
+
+function charsRow(chars: string[], visibleCount: number): SatoriNode {
+  return h(
+    "div",
+    { style: { display: "flex", flexDirection: "row", flexWrap: "nowrap", gap: 0 } },
+    ...chars.map((ch, idx) => h("div", { style: { display: "flex", opacity: idx < visibleCount ? 1 : 0 } }, ch))
+  );
+}
+
 function renderRunNode(run: string, revealedChars: number): SatoriNode {
   const isHebrewRun = HAS_HEBREW_REGEX.test(run);
   const chars = Array.from(run);
   const visibleCount = Math.max(0, Math.min(chars.length, revealedChars));
+
+  if (!isHebrewRun) {
+    const trailingMatch = run.match(TRAILING_PUNCT_REGEX);
+    if (trailingMatch && trailingMatch[0].length < run.length) {
+      const coreChars = Array.from(run.slice(0, run.length - trailingMatch[0].length));
+      const trailingChars = Array.from(trailingMatch[0]);
+      const coreVisible = Math.min(coreChars.length, visibleCount);
+      const trailingVisible = Math.max(0, Math.min(trailingChars.length, visibleCount - coreChars.length));
+      return h(
+        "div",
+        { style: { display: "flex", flexDirection: "row-reverse", flexWrap: "nowrap", gap: 0 } },
+        charsRow(coreChars, coreVisible),
+        charsRow(trailingChars, trailingVisible)
+      );
+    }
+  }
+
   if (visibleCount >= chars.length) {
     return h("div", { style: { display: "flex" } }, run);
   }

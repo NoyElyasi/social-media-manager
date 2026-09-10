@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 export interface InitialProfile {
   displayName: string;
-  highlights: string[];
   profileImageUrl: string | null;
   facebookProfileUrl: string | null;
 }
@@ -26,7 +25,6 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
   const [facebookProfileUrl, setFacebookProfileUrl] = useState(
     initial.facebookProfileUrl ?? DEFAULT_FACEBOOK_PROFILE_URL
   );
-  const [highlightsText, setHighlightsText] = useState(initial.highlights.join(", "));
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -35,11 +33,6 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
     e.preventDefault();
     setSaving(true);
     setSaved(false);
-
-    const highlights = highlightsText
-      .split(",")
-      .map((h) => h.trim())
-      .filter(Boolean);
 
     let profileImageBase64: string | undefined;
     let profileImageExt: string | undefined;
@@ -55,7 +48,6 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         displayName,
-        highlights,
         profileImageBase64,
         profileImageExt,
         facebookProfileUrl: facebookProfileUrl.trim(),
@@ -101,19 +93,6 @@ export default function ProfileSettingsForm({ initial }: { initial: InitialProfi
           כפתור &quot;חיפוש בפייסבוק&quot; בעמוד &quot;פוסט חדש&quot; פותח את הלינק הזה — משם לוחצים על סימן החיפוש
           בתוך הפרופיל ומחפשים את התגית (פייסבוק לא מאפשרת יותר קישור ישיר לחיפוש בתוך פרופיל).
         </p>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium">
-          היילייטס קיימים באינסטגרם (מופרדים בפסיקים — סעיף 4.5)
-        </label>
-        <input
-          type="text"
-          value={highlightsText}
-          onChange={(e) => setHighlightsText(e.target.value)}
-          className="rounded-lg border border-brand-pink/40 p-2 bg-white"
-          placeholder="למשל: טיולים, משפחה, מתכונים"
-        />
       </div>
 
       <button

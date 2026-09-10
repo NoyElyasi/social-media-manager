@@ -1,11 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ALWAYS_FIRST_HASHTAG, SELECTABLE_TARGETS, type SelectedTarget } from "@/lib/labels";
 import { readNdjsonStream, estimateRemainingSeconds } from "@/lib/ndjsonStream";
 import ReelProgress from "./ReelProgress";
 import HashtagBadge from "./HashtagBadge";
+import BackgroundPicker from "./BackgroundPicker";
+import type { BackgroundItem } from "./BackgroundGallery";
+import { buildFileUrlFromPath } from "@/lib/files";
 
 export default function PostExtras({
   postId,
@@ -25,7 +28,21 @@ export default function PostExtras({
   const startedAtRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  const [showReelBackgroundPicker, setShowReelBackgroundPicker] = useState(false);
+  const [reelBackgrounds, setReelBackgrounds] = useState<BackgroundItem[]>([]);
+  const [reelBackgroundPath, setReelBackgroundPath] = useState<string | null>(null);
+
   const missingTargets = SELECTABLE_TARGETS.filter((t) => !existingTypes.includes(t.value));
+
+  useEffect(() => {
+    if (!showReelBackgroundPicker) return;
+    fetch("/api/settings/profile")
+      .then((r) => r.json())
+      .then((data) => {
+        const paths: string[] = data.profile?.reelBackgroundImagePaths ?? [];
+        setReelBackgrounds(paths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
+      });
+  }, [showReelBackgroundPicker]);
 
   async function saveHashtags() {
     setSavingHashtags(true);
@@ -58,7 +75,10 @@ export default function PostExtras({
       const res = await fetch(`/api/posts/${postId}/targets`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target }),
+        body: JSON.stringify({
+          target,
+          ...(target === "instagram_reel" ? { reelBackgroundPath } : {}),
+        }),
         signal: controller.signal,
       });
       if (!res.ok) {
@@ -120,21 +140,52 @@ export default function PostExtras({
       </div>
 
       {missingTargets.length > 0 && (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-2">
           <label className="text-xs font-medium">הוסיפו יעד נוסף לפוסט הזה</label>
           <div className="flex gap-2 flex-wrap">
-            {missingTargets.map((t) => (
-              <button
-                key={t.value}
-                type="button"
-                onClick={() => addTarget(t.value)}
-                disabled={addingTarget !== null}
-                className="rounded-md border border-brand-pink/40 px-3 py-1.5 text-sm hover:bg-brand-pink/10 disabled:opacity-50"
-              >
-                {addingTarget === t.value ? "מכין..." : `+ ${t.label}`}
-              </button>
-            ))}
+            {missingTargets.map((t) =>
+              t.value === "instagram_reel" ? (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setShowReelBackgroundPicker((v) => !v)}
+                  disabled={addingTarget !== null}
+                  className="rounded-md border border-brand-pink/40 px-3 py-1.5 text-sm hover:bg-brand-pink/10 disabled:opacity-50"
+                >
+                  {addingTarget === t.value ? "מכין..." : `+ ${t.label}`}
+                </button>
+              ) : (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => addTarget(t.value)}
+                  disabled={addingTarget !== null}
+                  className="rounded-md border border-brand-pink/40 px-3 py-1.5 text-sm hover:bg-brand-pink/10 disabled:opacity-50"
+                >
+                  {addingTarget === t.value ? "מכין..." : `+ ${t.label}`}
+                </button>
+              )
+            )}
           </div>
+          {showReelBackgroundPicker && (
+            <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 bg-brand-pink/10 p-3">
+              <label className="text-xs font-medium">רקע לריל</label>
+              <BackgroundPicker
+                items={reelBackgrounds}
+                selected={reelBackgroundPath}
+                onSelect={setReelBackgroundPath}
+                noneLabel="בלי תבנית (צבע אוטומטי)"
+              />
+              <button
+                type="button"
+                onClick={() => addTarget("instagram_reel")}
+                disabled={addingTarget !== null}
+                className="self-start rounded-md bg-brand-red px-3 py-1.5 text-sm text-white hover:bg-brand-red-dark disabled:opacity-50"
+              >
+                {addingTarget === "instagram_reel" ? "מכין..." : "הוסיפי ריל"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -63,6 +63,7 @@ export default function NewPostPage() {
   const [reelBackgrounds, setReelBackgrounds] = useState<BackgroundItem[]>([]);
   const [coverBackgrounds, setCoverBackgrounds] = useState<BackgroundItem[]>([]);
   const [facebookProfileUrl, setFacebookProfileUrl] = useState<string | null>(null);
+  const [facebookSearchQuery, setFacebookSearchQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
@@ -226,6 +227,13 @@ export default function NewPostPage() {
     window.open(facebookProfileUrl || "https://www.facebook.com/", "_blank");
   }
 
+  function openFacebookGeneralSearch() {
+    const query = facebookSearchQuery.trim();
+    if (!query) return;
+    const url = `https://www.facebook.com/search/top?q=${encodeURIComponent(query)}`;
+    window.open(url, "_blank");
+  }
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold text-brand-maroon">פוסט חדש</h1>
@@ -235,16 +243,40 @@ export default function NewPostPage() {
           #קוטג) נעשה ידנית משם, באמצעות סימן החיפוש שבתוך הפרופיל. */}
       <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3 bg-brand-pink/10">
         <label className="font-medium text-sm">מצאי טקסט מפוסט ישן בפייסבוק</label>
-        <button
-          type="button"
-          onClick={openFacebookProfile}
-          className="self-start rounded-md border border-brand-pink/40 px-3 py-2 text-sm hover:bg-white"
-        >
-          פתחו את הפרופיל שלי בפייסבוק 🔗
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={openFacebookProfile}
+            className="self-start rounded-md border border-brand-pink/40 px-3 py-2 text-sm hover:bg-white"
+          >
+            פתחו את הפרופיל שלי בפייסבוק 🔗
+          </button>
+          <input
+            type="text"
+            value={facebookSearchQuery}
+            onChange={(e) => setFacebookSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                openFacebookGeneralSearch();
+              }
+            }}
+            placeholder="תגית לחיפוש, למשל #קוטג'"
+            className="rounded-md border border-brand-pink/40 px-3 py-2 text-sm bg-white"
+          />
+          <button
+            type="button"
+            onClick={openFacebookGeneralSearch}
+            disabled={!facebookSearchQuery.trim()}
+            className="self-start rounded-md border border-brand-pink/40 px-3 py-2 text-sm hover:bg-white disabled:opacity-50"
+          >
+            חיפוש כללי בפייסבוק לפי תגית 🔍
+          </button>
+        </div>
         <p className="text-xs text-brand-maroon/60">
           משם, לחצי על סימן החיפוש שבתוך הפרופיל וחפשי לפי תגית (למשל #קוטג) — פייסבוק לא מאפשרת יותר קישור ישיר
-          לחיפוש כזה. את הטקסט הרלוונטי מעתיקים ומדביקים בתיבה שמתחת.
+          לחיפוש בתוך פרופיל. כפתור החיפוש הכללי מחפש בכל פייסבוק (לא רק בפרופיל שלך) את מה שכתוב בתיבה שלמעלה. את
+          הטקסט הרלוונטי מעתיקים ומדביקים בתיבה שמתחת.
         </p>
       </div>
 

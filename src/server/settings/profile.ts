@@ -37,7 +37,6 @@ export async function getProfileSettings() {
     data: {
       id: "default",
       displayName: process.env.DEFAULT_DISPLAY_NAME ?? "שם לדוגמה",
-      highlights: "[]",
     },
   });
 }
@@ -46,7 +45,7 @@ export async function updateProfileSettings(input: {
   displayName?: string;
   profileImagePath?: string | null;
   facebookProfileUrl?: string | null;
-  highlights?: string[];
+  aiThemeOptions?: string[];
 }) {
   await getProfileSettings(); // מבטיח שהרשומה קיימת
 
@@ -56,7 +55,7 @@ export async function updateProfileSettings(input: {
       ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
       ...(input.profileImagePath !== undefined ? { profileImagePath: input.profileImagePath } : {}),
       ...(input.facebookProfileUrl !== undefined ? { facebookProfileUrl: input.facebookProfileUrl } : {}),
-      ...(input.highlights !== undefined ? { highlights: JSON.stringify(input.highlights) } : {}),
+      ...(input.aiThemeOptions !== undefined ? { aiThemeOptions: JSON.stringify(input.aiThemeOptions) } : {}),
     },
   });
 }

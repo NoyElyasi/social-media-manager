@@ -1,31 +1,48 @@
 import { getProfileSettings } from "@/server/settings/profile";
+import { getMetaConnectionStatus } from "@/server/settings/meta";
+import { prisma } from "@/server/db";
 import { buildFileUrlFromPath } from "@/lib/files";
 import ProfileSettingsForm from "@/components/ProfileSettingsForm";
 import BackgroundGallery from "@/components/BackgroundGallery";
+import MetaConnectionForm from "@/components/MetaConnectionForm";
+import AiThemeOptionsForm from "@/components/AiThemeOptionsForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const profile = await getProfileSettings();
-  const highlights: string[] = JSON.parse(profile.highlights || "[]");
   const reelBackgroundPaths: string[] = JSON.parse(profile.reelBackgroundImagePaths || "[]");
   const carouselBackgroundPaths: string[] = JSON.parse(profile.carouselBackgroundImagePaths || "[]");
   const coverBackgroundPaths: string[] = JSON.parse(profile.coverBackgroundImagePaths || "[]");
+  const aiThemeOptions: string[] = JSON.parse(profile.aiThemeOptions || "[]");
+  const metaStatus = await getMetaConnectionStatus();
+  const latestSyncedPost = await prisma.instagramMedia.findFirst({ orderBy: { timestamp: "desc" }, select: { timestamp: true } });
 
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold text-brand-maroon">הגדרות</h1>
       <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
+        <h2 className="mb-3 font-bold text-brand-maroon">חיבור לאינסטגרם/פייסבוק</h2>
+        <MetaConnectionForm
+          initial={metaStatus}
+          lastDashboardSyncAt={profile.lastDashboardSyncAt ? profile.lastDashboardSyncAt.toISOString() : null}
+          latestSyncedPostAt={latestSyncedPost ? latestSyncedPost.timestamp.toISOString() : null}
+        />
+      </div>
+      <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
         <ProfileSettingsForm
           initial={{
             displayName: profile.displayName,
-            highlights,
             profileImageUrl: profile.profileImagePath
               ? buildFileUrlFromPath(profile.profileImagePath)
               : null,
             facebookProfileUrl: profile.facebookProfileUrl,
           }}
         />
+      </div>
+      <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
+        <h2 className="mb-3 font-bold text-brand-maroon">נושאי תיוג (לסיווג ידני של פוסטים)</h2>
+        <AiThemeOptionsForm initial={aiThemeOptions} />
       </div>
       <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
         <BackgroundGallery

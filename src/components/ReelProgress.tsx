@@ -1,15 +1,27 @@
 "use client";
 
+/** מציגה שניות בפורמט "MM:SS" מעל דקה, ואחרת כמספר שניות פשוט. */
+function formatEta(seconds: number): string {
+  if (seconds < 60) return `${seconds} שניות`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
 export default function ReelProgress({
   rendered,
   total,
   etaSeconds,
   onCancel,
+  label = "מייצרת ריל...",
+  unitLabel = "תמונות",
 }: {
   rendered: number;
   total: number;
   etaSeconds: number | null;
   onCancel: () => void;
+  label?: string;
+  unitLabel?: string;
 }) {
   const pct = total > 0 ? Math.min(100, Math.round((rendered / total) * 100)) : 0;
 
@@ -20,8 +32,8 @@ export default function ReelProgress({
           <div className="h-full bg-brand-red transition-all" style={{ width: `${pct}%` }} />
         </div>
         <p className="text-xs text-neutral-500 mt-1">
-          מייצרת ריל... {rendered}/{total} תמונות
-          {etaSeconds !== null && ` · נותרו כ-${etaSeconds} שניות`}
+          {label} {rendered}/{total} {unitLabel}
+          {etaSeconds !== null && ` · נותרו כ-${formatEta(etaSeconds)}`}
         </p>
       </div>
       <button
