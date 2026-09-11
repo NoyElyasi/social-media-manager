@@ -25,6 +25,8 @@ const updatePostSchema = z.object({
   carouselBackgroundPath: z.string().nullable().optional(),
   reelBackgroundPath: z.string().nullable().optional(),
   coverBackgroundPath: z.string().nullable().optional(),
+  regenerateCarousel: z.boolean().optional(),
+  regenerateReel: z.boolean().optional(),
 });
 
 /**
@@ -64,6 +66,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           carouselBackgroundPath: parsed.data.carouselBackgroundPath,
           reelBackgroundPath: parsed.data.reelBackgroundPath,
           coverBackgroundPath: parsed.data.coverBackgroundPath,
+          regenerateCarousel: parsed.data.regenerateCarousel,
+          regenerateReel: parsed.data.regenerateReel,
         });
         send({ type: "done", post });
       } catch (err) {

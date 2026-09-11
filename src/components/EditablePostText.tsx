@@ -46,6 +46,21 @@ export default function EditablePostText({
   const [carouselBackgroundPath, setCarouselBackgroundPath] = useState<string | null>(initialCarouselBackgroundPath);
   const [reelBackgroundPath, setReelBackgroundPath] = useState<string | null>(initialReelBackgroundPath);
   const [coverBackgroundPath, setCoverBackgroundPath] = useState<string | null>(initialCoverBackgroundPath);
+  const [updateCarousel, setUpdateCarousel] = useState(true);
+  const [updateReel, setUpdateReel] = useState(true);
+
+  // מסנכרן את הרקע הנבחר עם מה שבאמת שמור על התוכן — כדי שהוספת יעד חדש
+  // (למשל ריל, עם רקע שנבחר בזמן ההוספה) לא תישאר עם ערך ישן מהעלייה
+  // הראשונה של הקומפוננטה (שהיה null לפני שהיעד הזה בכלל התווסף לפוסט).
+  useEffect(() => {
+    setCarouselBackgroundPath(initialCarouselBackgroundPath);
+  }, [initialCarouselBackgroundPath]);
+  useEffect(() => {
+    setReelBackgroundPath(initialReelBackgroundPath);
+  }, [initialReelBackgroundPath]);
+  useEffect(() => {
+    setCoverBackgroundPath(initialCoverBackgroundPath);
+  }, [initialCoverBackgroundPath]);
 
   useEffect(() => {
     if (!showBackgroundEditor) return;
@@ -85,6 +100,10 @@ export default function EditablePostText({
       setError("יש להזין טקסט לפוסט");
       return;
     }
+    if (hasCarousel && hasReel && !updateCarousel && !updateReel) {
+      setError("בחרי לפחות תוכן אחד לעדכן (קרוסלה או ריל)");
+      return;
+    }
     setSaving(true);
     setProgress(null);
     startedAtRef.current = Date.now();
@@ -97,8 +116,14 @@ export default function EditablePostText({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           rawText,
-          ...(hasCarousel ? { carouselBackgroundPath, coverBackgroundPath } : {}),
-          ...(hasReel ? { reelBackgroundPath } : {}),
+          ...(hasCarousel
+            ? {
+                carouselBackgroundPath,
+                coverBackgroundPath,
+                regenerateCarousel: hasReel ? updateCarousel : true,
+              }
+            : {}),
+          ...(hasReel ? { reelBackgroundPath, regenerateReel: hasCarousel ? updateReel : true } : {}),
         }),
         signal: controller.signal,
       });
@@ -173,6 +198,23 @@ export default function EditablePostText({
               + סימון הדבקה
             </button>
           </div>
+        </div>
+      )}
+      {hasCarousel && hasReel && (
+        <div className="flex items-center gap-4 text-xs">
+          <span className="text-neutral-500">עדכן ברענון:</span>
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={updateCarousel}
+              onChange={(e) => setUpdateCarousel(e.target.checked)}
+            />
+            קרוסלה
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={updateReel} onChange={(e) => setUpdateReel(e.target.checked)} />
+            ריל
+          </label>
         </div>
       )}
       {(hasCarousel || hasReel) && (

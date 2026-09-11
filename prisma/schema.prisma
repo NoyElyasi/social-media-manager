@@ -182,6 +182,10 @@ model ProfileSettings {
   audienceGenderJson  String?
   audienceAgeJson     String?
   audienceCountryJson String?
+  // חשיפה למי שלא עוקב אחריה לעומת מי שכן — מצטבר על פני כל תקופת הסנכרון
+  // (מדד ברמת החשבון בלבד, לא לכל פוסט בנפרד — כך חושפת מטא את הנתון הזה),
+  // מופרד לריל לעומת פוסט/קרוסלה. JSON: {reel:{follower,nonFollower},post:{follower,nonFollower}}.
+  audienceReachByFollowJson String?
 
   updatedAt                    DateTime @updatedAt
 }

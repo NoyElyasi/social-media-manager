@@ -224,6 +224,9 @@ export async function updatePostRawText(
     carouselBackgroundPath?: string | null;
     reelBackgroundPath?: string | null;
     coverBackgroundPath?: string | null;
+    /** מאפשר לעדכן רק את הקרוסלה או רק את הריל בלי לרנדר מחדש את השני. ברירת מחדל: שניהם. */
+    regenerateCarousel?: boolean;
+    regenerateReel?: boolean;
   }
 ) {
   const storage = getStorageService();
@@ -268,7 +271,7 @@ export async function updatePostRawText(
       });
     }
 
-    if (content.type === "instagram_carousel") {
+    if (content.type === "instagram_carousel" && options?.regenerateCarousel !== false) {
       const backgroundPath =
         options?.carouselBackgroundPath !== undefined ? options.carouselBackgroundPath : content.backgroundImagePath;
       const coverPath = options?.coverBackgroundPath !== undefined ? options.coverBackgroundPath : content.coverImagePath;
@@ -300,7 +303,7 @@ export async function updatePostRawText(
       });
     }
 
-    if (content.type === "instagram_reel") {
+    if (content.type === "instagram_reel" && options?.regenerateReel !== false) {
       const backgroundPath =
         options?.reelBackgroundPath !== undefined ? options.reelBackgroundPath : content.backgroundImagePath;
       const backgroundImageDataUri = await loadProfileImageDataUri(storage, backgroundPath);

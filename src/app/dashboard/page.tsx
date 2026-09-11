@@ -69,6 +69,16 @@ function fmt(n: number | null, digits = 1): string {
   return n === null ? "—" : n.toFixed(digits).replace(/\.0$/, "");
 }
 
+/** בונה לינק לגלריה שמשמר את הפילטרים/מיון הקיימים, עם עדכון של אלה שמועברים ב-overrides. */
+function buildGalleryHref(params: { theme?: string; format?: string; sort?: string }): string {
+  const qs = new URLSearchParams();
+  if (params.theme) qs.set("theme", params.theme);
+  if (params.format) qs.set("format", params.format);
+  if (params.sort) qs.set("sort", params.sort);
+  const query = qs.toString();
+  return `/dashboard${query ? `?${query}` : ""}#gallery`;
+}
+
 /** משווה שתי קבוצות במדד נתון; מחזירה null אם אין מספיק נתונים בכל קבוצה. */
 function twoGroupBarData(
   groupA: Row[],
@@ -195,9 +205,9 @@ function buildBestBucketRecommendation(
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ theme?: string; format?: string }>;
+  searchParams: Promise<{ theme?: string; format?: string; sort?: string }>;
 }) {
-  const { theme: filterTheme, format: filterFormat } = await searchParams;
+  const { theme: filterTheme, format: filterFormat, sort: sortBy } = await searchParams;
   const media = await prisma.instagramMedia.findMany({ orderBy: { timestamp: "asc" } });
   const profile = await getProfileSettings();
   const aiThemeOptions: string[] = JSON.parse(profile.aiThemeOptions || "[]");
@@ -220,6 +230,18 @@ export default async function DashboardPage({
         const restTotal = countryDataRaw.slice(5).reduce((sum, d) => sum + d.value, 0);
         return restTotal > 0 ? [...top, { label: "אחר", value: restTotal }] : top;
       })()
+    : null;
+  const reachByFollowType = profile.audienceReachByFollowJson
+    ? (JSON.parse(profile.audienceReachByFollowJson) as {
+        reel: { follower: number; nonFollower: number };
+        post: { follower: number; nonFollower: number };
+      })
+    : null;
+  const reachByFollowTypeData = reachByFollowType
+    ? [
+        { name: "ריל", nonFollower: reachByFollowType.reel.nonFollower, follower: reachByFollowType.reel.follower },
+        { name: "פוסט/קרוסלה", nonFollower: reachByFollowType.post.nonFollower, follower: reachByFollowType.post.follower },
+      ]
     : null;
 
   const rows: Row[] = media.map((m) => {
@@ -670,6 +692,15 @@ export default async function DashboardPage({
           <PieBreakdownCard title="מין" data={genderData} />
           <PieBreakdownCard title="גיל" data={ageData} />
           <PieBreakdownCard title="מדינה" data={countryData} note="דרוש סנכרון" />
+          <GroupedBarCard
+            title="חשיפה: עוקבים לעומת לא-עוקבים"
+            data={reachByFollowTypeData}
+            bars={[
+              { key: "nonFollower", label: "לא עוקבים", color: "#c41e3a" },
+              { key: "follower", label: "עוקבים", color: "#e7a9b8" },
+            ]}
+            note="דרוש סנכרון — מדד ברמת החשבון (לא לכל פוסט), מצטבר מתאריך הסנכרון"
+          />
         </ChartScrollRow>
       </div>
 
@@ -678,7 +709,7 @@ export default async function DashboardPage({
         {(themes.length > 0 || hasLetterPosts) && (
           <div className="flex items-center gap-2 flex-wrap text-xs">
             <Link
-              href={filterFormat ? `/dashboard?format=${filterFormat}#gallery` : "/dashboard#gallery"}
+              href={buildGalleryHref({ format: filterFormat, sort: sortBy })}
               className={`rounded-full px-3 py-1 ${!filterTheme ? "bg-brand-red text-white" : "bg-brand-pink/10 text-brand-maroon hover:bg-brand-pink/20"}`}
             >
               הכל
@@ -686,7 +717,7 @@ export default async function DashboardPage({
             {themes.map((theme) => (
               <Link
                 key={theme}
-                href={`/dashboard?theme=${encodeURIComponent(theme)}${filterFormat ? `&format=${filterFormat}` : ""}#gallery`}
+                href={buildGalleryHref({ theme, format: filterFormat, sort: sortBy })}
                 className={`rounded-full px-3 py-1 ${filterTheme === theme ? "bg-brand-red text-white" : "bg-brand-pink/10 text-brand-maroon hover:bg-brand-pink/20"}`}
               >
                 {theme}
@@ -694,11 +725,11 @@ export default async function DashboardPage({
             ))}
             {hasLetterPosts && (
               <Link
-                href={
-                  filterFormat === "letter"
-                    ? `/dashboard${filterTheme ? `?theme=${encodeURIComponent(filterTheme)}` : ""}#gallery`
-                    : `/dashboard?${filterTheme ? `theme=${encodeURIComponent(filterTheme)}&` : ""}format=letter#gallery`
-                }
+                href={buildGalleryHref({
+                  theme: filterTheme,
+                  format: filterFormat === "letter" ? undefined : "letter",
+                  sort: sortBy,
+                })}
                 className={`rounded-full px-3 py-1 ${filterFormat === "letter" ? "bg-brand-red text-white" : "bg-brand-pink/10 text-brand-maroon hover:bg-brand-pink/20"}`}
               >
                 ✉️ מכתב
@@ -706,9 +737,26 @@ export default async function DashboardPage({
             )}
           </div>
         )}
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span className="text-brand-maroon/50">מיון:</span>
+          <Link
+            href={buildGalleryHref({ theme: filterTheme, format: filterFormat })}
+            className={`rounded-full px-3 py-1 ${sortBy !== "views" ? "bg-brand-red text-white" : "bg-brand-pink/10 text-brand-maroon hover:bg-brand-pink/20"}`}
+          >
+            תאריך (חדש לישן)
+          </Link>
+          <Link
+            href={buildGalleryHref({ theme: filterTheme, format: filterFormat, sort: "views" })}
+            className={`rounded-full px-3 py-1 ${sortBy === "views" ? "bg-brand-red text-white" : "bg-brand-pink/10 text-brand-maroon hover:bg-brand-pink/20"}`}
+          >
+            👁 הכי הרבה צפיות
+          </Link>
+        </div>
         <ChartScrollRow>
-          {[...rows]
-            .reverse()
+          {(sortBy === "views"
+            ? [...rows].sort((a, b) => (b.viewsCount ?? -1) - (a.viewsCount ?? -1))
+            : [...rows].reverse()
+          )
             .filter((row) => !filterTheme || row.aiTheme === filterTheme)
             .filter((row) => !filterFormat || row.aiFormat === filterFormat)
             .map((row) => (

@@ -329,7 +329,7 @@ export async function syncInstagramMediaSince(
   sinceDate: Date,
   options?: { signal?: AbortSignal; onProgress?: (synced: number, total: number) => void }
 ): Promise<{ syncedCount: number }> {
-  const { accessToken } = await requireMetaConnection();
+  const { accessToken, instagramBusinessAccountId } = await requireMetaConnection();
   const media = await fetchAllInstagramMediaSince(sinceDate);
 
   let syncedCount = 0;
@@ -401,6 +401,9 @@ export async function syncInstagramMediaSince(
   }
 
   const audience = await fetchAudienceDemographicsSafely(accessToken);
+  const reachByFollowType = await fetchReachByFollowType(instagramBusinessAccountId, accessToken, sinceDate).catch(
+    () => null
+  );
 
   await getProfileSettings();
   await prisma.profileSettings.update({
@@ -410,6 +413,7 @@ export async function syncInstagramMediaSince(
       ...(audience.genderJson !== null ? { audienceGenderJson: audience.genderJson } : {}),
       ...(audience.ageJson !== null ? { audienceAgeJson: audience.ageJson } : {}),
       ...(audience.countryJson !== null ? { audienceCountryJson: audience.countryJson } : {}),
+      ...(reachByFollowType !== null ? { audienceReachByFollowJson: JSON.stringify(reachByFollowType) } : {}),
     },
   });
 
@@ -442,6 +446,62 @@ async function fetchFollowerDemographics(
   const breakdownData = totalValue?.breakdowns?.[0];
   if (!breakdownData) return null;
   return { dimensionKeys: breakdownData.dimension_keys, results: breakdownData.results };
+}
+
+export interface ReachByFollowType {
+  reel: { follower: number; nonFollower: number };
+  post: { follower: number; nonFollower: number };
+}
+
+/**
+ * חשיפה למי שעוקב לעומת מי שלא, מופרדת לריל לעומת פוסט/קרוסלה. מטא חושפת
+ * את הפילוח הזה (breakdown=follow_type,media_product_type) רק ברמת החשבון
+ * כולו (לא לכל פוסט בנפרד), ורק בחלונות של עד 30 יום לבקשה — אז מצטברים כאן
+ * כמה בקשות של עד 30 יום, מ-sinceDate ועד עכשיו, וסוכמים אותן ל-2 קטגוריות
+ * (ריל / פוסט-קרוסלה, בלי סטורי — הפיצ'ר הזה הוסר מהכלי).
+ */
+async function fetchReachByFollowType(
+  instagramBusinessAccountId: string,
+  accessToken: string,
+  sinceDate: Date
+): Promise<ReachByFollowType | null> {
+  const MAX_WINDOW_SECONDS = 30 * 24 * 60 * 60 - 3600; // קצת מתחת ל-30 יום, ליתר בטחון
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  let windowStart = Math.floor(sinceDate.getTime() / 1000);
+  const totals: ReachByFollowType = { reel: { follower: 0, nonFollower: 0 }, post: { follower: 0, nonFollower: 0 } };
+  let gotAnyData = false;
+
+  while (windowStart < nowSeconds) {
+    const windowEnd = Math.min(windowStart + MAX_WINDOW_SECONDS, nowSeconds);
+
+    const url = new URL(`${GRAPH_API_BASE}/${instagramBusinessAccountId}/insights`);
+    url.searchParams.set("metric", "reach");
+    url.searchParams.set("period", "day");
+    url.searchParams.set("metric_type", "total_value");
+    url.searchParams.set("breakdown", "follow_type,media_product_type");
+    url.searchParams.set("since", String(windowStart));
+    url.searchParams.set("until", String(windowEnd));
+    url.searchParams.set("access_token", accessToken);
+
+    const res = await fetch(url.toString());
+    const data = await res.json();
+    if (res.ok) {
+      const results: { dimension_values: [string, string]; value: number }[] =
+        data?.data?.[0]?.total_value?.breakdowns?.[0]?.results ?? [];
+      for (const r of results) {
+        const [followType, productType] = r.dimension_values;
+        const bucket = productType === "REEL" ? totals.reel : productType === "STORY" ? null : totals.post;
+        if (!bucket) continue;
+        gotAnyData = true;
+        if (followType === "FOLLOWER") bucket.follower += r.value;
+        else if (followType === "NON_FOLLOWER") bucket.nonFollower += r.value;
+      }
+    }
+
+    windowStart = windowEnd;
+  }
+
+  return gotAnyData ? totals : null;
 }
 
 /** לא זורקת — דמוגרפיה היא תוספת "יפה שיהיה", לא קריטית לשאר הסנכרון. */
