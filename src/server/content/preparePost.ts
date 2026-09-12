@@ -1,10 +1,11 @@
+import path from "path";
 import { nanoid } from "nanoid";
 import { prisma } from "../db";
 import { getStorageService } from "../storage";
 import { scanForIdentifyingDetails } from "./privacyScanner";
 import { prepareFacebookDraft } from "./facebook";
 import { prepareInstagramCarousel, stripSlideMarkers, type SplitMode } from "./instagramCarousel";
-import { prepareInstagramReel, ReelCancelledError, type RevealMode } from "./instagramReel";
+import { prepareInstagramReel, ReelCancelledError, type RevealMode, type ReelNarration } from "./instagramReel";
 import { getProfileSettings, loadProfileImageDataUri } from "../settings/profile";
 import { ALWAYS_FIRST_HASHTAG, type SelectedTarget } from "@/lib/labels";
 
@@ -58,6 +59,8 @@ export interface CreatePostInput {
   coverBackgroundPath?: string | null;
   /** תגיות שהמשתמשת הזינה בעצמה, במקום ההצעה האוטומטית (לכל היעדים). */
   manualHashtags?: string[] | null;
+  /** הקלטת הקראה מסונכרנת לריל (ראו ReelNarration) — רק אם instagram_reel נבחר. */
+  reelNarration?: ReelNarration | null;
   /** מאפשר עצירה מבוקשת (כפתור "עצור") באמצע יצירת ריל. */
   signal?: AbortSignal;
   /** התקדמות רינדור מסגרות הריל, לצורך אינדיקציית זמן משוער בממשק. */
@@ -172,6 +175,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           hashtags: sharedHashtags,
           signal: input.signal,
           onProgress: input.onProgress,
+          narration: input.reelNarration,
         });
         await prisma.platformContent.create({
           data: {
@@ -186,6 +190,9 @@ export async function createAndPreparePost(input: CreatePostInput) {
             tags: JSON.stringify([]),
             suggestedSongs: JSON.stringify([]),
             backgroundImagePath: input.reelBackgroundPath ?? null,
+            narrationAudioPath: result.narrationAudioFileName
+              ? path.join(subfolder, result.narrationAudioFileName)
+              : null,
           },
         });
       }
@@ -227,6 +234,8 @@ export async function updatePostRawText(
     /** מאפשר לעדכן רק את הקרוסלה או רק את הריל בלי לרנדר מחדש את השני. ברירת מחדל: שניהם. */
     regenerateCarousel?: boolean;
     regenerateReel?: boolean;
+    /** הקלטת הקראה מסונכרנת חדשה — לא סופק/null = בלי הקראה (גם אם הייתה קודם, ראו ReelNarration). */
+    reelNarration?: ReelNarration | null;
   }
 ) {
   const storage = getStorageService();
@@ -318,6 +327,7 @@ export async function updatePostRawText(
         hashtags: sharedHashtags,
         signal: options?.signal,
         onProgress: options?.onProgress,
+        narration: options?.reelNarration,
       });
       await prisma.platformContent.update({
         where: { id: content.id },
@@ -328,6 +338,9 @@ export async function updatePostRawText(
           durationSeconds: result.durationSeconds,
           hashtags: JSON.stringify(sharedHashtags),
           backgroundImagePath: backgroundPath,
+          narrationAudioPath: result.narrationAudioFileName
+            ? path.join(content.folderPath, result.narrationAudioFileName)
+            : null,
         },
       });
     }
@@ -437,6 +450,7 @@ export async function addTargetToPost(
     signal?: AbortSignal;
     onProgress?: (renderedFrames: number, totalFrames: number) => void;
     reelBackgroundPath?: string | null;
+    reelNarration?: ReelNarration | null;
   }
 ) {
   const storage = getStorageService();
@@ -495,6 +509,7 @@ export async function addTargetToPost(
       hashtags: sharedHashtags,
       signal: options?.signal,
       onProgress: options?.onProgress,
+      narration: options?.reelNarration,
     });
     await prisma.platformContent.create({
       data: {
@@ -509,6 +524,9 @@ export async function addTargetToPost(
         tags: JSON.stringify([]),
         suggestedSongs: JSON.stringify([]),
         backgroundImagePath: options?.reelBackgroundPath ?? null,
+        narrationAudioPath: result.narrationAudioFileName
+          ? path.join(subfolder, result.narrationAudioFileName)
+          : null,
       },
     });
   }

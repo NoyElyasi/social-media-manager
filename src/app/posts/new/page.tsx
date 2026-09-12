@@ -9,6 +9,7 @@ import HashtagBadge from "@/components/HashtagBadge";
 import BackgroundPicker from "@/components/BackgroundPicker";
 import type { BackgroundItem } from "@/components/BackgroundGallery";
 import { buildFileUrlFromPath } from "@/lib/files";
+import NarrationRecorder, { type CapturedNarration } from "@/components/NarrationRecorder";
 
 const MANUAL_SLIDE_BREAK = "///";
 const GLUE_MARKER = "&&";
@@ -59,6 +60,10 @@ export default function NewPostPage() {
   const [coverBackgroundPath, setCoverBackgroundPath] = useState<string | null>(
     () => loadDraft().coverBackgroundPath ?? null
   );
+  // לא נשמר בטיוטה המקומית (base64 של הקלטה יכול להיות כבד) — ומתאפס בכל
+  // שינוי טקסט/חילוק דרך ה-key על NarrationRecorder, כי תזמוני המילים כבר
+  // לא רלוונטיים לטקסט חדש.
+  const [reelNarration, setReelNarration] = useState<CapturedNarration | null>(null);
   const [carouselBackgrounds, setCarouselBackgrounds] = useState<BackgroundItem[]>([]);
   const [reelBackgrounds, setReelBackgrounds] = useState<BackgroundItem[]>([]);
   const [coverBackgrounds, setCoverBackgrounds] = useState<BackgroundItem[]>([]);
@@ -181,6 +186,7 @@ export default function NewPostPage() {
           carouselBackgroundPath,
           reelBackgroundPath,
           coverBackgroundPath,
+          reelNarration: selectedTargets.includes("instagram_reel") ? reelNarration : null,
         }),
         signal: controller.signal,
       });
@@ -451,6 +457,15 @@ export default function NewPostPage() {
                 noneLabel="ללא תבנית (רקע אוטומטי)"
               />
             </div>
+          )}
+          {revealMode === "word" && (
+            <NarrationRecorder
+              key={`${rawText}-${splitMode}`}
+              rawText={rawText}
+              splitMode={splitMode}
+              revealMode={revealMode}
+              onCaptured={setReelNarration}
+            />
           )}
         </div>
       )}

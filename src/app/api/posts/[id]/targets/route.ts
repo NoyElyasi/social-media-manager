@@ -8,6 +8,14 @@ import { ReelCancelledError } from "@/server/content/instagramReel";
 const addTargetSchema = z.object({
   target: z.enum(["instagram_carousel", "instagram_reel"]),
   reelBackgroundPath: z.string().nullable().optional(),
+  reelNarration: z
+    .object({
+      audioBase64: z.string(),
+      audioMimeType: z.string(),
+      wordTimestamps: z.array(z.number()),
+    })
+    .nullable()
+    .optional(),
 });
 
 /** זרם NDJSON, כמו ב-POST /api/posts — כדי לשדר התקדמות ריל ולאפשר ביטול. */
@@ -41,6 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           signal: req.signal,
           onProgress: (rendered, total) => send({ type: "progress", rendered, total }),
           reelBackgroundPath: parsed.data.reelBackgroundPath,
+          reelNarration: parsed.data.reelNarration,
         });
         send({ type: "done", post });
       } catch (err) {

@@ -9,15 +9,22 @@ import HashtagBadge from "./HashtagBadge";
 import BackgroundPicker from "./BackgroundPicker";
 import type { BackgroundItem } from "./BackgroundGallery";
 import { buildFileUrlFromPath } from "@/lib/files";
+import NarrationRecorder, { type CapturedNarration } from "./NarrationRecorder";
 
 export default function PostExtras({
   postId,
   hashtags,
   existingTypes,
+  rawText,
+  splitMode,
+  revealMode,
 }: {
   postId: string;
   hashtags: string[];
   existingTypes: string[];
+  rawText: string;
+  splitMode: "auto" | "manual";
+  revealMode: "word" | "letter";
 }) {
   const router = useRouter();
   const [hashtagsInput, setHashtagsInput] = useState(hashtags.join(" "));
@@ -31,6 +38,7 @@ export default function PostExtras({
   const [showReelBackgroundPicker, setShowReelBackgroundPicker] = useState(false);
   const [reelBackgrounds, setReelBackgrounds] = useState<BackgroundItem[]>([]);
   const [reelBackgroundPath, setReelBackgroundPath] = useState<string | null>(null);
+  const [reelNarration, setReelNarration] = useState<CapturedNarration | null>(null);
 
   const missingTargets = SELECTABLE_TARGETS.filter((t) => !existingTypes.includes(t.value));
 
@@ -77,7 +85,7 @@ export default function PostExtras({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           target,
-          ...(target === "instagram_reel" ? { reelBackgroundPath } : {}),
+          ...(target === "instagram_reel" ? { reelBackgroundPath, reelNarration } : {}),
         }),
         signal: controller.signal,
       });
@@ -176,6 +184,15 @@ export default function PostExtras({
                 onSelect={setReelBackgroundPath}
                 noneLabel="בלי תבנית (צבע אוטומטי)"
               />
+              {revealMode === "word" && (
+                <NarrationRecorder
+                  key={`${rawText}-${splitMode}`}
+                  rawText={rawText}
+                  splitMode={splitMode}
+                  revealMode={revealMode}
+                  onCaptured={setReelNarration}
+                />
+              )}
               <button
                 type="button"
                 onClick={() => addTarget("instagram_reel")}

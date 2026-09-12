@@ -7,6 +7,7 @@ import ReelProgress from "@/components/ReelProgress";
 import BackgroundPicker from "@/components/BackgroundPicker";
 import type { BackgroundItem } from "@/components/BackgroundGallery";
 import { buildFileUrlFromPath } from "@/lib/files";
+import NarrationRecorder, { type CapturedNarration } from "@/components/NarrationRecorder";
 
 const MANUAL_SLIDE_BREAK = "///";
 const GLUE_MARKER = "&&";
@@ -17,6 +18,8 @@ export default function EditablePostText({
   hasSplitTarget,
   hasCarousel,
   hasReel,
+  splitMode,
+  revealMode,
   initialCarouselBackgroundPath,
   initialReelBackgroundPath,
   initialCoverBackgroundPath,
@@ -26,6 +29,8 @@ export default function EditablePostText({
   hasSplitTarget: boolean;
   hasCarousel: boolean;
   hasReel: boolean;
+  splitMode: "auto" | "manual";
+  revealMode: "word" | "letter";
   initialCarouselBackgroundPath: string | null;
   initialReelBackgroundPath: string | null;
   initialCoverBackgroundPath: string | null;
@@ -48,6 +53,7 @@ export default function EditablePostText({
   const [coverBackgroundPath, setCoverBackgroundPath] = useState<string | null>(initialCoverBackgroundPath);
   const [updateCarousel, setUpdateCarousel] = useState(true);
   const [updateReel, setUpdateReel] = useState(true);
+  const [reelNarration, setReelNarration] = useState<CapturedNarration | null>(null);
 
   // מסנכרן את הרקע הנבחר עם מה שבאמת שמור על התוכן — כדי שהוספת יעד חדש
   // (למשל ריל, עם רקע שנבחר בזמן ההוספה) לא תישאר עם ערך ישן מהעלייה
@@ -123,7 +129,9 @@ export default function EditablePostText({
                 regenerateCarousel: hasReel ? updateCarousel : true,
               }
             : {}),
-          ...(hasReel ? { reelBackgroundPath, regenerateReel: hasCarousel ? updateReel : true } : {}),
+          ...(hasReel
+            ? { reelBackgroundPath, regenerateReel: hasCarousel ? updateReel : true, reelNarration }
+            : {}),
         }),
         signal: controller.signal,
       });
@@ -260,6 +268,15 @@ export default function EditablePostText({
                     noneLabel="בלי תבנית (צבע אוטומטי)"
                   />
                 </div>
+              )}
+              {hasReel && revealMode === "word" && updateReel && (
+                <NarrationRecorder
+                  key={`${rawText}-${splitMode}`}
+                  rawText={rawText}
+                  splitMode={splitMode}
+                  revealMode={revealMode}
+                  onCaptured={setReelNarration}
+                />
               )}
               <p className="text-xs text-brand-maroon/60">
                 הבחירה כאן תיכנס לתוקף רק בלחיצה על &quot;שמור טקסט&quot; למטה.

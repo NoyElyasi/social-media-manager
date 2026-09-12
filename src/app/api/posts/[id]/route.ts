@@ -27,6 +27,14 @@ const updatePostSchema = z.object({
   coverBackgroundPath: z.string().nullable().optional(),
   regenerateCarousel: z.boolean().optional(),
   regenerateReel: z.boolean().optional(),
+  reelNarration: z
+    .object({
+      audioBase64: z.string(),
+      audioMimeType: z.string(),
+      wordTimestamps: z.array(z.number()),
+    })
+    .nullable()
+    .optional(),
 });
 
 /**
@@ -68,6 +76,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           coverBackgroundPath: parsed.data.coverBackgroundPath,
           regenerateCarousel: parsed.data.regenerateCarousel,
           regenerateReel: parsed.data.regenerateReel,
+          reelNarration: parsed.data.reelNarration,
         });
         send({ type: "done", post });
       } catch (err) {

@@ -18,7 +18,7 @@ const execFileAsync = promisify(execFile);
 export type RevealMode = RevealGranularity;
 
 // כתוביות קצרות לריל — מסך אחד קטן וקריא, לא פסקה שלמה (סעיף 4.4).
-const MAX_CHARS_PER_CAPTION = 50;
+export const MAX_CHARS_PER_CAPTION = 50;
 
 // קצב "כתיבה בלייב" של מילה חדשה על המסך — לא קצב קריאה, רק אפקט חזותי.
 // לפי בקשה מפורשת "בקצב מהיר יותר" (היה 0.28).
@@ -39,6 +39,25 @@ export interface InstagramReelResult {
   durationSeconds: number;
   captions: string[];
   altText: string;
+  hasNarration: boolean;
+  /** שם קובץ ההקלטה שנשמר בתוך folderPath (למשל "narration.webm"), או null אם אין הקראה. */
+  narrationAudioFileName: string | null;
+}
+
+/**
+ * הקלטת הקראה שהמשתמשת סינכרנה ידנית (לחיצה על כל מילה בזמן ההקלטה, ראו
+ * NarrationRecorder) — כשקיימת, קצב הופעת המילים בריל נגזר מהתזמונים
+ * האמיתיים האלה במקום מ-WORD_REVEAL_SECONDS/READ_SECONDS_PER_WORD הקבועים,
+ * והאודיו מוטמע כפס קול בתוך reel.mp4. רלוונטי רק במצב revealMode="word"
+ * (בלי משמעות ברמת אות-אות) — במצב אחר מתעלמים ממנה בשקט.
+ */
+export interface ReelNarration {
+  audioBase64: string;
+  audioMimeType: string;
+  /** שנייה שבה המשתמשת התחילה לומר כל מילה, יחסית לתחילת ההקלטה — מערך אחד
+   * שטוח, לפי סדר המילים המדויק שיוצא מ-splitIntoSlides+פיצול לרווחים
+   * (בדיוק כמו ב-countTotalWords/renderCaptionFrames). */
+  wordTimestamps: number[];
 }
 
 /** נזרקת כשהיצירה בוטלה במפורש (signal) באמצע — לא שגיאה אמיתית. */
@@ -67,6 +86,8 @@ export interface PrepareReelParams {
   signal?: AbortSignal;
   /** התקדמות רינדור המסגרות, לצורך אינדיקציית זמן משוער בממשק. */
   onProgress?: (renderedFrames: number, totalFrames: number) => void;
+  /** ראו ReelNarration — אופציונלי, לא "נדבק" בין רינדורים. */
+  narration?: ReelNarration | null;
 }
 
 function countTotalWords(captions: string[]): number {
@@ -86,13 +107,19 @@ async function renderCaptionFrames(
   revealMode: RevealMode,
   framesDir: string,
   signal: AbortSignal | undefined,
-  onProgress: ((renderedFrames: number, totalFrames: number) => void) | undefined
+  onProgress: ((renderedFrames: number, totalFrames: number) => void) | undefined,
+  // תזמוני מילים אמיתיים מהקלטת הקראה מסונכרנת (ראו ReelNarration) — קיים
+  // רק אם revealMode==="word" וכמות המילים תואמת בדיוק לכמות המילים בטקסט
+  // (אחרת התזמונים לא רלוונטיים יותר, ומתעלמים מהם בשקט אצל הקורא).
+  wordTimestamps: number[] | null,
+  narrationTotalSeconds: number | null
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
   const totalFrames = revealMode === "letter" ? countTotalChars(captions) : countTotalWords(captions);
   const unitRevealSeconds = revealMode === "letter" ? LETTER_REVEAL_SECONDS : WORD_REVEAL_SECONDS;
   let frameIndex = 0;
+  let globalWordIndex = 0;
 
   for (const caption of captions) {
     const words = caption.split(/\s+/).filter(Boolean);
@@ -124,8 +151,22 @@ async function renderCaptionFrames(
 
       const isLastUnit = i === unitCount - 1;
       framePaths.push(filePath);
-      durations.push(isLastUnit ? unitRevealSeconds + holdExtraSeconds : unitRevealSeconds);
+
+      // מצב הקראה מסונכרנת: המשך המסגרת הוא בדיוק הזמן עד שהיא אמרה את
+      // המילה הבאה (או עד שההקלטה מסתיימת, למילה האחרונה בכל הטקסט) —
+      // כולל הפסקות טבעיות בין משפטים, בלי צורך ב-holdExtraSeconds מלאכותי.
+      if (wordTimestamps && revealMode === "word") {
+        const nextTimestamp =
+          globalWordIndex + 1 < wordTimestamps.length
+            ? wordTimestamps[globalWordIndex + 1]
+            : narrationTotalSeconds ?? wordTimestamps[globalWordIndex] + unitRevealSeconds;
+        durations.push(Math.max(0.05, nextTimestamp - wordTimestamps[globalWordIndex]));
+      } else {
+        durations.push(isLastUnit ? unitRevealSeconds + holdExtraSeconds : unitRevealSeconds);
+      }
+
       frameIndex++;
+      if (revealMode === "word") globalWordIndex++;
       onProgress?.(frameIndex, totalFrames);
     }
   }
@@ -165,6 +206,55 @@ async function encodeVideo(framePaths: string[], durations: number[], outputPath
   ]);
 }
 
+/** סיומת קובץ סבירה למ-mimeType של MediaRecorder בדפדפן (ברוב המקרים "audio/webm;codecs=opus"). */
+function audioExtensionFromMimeType(mimeType: string): string {
+  const subtype = mimeType.split(";")[0].split("/")[1] ?? "webm";
+  if (subtype === "mp4") return "m4a";
+  return subtype;
+}
+
+// לא מייבאים את @ffprobe-installer/ffprobe עצמו (require.resolve דינמי בתוכו
+// גורם ל-Turbopack לנסות לצרף לבנדל את כל תיקיית החבילה, כולל README.md —
+// קובץ שהוא לא יודע לטפל בו, מה שקורס את השרת). @ffprobe-installer/darwin-arm64
+// יושבת תמיד ליד @ffmpeg-installer/darwin-arm64 (אותו node_modules), אז בונים
+// את הנתיב לבינארי ידנית — path.join רגיל, בלי require דינמי בכלל.
+function resolveFfprobePath(): string {
+  const platform = `${os.platform()}-${os.arch()}`;
+  const binary = os.platform() === "win32" ? "ffprobe.exe" : "ffprobe";
+  return path.join(path.dirname(ffmpegInstaller.path), "..", "..", "@ffprobe-installer", platform, binary);
+}
+
+async function probeAudioDurationSeconds(filePath: string): Promise<number | null> {
+  try {
+    const { stdout } = await execFileAsync(resolveFfprobePath(), [
+      "-v", "error",
+      "-show_entries", "format=duration",
+      "-of", "default=noprint_wrappers=1:nokey=1",
+      filePath,
+    ]);
+    const seconds = parseFloat(stdout.trim());
+    return Number.isFinite(seconds) ? seconds : null;
+  } catch {
+    return null;
+  }
+}
+
+/** מטמיעה פס קול קיים בתוך הסרטון השקט — מחליפה את outputPath בגרסה עם אודיו. */
+async function muxAudioIntoVideo(videoPath: string, audioPath: string, outputPath: string): Promise<void> {
+  await execFileAsync(ffmpegInstaller.path, [
+    "-y",
+    "-i", videoPath,
+    "-i", audioPath,
+    "-map", "0:v:0",
+    "-map", "1:a:0",
+    "-c:v", "copy",
+    "-c:a", "aac",
+    "-shortest",
+    "-movflags", "+faststart",
+    outputPath,
+  ]);
+}
+
 export async function prepareInstagramReel(params: PrepareReelParams): Promise<InstagramReelResult> {
   // חשוב: מפצלים על rawText המקורי (עם סימוני ///), לא על טקסט מנוקה —
   // splitIntoSlides בעצמו אחראי על הטיפול בסימונים (ראו instagramCarousel.ts).
@@ -172,28 +262,61 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
   const backgroundHex = pickBackgroundColor(params.seed + "-reel");
   // #אחתביום לא מוצגת כאן — היא מוטמעת כבר בתבנית הרקע (אם יש), אין צורך לכפול אותה.
   const displayHashtags = (params.hashtags ?? []).filter((tag) => tag !== ALWAYS_FIRST_HASHTAG);
+  const revealMode = params.revealMode ?? "word";
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "reel-"));
   try {
+    // הקלטת ההקראה תקפה רק במצב "מילה-מילה" וכשכמות התזמונים תואמת בדיוק
+    // לכמות המילים בטקסט הנוכחי (אחרת הטקסט השתנה מאז ההקלטה, והתזמונים
+    // לא רלוונטיים יותר) — במקרה אחר מתעלמים ממנה בשקט וחוזרים לקצב הקבוע.
+    const totalWordCount = countTotalWords(captions);
+    let audioPath: string | null = null;
+    let narrationTotalSeconds: number | null = null;
+    let wordTimestamps: number[] | null = null;
+
+    if (params.narration && revealMode === "word" && params.narration.wordTimestamps.length === totalWordCount) {
+      const ext = audioExtensionFromMimeType(params.narration.audioMimeType);
+      audioPath = path.join(workDir, `narration.${ext}`);
+      await fs.writeFile(audioPath, Buffer.from(params.narration.audioBase64, "base64"));
+      narrationTotalSeconds = await probeAudioDurationSeconds(audioPath);
+      wordTimestamps = params.narration.wordTimestamps;
+    }
+
     const { framePaths, durations } = await renderCaptionFrames(
       captions,
       backgroundHex,
       params.backgroundImageDataUri,
       displayHashtags,
-      params.revealMode ?? "word",
+      revealMode,
       workDir,
       params.signal,
-      params.onProgress
+      params.onProgress,
+      wordTimestamps,
+      narrationTotalSeconds
     );
     if (params.signal?.aborted) throw new ReelCancelledError();
+    const silentPath = path.join(workDir, "reel-silent.mp4");
+    await encodeVideo(framePaths, durations, silentPath);
+
     const outputPath = path.join(workDir, "reel.mp4");
-    await encodeVideo(framePaths, durations, outputPath);
+    const hasNarration = audioPath !== null;
+    if (hasNarration && audioPath) {
+      await muxAudioIntoVideo(silentPath, audioPath, outputPath);
+    } else {
+      await fs.rename(silentPath, outputPath);
+    }
 
     const videoBuffer = await fs.readFile(outputPath);
     const fileName = "reel.mp4";
     await params.storage.saveFile(params.folderPath, fileName, videoBuffer);
 
-    const durationSeconds = durations.reduce((sum, d) => sum + d, 0);
+    let narrationAudioFileName: string | null = null;
+    if (hasNarration && audioPath) {
+      narrationAudioFileName = `narration${path.extname(audioPath)}`;
+      await params.storage.saveFile(params.folderPath, narrationAudioFileName, await fs.readFile(audioPath));
+    }
+
+    const durationSeconds = narrationTotalSeconds ?? durations.reduce((sum, d) => sum + d, 0);
     const altText = captions.join(" ");
 
     await params.storage.saveTextFile(
@@ -204,11 +327,12 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
         captions.map((c, i) => `${i + 1}. ${c}`).join("\n"),
         `תגיות מוטבעות בסרטון: ${displayHashtags.join(" ") || "אין"}`,
         `אורך כולל: ${durationSeconds.toFixed(1)} שניות`,
+        `הקראה מסונכרנת: ${hasNarration ? "כן" : "לא"}`,
       ].join("\n\n")
     );
     await params.storage.saveTextFile(params.folderPath, "alt-text.txt", `${fileName}:\n${altText}`);
 
-    return { file: fileName, durationSeconds, captions, altText };
+    return { file: fileName, durationSeconds, captions, altText, hasNarration, narrationAudioFileName };
   } finally {
     await fs.rm(workDir, { recursive: true, force: true });
   }
