@@ -19,7 +19,6 @@ export default function EditablePostText({
   hasCarousel,
   hasReel,
   splitMode,
-  revealMode,
   initialCarouselBackgroundPath,
   initialReelBackgroundPath,
   initialCoverBackgroundPath,
@@ -30,7 +29,6 @@ export default function EditablePostText({
   hasCarousel: boolean;
   hasReel: boolean;
   splitMode: "auto" | "manual";
-  revealMode: "word" | "letter";
   initialCarouselBackgroundPath: string | null;
   initialReelBackgroundPath: string | null;
   initialCoverBackgroundPath: string | null;
@@ -269,12 +267,11 @@ export default function EditablePostText({
                   />
                 </div>
               )}
-              {hasReel && revealMode === "word" && updateReel && (
+              {hasReel && updateReel && (
                 <NarrationRecorder
                   key={`${rawText}-${splitMode}`}
                   rawText={rawText}
                   splitMode={splitMode}
-                  revealMode={revealMode}
                   onCaptured={setReelNarration}
                 />
               )}

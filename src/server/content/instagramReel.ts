@@ -46,10 +46,12 @@ export interface InstagramReelResult {
 
 /**
  * הקלטת הקראה שהמשתמשת סינכרנה ידנית (לחיצה על כל מילה בזמן ההקלטה, ראו
- * NarrationRecorder) — כשקיימת, קצב הופעת המילים בריל נגזר מהתזמונים
- * האמיתיים האלה במקום מ-WORD_REVEAL_SECONDS/READ_SECONDS_PER_WORD הקבועים,
- * והאודיו מוטמע כפס קול בתוך reel.mp4. רלוונטי רק במצב revealMode="word"
- * (בלי משמעות ברמת אות-אות) — במצב אחר מתעלמים ממנה בשקט.
+ * NarrationRecorder) — כשקיימת, קצב הופעת הטקסט בריל נגזר מהתזמונים
+ * האמיתיים האלה במקום מהקבועים הקבועים (WORD_REVEAL_SECONDS/LETTER_REVEAL_SECONDS/
+ * READ_SECONDS_PER_WORD), והאודיו מוטמע כפס קול בתוך reel.mp4. הלחיצה היא
+ * תמיד פר-מילה (גם במצב "אות-אות") — במצב הזה, משך הזמן שנקבע למילה מתחלק
+ * שווה בשווה בין האותיות שלה, כך שהיא עדיין "נכתבת" אות-אות אבל בקצב
+ * שתואם בדיוק למתי המשתמשת סיימה לומר את המילה השלמה.
  */
 export interface ReelNarration {
   audioBase64: string;
@@ -109,8 +111,10 @@ async function renderCaptionFrames(
   signal: AbortSignal | undefined,
   onProgress: ((renderedFrames: number, totalFrames: number) => void) | undefined,
   // תזמוני מילים אמיתיים מהקלטת הקראה מסונכרנת (ראו ReelNarration) — קיים
-  // רק אם revealMode==="word" וכמות המילים תואמת בדיוק לכמות המילים בטקסט
-  // (אחרת התזמונים לא רלוונטיים יותר, ומתעלמים מהם בשקט אצל הקורא).
+  // רק כשכמות המילים תואמת בדיוק לכמות המילים בטקסט (אחרת התזמונים לא
+  // רלוונטיים יותר, ומתעלמים מהם בשקט אצל הקורא). תקף גם ב-revealMode="letter":
+  // הלחיצה עדיין פר-מילה, אבל משך הזמן של המילה מתחלק שווה בשווה על פני
+  // האותיות שלה (ראו ReelNarration).
   wordTimestamps: number[] | null,
   narrationTotalSeconds: number | null
 ): Promise<{ framePaths: string[]; durations: number[] }> {
@@ -130,45 +134,57 @@ async function renderCaptionFrames(
     const revealSeconds = unitCount * unitRevealSeconds;
     const holdExtraSeconds = Math.max(0, targetCaptionSeconds - revealSeconds);
 
-    for (let i = 0; i < unitCount; i++) {
-      if (signal?.aborted) throw new ReelCancelledError();
+    // משך הזמן האמיתי שהמשתמשת הקדישה לכל מילה בכתובית הזו (מהלחיצה על
+    // המילה הזו ועד הלחיצה על הבאה, או עד סוף ההקלטה למילה האחרונה בטקסט).
+    const wordSlotSeconds: number[] | null = wordTimestamps
+      ? words.map((_, wIdx) => {
+          const gIdx = globalWordIndex + wIdx;
+          const nextTimestamp =
+            gIdx + 1 < wordTimestamps.length
+              ? wordTimestamps[gIdx + 1]
+              : narrationTotalSeconds ?? wordTimestamps[gIdx] + unitRevealSeconds;
+          return Math.max(0.05, nextTimestamp - wordTimestamps[gIdx]);
+        })
+      : null;
 
-      const png = await renderNodeToPng(
-        buildReelFrameNode({
-          fullText: caption,
-          revealedUnitCount: i + 1,
-          revealMode,
-          backgroundHex,
-          backgroundImageDataUri,
-          hashtags: displayHashtags,
-        }),
-        REEL_WIDTH,
-        REEL_HEIGHT
-      );
-      const fileName = `frame-${String(frameIndex).padStart(5, "0")}.png`;
-      const filePath = path.join(framesDir, fileName);
-      await fs.writeFile(filePath, png);
+    let unitIndexInCaption = 0;
+    for (let wIdx = 0; wIdx < words.length; wIdx++) {
+      const letterCount = revealMode === "letter" ? words[wIdx].length : 1;
 
-      const isLastUnit = i === unitCount - 1;
-      framePaths.push(filePath);
+      for (let l = 0; l < letterCount; l++) {
+        if (signal?.aborted) throw new ReelCancelledError();
 
-      // מצב הקראה מסונכרנת: המשך המסגרת הוא בדיוק הזמן עד שהיא אמרה את
-      // המילה הבאה (או עד שההקלטה מסתיימת, למילה האחרונה בכל הטקסט) —
-      // כולל הפסקות טבעיות בין משפטים, בלי צורך ב-holdExtraSeconds מלאכותי.
-      if (wordTimestamps && revealMode === "word") {
-        const nextTimestamp =
-          globalWordIndex + 1 < wordTimestamps.length
-            ? wordTimestamps[globalWordIndex + 1]
-            : narrationTotalSeconds ?? wordTimestamps[globalWordIndex] + unitRevealSeconds;
-        durations.push(Math.max(0.05, nextTimestamp - wordTimestamps[globalWordIndex]));
-      } else {
-        durations.push(isLastUnit ? unitRevealSeconds + holdExtraSeconds : unitRevealSeconds);
+        const png = await renderNodeToPng(
+          buildReelFrameNode({
+            fullText: caption,
+            revealedUnitCount: unitIndexInCaption + 1,
+            revealMode,
+            backgroundHex,
+            backgroundImageDataUri,
+            hashtags: displayHashtags,
+          }),
+          REEL_WIDTH,
+          REEL_HEIGHT
+        );
+        const fileName = `frame-${String(frameIndex).padStart(5, "0")}.png`;
+        const filePath = path.join(framesDir, fileName);
+        await fs.writeFile(filePath, png);
+        framePaths.push(filePath);
+
+        const isLastUnitInCaption = unitIndexInCaption === unitCount - 1;
+
+        if (wordSlotSeconds) {
+          durations.push(wordSlotSeconds[wIdx] / letterCount);
+        } else {
+          durations.push(isLastUnitInCaption ? unitRevealSeconds + holdExtraSeconds : unitRevealSeconds);
+        }
+
+        frameIndex++;
+        unitIndexInCaption++;
+        onProgress?.(frameIndex, totalFrames);
       }
-
-      frameIndex++;
-      if (revealMode === "word") globalWordIndex++;
-      onProgress?.(frameIndex, totalFrames);
     }
+    globalWordIndex += words.length;
   }
 
   return { framePaths, durations };
@@ -266,7 +282,7 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "reel-"));
   try {
-    // הקלטת ההקראה תקפה רק במצב "מילה-מילה" וכשכמות התזמונים תואמת בדיוק
+    // הקלטת ההקראה תקפה (בכל revealMode) רק כשכמות התזמונים תואמת בדיוק
     // לכמות המילים בטקסט הנוכחי (אחרת הטקסט השתנה מאז ההקלטה, והתזמונים
     // לא רלוונטיים יותר) — במקרה אחר מתעלמים ממנה בשקט וחוזרים לקצב הקבוע.
     const totalWordCount = countTotalWords(captions);
@@ -274,7 +290,7 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
     let narrationTotalSeconds: number | null = null;
     let wordTimestamps: number[] | null = null;
 
-    if (params.narration && revealMode === "word" && params.narration.wordTimestamps.length === totalWordCount) {
+    if (params.narration && params.narration.wordTimestamps.length === totalWordCount) {
       const ext = audioExtensionFromMimeType(params.narration.audioMimeType);
       audioPath = path.join(workDir, `narration.${ext}`);
       await fs.writeFile(audioPath, Buffer.from(params.narration.audioBase64, "base64"));

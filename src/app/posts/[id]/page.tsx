@@ -62,7 +62,6 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
             hasCarousel={visiblePlatformContents.some((pc) => pc.type === "instagram_carousel")}
             hasReel={visiblePlatformContents.some((pc) => pc.type === "instagram_reel")}
             splitMode={post.splitMode as "auto" | "manual"}
-            revealMode={post.revealMode as "word" | "letter"}
             initialCarouselBackgroundPath={
               visiblePlatformContents.find((pc) => pc.type === "instagram_carousel")?.backgroundImagePath ?? null
             }
@@ -79,7 +78,6 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
             existingTypes={visiblePlatformContents.map((pc) => pc.type)}
             rawText={post.rawText}
             splitMode={post.splitMode as "auto" | "manual"}
-            revealMode={post.revealMode as "word" | "letter"}
           />
         </div>
       </div>

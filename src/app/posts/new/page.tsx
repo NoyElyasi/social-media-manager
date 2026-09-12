@@ -458,15 +458,12 @@ export default function NewPostPage() {
               />
             </div>
           )}
-          {revealMode === "word" && (
-            <NarrationRecorder
-              key={`${rawText}-${splitMode}`}
-              rawText={rawText}
-              splitMode={splitMode}
-              revealMode={revealMode}
-              onCaptured={setReelNarration}
-            />
-          )}
+          <NarrationRecorder
+            key={`${rawText}-${splitMode}`}
+            rawText={rawText}
+            splitMode={splitMode}
+            onCaptured={setReelNarration}
+          />
         </div>
       )}
 

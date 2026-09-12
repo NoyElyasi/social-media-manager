@@ -17,14 +17,12 @@ export default function PostExtras({
   existingTypes,
   rawText,
   splitMode,
-  revealMode,
 }: {
   postId: string;
   hashtags: string[];
   existingTypes: string[];
   rawText: string;
   splitMode: "auto" | "manual";
-  revealMode: "word" | "letter";
 }) {
   const router = useRouter();
   const [hashtagsInput, setHashtagsInput] = useState(hashtags.join(" "));
@@ -184,15 +182,12 @@ export default function PostExtras({
                 onSelect={setReelBackgroundPath}
                 noneLabel="בלי תבנית (צבע אוטומטי)"
               />
-              {revealMode === "word" && (
-                <NarrationRecorder
-                  key={`${rawText}-${splitMode}`}
-                  rawText={rawText}
-                  splitMode={splitMode}
-                  revealMode={revealMode}
-                  onCaptured={setReelNarration}
-                />
-              )}
+              <NarrationRecorder
+                key={`${rawText}-${splitMode}`}
+                rawText={rawText}
+                splitMode={splitMode}
+                onCaptured={setReelNarration}
+              />
               <button
                 type="button"
                 onClick={() => addTarget("instagram_reel")}

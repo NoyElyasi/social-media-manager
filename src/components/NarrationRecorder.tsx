@@ -23,18 +23,18 @@ function blobToBase64(blob: Blob): Promise<string> {
 /**
  * מקליטה הקראה של טקסט הריל, בעוד המשתמשת מקישה על כל מילה בדיוק ברגע
  * שהיא מתחילה להקריא אותה — כך נאספים תזמוני מילים אמיתיים בלי צורך בזיהוי
- * דיבור. רלוונטי רק ב-revealMode="word" (תזמון פר-מילה חסר משמעות באות-אות).
- * ה-onCaptured נקרא עם ההקלטה המוכנה (base64+תזמונים), או null כשמנקים/מקליטים מחדש.
+ * דיבור. הלחיצה תמיד פר-מילה, גם ב-revealMode="letter" — במצב הזה השרת
+ * מחלק את משך הזמן של כל מילה שווה בשווה בין האותיות שלה (ראו ReelNarration
+ * ב-instagramReel.ts). ה-onCaptured נקרא עם ההקלטה המוכנה (base64+תזמונים),
+ * או null כשמנקים/מקליטים מחדש.
  */
 export default function NarrationRecorder({
   rawText,
   splitMode,
-  revealMode,
   onCaptured,
 }: {
   rawText: string;
   splitMode: "auto" | "manual";
-  revealMode: "word" | "letter";
   onCaptured: (narration: CapturedNarration | null) => void;
 }) {
   const [words, setWords] = useState<string[] | null>(null);
@@ -159,10 +159,6 @@ export default function NarrationRecorder({
       if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
   }, [audioUrl]);
-
-  if (revealMode !== "word") {
-    return <p className="text-xs text-brand-maroon/50">הקלטת הקראה מסונכרנת זמינה רק באנימציית "מילה-מילה".</p>;
-  }
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 bg-white p-3">
