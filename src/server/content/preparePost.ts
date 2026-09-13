@@ -6,9 +6,16 @@ import { scanForIdentifyingDetails } from "./privacyScanner";
 import { prepareFacebookDraft } from "./facebook";
 import { prepareInstagramCarousel, stripSlideMarkers, type SplitMode } from "./instagramCarousel";
 import { suggestSongs, type ThemeSongs } from "./songSuggestions";
-import { prepareInstagramReel, ReelCancelledError, type RevealMode, type ReelNarration } from "./instagramReel";
+import {
+  prepareInstagramReel,
+  ReelCancelledError,
+  guessAudioMimeTypeFromExtension,
+  type RevealMode,
+  type ReelNarration,
+} from "./instagramReel";
 import { getProfileSettings, loadProfileImageDataUri } from "../settings/profile";
 import { ALWAYS_FIRST_HASHTAG, type SelectedTarget } from "@/lib/labels";
+import type { StorageService } from "../storage/types";
 
 export type { SelectedTarget };
 
@@ -17,6 +24,29 @@ function parseThemeSongs(themeSongsJson: string): ThemeSongs {
     return JSON.parse(themeSongsJson || "{}");
   } catch {
     return {};
+  }
+}
+
+/**
+ * מחזירה את ההקלטה שיש להעביר ל-prepareInstagramReel ברינדור הזה — לפי
+ * משוב מפורש שרינדור מחדש (שינוי רקע/תגיות) לא צריך למחוק הקלטה קיימת.
+ * undefined (לא סופקה הקלטה חדשה בבקשה) = משתמשים מחדש בהקלטה השמורה אם
+ * יש כזו; null (מפורש) = המשתמשת הסירה את ההקלטה בכוונה; אחרת — הקלטה חדשה.
+ */
+async function resolveReelNarration(
+  storage: StorageService,
+  existingNarrationAudioPath: string | null,
+  providedNarration: ReelNarration | null | undefined
+): Promise<ReelNarration | null | undefined> {
+  if (providedNarration !== undefined) return providedNarration;
+  if (!existingNarrationAudioPath) return undefined;
+
+  try {
+    const audioBase64 = (await storage.readFile(".", existingNarrationAudioPath)).toString("base64");
+    const ext = path.extname(existingNarrationAudioPath);
+    return { audioBase64, audioMimeType: guessAudioMimeTypeFromExtension(ext) };
+  } catch {
+    return undefined; // הקובץ לא נמצא (למשל נמחק חיצונית) — מתעלמים בשקט, לא מפילים את הרינדור.
   }
 }
 
@@ -332,6 +362,7 @@ export async function updatePostRawText(
       const backgroundPath =
         options?.reelBackgroundPath !== undefined ? options.reelBackgroundPath : content.backgroundImagePath;
       const backgroundImageDataUri = await loadProfileImageDataUri(storage, backgroundPath);
+      const narration = await resolveReelNarration(storage, content.narrationAudioPath, options?.reelNarration);
       const result = await prepareInstagramReel({
         rawText: newRawText,
         seed: post.id,
@@ -343,7 +374,7 @@ export async function updatePostRawText(
         hashtags: sharedHashtags,
         signal: options?.signal,
         onProgress: options?.onProgress,
-        narration: options?.reelNarration,
+        narration,
       });
       await prisma.platformContent.update({
         where: { id: content.id },
@@ -426,8 +457,10 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
 
     if (content.type === "instagram_reel") {
       // התגיות מוטבעות בפועל בסרטון (שורה נפרדת בראש) — עדכון שלהן חייב
-      // רינדור מחדש, לא רק שמירה בשדה.
+      // רינדור מחדש, לא רק שמירה בשדה. משתמשים מחדש בהקלטה הקיימת (אם יש) —
+      // עדכון תגיות לא צריך למחוק אותה.
       const backgroundImageDataUri = await loadProfileImageDataUri(storage, content.backgroundImagePath);
+      const narration = await resolveReelNarration(storage, content.narrationAudioPath, undefined);
       const result = await prepareInstagramReel({
         rawText: post.rawText,
         seed: post.id,
@@ -437,6 +470,7 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
         revealMode,
         backgroundImageDataUri,
         hashtags: sharedHashtags,
+        narration,
       });
       await prisma.platformContent.update({
         where: { id: content.id },
@@ -446,6 +480,9 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
           altText: result.altText,
           durationSeconds: result.durationSeconds,
           hashtags: JSON.stringify(sharedHashtags),
+          narrationAudioPath: result.narrationAudioFileName
+            ? path.join(content.folderPath, result.narrationAudioFileName)
+            : null,
         },
       });
     }

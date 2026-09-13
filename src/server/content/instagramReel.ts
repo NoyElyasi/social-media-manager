@@ -243,8 +243,25 @@ async function encodeVideo(framePaths: string[], durations: number[], outputPath
 /** סיומת קובץ סבירה למ-mimeType של MediaRecorder בדפדפן (ברוב המקרים "audio/webm;codecs=opus"). */
 function audioExtensionFromMimeType(mimeType: string): string {
   const subtype = mimeType.split(";")[0].split("/")[1] ?? "webm";
-  if (subtype === "mp4") return "m4a";
+  // "audio/mp4" ו-"audio/x-m4a" הן שתיהן וריאציות MIME נפוצות ל-m4a
+  // (ראינו את שתיהן בפועל, תלוי בדפדפן/מכשיר).
+  if (subtype === "mp4" || subtype === "x-m4a") return "m4a";
   return subtype;
+}
+
+/**
+ * ההופכי ל-audioExtensionFromMimeType — משמש כשמשתמשים מחדש בהקלטה שמורה
+ * (ראו resolveReelNarration ב-preparePost.ts): יש רק את סיומת הקובץ, וצריך
+ * mimeType סביר כדי להעביר אותה חזרה ל-prepareInstagramReel. לא צריך להיות
+ * מדויק ב-100% — prepareInstagramReel רק מחלץ ממנו את הסיומת בחזרה.
+ */
+export function guessAudioMimeTypeFromExtension(ext: string): string {
+  const normalized = ext.replace(/^\./, "").toLowerCase();
+  if (normalized === "m4a" || normalized === "x-m4a") return "audio/mp4";
+  if (normalized === "mp3") return "audio/mpeg";
+  if (normalized === "wav") return "audio/wav";
+  if (normalized === "ogg") return "audio/ogg";
+  return "audio/webm";
 }
 
 // לא מייבאים את @ffprobe-installer/ffprobe עצמו (require.resolve דינמי בתוכו

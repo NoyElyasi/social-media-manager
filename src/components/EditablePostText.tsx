@@ -22,6 +22,7 @@ export default function EditablePostText({
   initialCarouselBackgroundPath,
   initialReelBackgroundPath,
   initialCoverBackgroundPath,
+  hasExistingNarration,
 }: {
   postId: string;
   initialRawText: string;
@@ -32,6 +33,7 @@ export default function EditablePostText({
   initialCarouselBackgroundPath: string | null;
   initialReelBackgroundPath: string | null;
   initialCoverBackgroundPath: string | null;
+  hasExistingNarration: boolean;
 }) {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -51,7 +53,10 @@ export default function EditablePostText({
   const [coverBackgroundPath, setCoverBackgroundPath] = useState<string | null>(initialCoverBackgroundPath);
   const [updateCarousel, setUpdateCarousel] = useState(true);
   const [updateReel, setUpdateReel] = useState(true);
-  const [reelNarration, setReelNarration] = useState<CapturedNarration | null>(null);
+  // undefined = לא נגעה בהקלטה בעריכה הזו — משתמשים מחדש בהקלטה הקיימת
+  // (אם יש) בצד השרת; null = לחצה "הסירי הקלטה" בכוונה. לפי משוב מפורש
+  // שרינדור מחדש (למשל שינוי רקע) לא צריך למחוק הקלטה קיימת בטעות.
+  const [reelNarration, setReelNarration] = useState<CapturedNarration | null | undefined>(undefined);
 
   // מסנכרן את הרקע הנבחר עם מה שבאמת שמור על התוכן — כדי שהוספת יעד חדש
   // (למשל ריל, עם רקע שנבחר בזמן ההוספה) לא תישאר עם ערך ישן מהעלייה
@@ -128,7 +133,11 @@ export default function EditablePostText({
               }
             : {}),
           ...(hasReel
-            ? { reelBackgroundPath, regenerateReel: hasCarousel ? updateReel : true, reelNarration }
+            ? {
+                reelBackgroundPath,
+                regenerateReel: hasCarousel ? updateReel : true,
+                ...(reelNarration !== undefined ? { reelNarration } : {}),
+              }
             : {}),
         }),
         signal: controller.signal,
@@ -268,7 +277,21 @@ export default function EditablePostText({
                 </div>
               )}
               {hasReel && updateReel && (
-                <NarrationInput key={`${rawText}-${splitMode}`} onCaptured={setReelNarration} />
+                <div className="flex flex-col gap-1">
+                  {hasExistingNarration && reelNarration === undefined && (
+                    <div className="flex items-center gap-2 text-xs text-green-700">
+                      <p>🎙️ יש הקלטה משויכת לריל הזה — היא תישמר אוטומטית, אין צורך להקליט מחדש (אלא אם רוצים להחליף).</p>
+                      <button
+                        type="button"
+                        onClick={() => setReelNarration(null)}
+                        className="shrink-0 text-brand-red hover:underline"
+                      >
+                        הסירי הקלטה
+                      </button>
+                    </div>
+                  )}
+                  <NarrationInput key={`${rawText}-${splitMode}`} onCaptured={setReelNarration} />
+                </div>
               )}
               <p className="text-xs text-brand-maroon/60">
                 הבחירה כאן תיכנס לתוקף רק בלחיצה על &quot;שמור טקסט&quot; למטה.

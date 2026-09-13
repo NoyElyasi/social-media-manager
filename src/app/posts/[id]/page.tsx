@@ -68,6 +68,9 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
             initialReelBackgroundPath={
               visiblePlatformContents.find((pc) => pc.type === "instagram_reel")?.backgroundImagePath ?? null
             }
+            hasExistingNarration={
+              !!visiblePlatformContents.find((pc) => pc.type === "instagram_reel")?.narrationAudioPath
+            }
             initialCoverBackgroundPath={
               visiblePlatformContents.find((pc) => pc.type === "instagram_carousel")?.coverImagePath ?? null
             }
