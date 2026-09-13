@@ -105,13 +105,16 @@ async function renderCaptionFrames(
   framesDir: string,
   signal: AbortSignal | undefined,
   onProgress: ((renderedFrames: number, totalFrames: number) => void) | undefined,
-  // תזמוני מילים אמיתיים מהקלטת הקראה מסונכרנת (ראו ReelNarration) — קיים
-  // רק כשכמות המילים תואמת בדיוק לכמות המילים בטקסט (אחרת התזמונים לא
-  // רלוונטיים יותר, ומתעלמים מהם בשקט אצל הקורא). תקף גם ב-revealMode="letter":
-  // הלחיצה עדיין פר-מילה, אבל משך הזמן של המילה מתחלק שווה בשווה על פני
-  // האותיות שלה (ראו ReelNarration).
+  // תזמוני מילים גסים מניתוח עוצמת הקול בהקלטה (ראו detectWordTimestamps) —
+  // כשקיימים, קובעים את קצב הכתיבה במקום הקבועים למעלה. תקף גם ב-revealMode="letter":
+  // משך הזמן של כל מילה מתחלק שווה בשווה על פני האותיות שלה.
   wordTimestamps: number[] | null,
-  narrationTotalSeconds: number | null
+  narrationTotalSeconds: number | null,
+  // כמה שניות של שקט יש לפני שהמילה הראשונה בפועל נאמרת (ראו
+  // detectSpeechStartSeconds) — לפי משוב מפורש שההתחלה תמיד שקטה ("לוקח לי
+  // זמן להתחיל להקריא"), אז מוסיפים מסגרת פותחת "ריקה" (בלי טקסט חשוף) באורך
+  // הזה, כדי שהמילה הראשונה על המסך לא תופיע לפני שבאמת אמרו אותה בהקלטה.
+  leadInSeconds: number
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
@@ -119,6 +122,26 @@ async function renderCaptionFrames(
   const unitRevealSeconds = revealMode === "letter" ? LETTER_REVEAL_SECONDS : WORD_REVEAL_SECONDS;
   let frameIndex = 0;
   let globalWordIndex = 0;
+
+  if (leadInSeconds > 0.05 && captions.length > 0) {
+    const png = await renderNodeToPng(
+      buildReelFrameNode({
+        fullText: captions[0],
+        revealedUnitCount: 0,
+        revealMode,
+        backgroundHex,
+        backgroundImageDataUri,
+        hashtags: displayHashtags,
+      }),
+      REEL_WIDTH,
+      REEL_HEIGHT
+    );
+    const filePath = path.join(framesDir, `frame-${String(frameIndex).padStart(5, "0")}.png`);
+    await fs.writeFile(filePath, png);
+    framePaths.push(filePath);
+    durations.push(leadInSeconds);
+    frameIndex++;
+  }
 
   for (const caption of captions) {
     const words = caption.split(/\s+/).filter(Boolean);
@@ -291,22 +314,55 @@ function computeShortTimeEnergy(samples: Int16Array, sampleRate: number, windowS
 }
 
 /**
+ * מזהה מתי בפועל מתחיל דיבור בהקלטה — לפי משוב מפורש שההתחלה תמיד שקטה
+ * ("לוקח לי זמן להתחיל להקריא"), ובלי הזיהוי הזה המילה הראשונה של הריל
+ * הייתה מוצגת מיד בזמן 0, לפני שנאמרה בפועל, מה שמפרק את הסנכרון לכל אורך
+ * ההקלטה. סף רעש נמוך (8% מהעוצמה המקסימלית) + דרישת רצף קצר (לא "בליפ"
+ * רגעי) — לא זיהוי דיבור מדויק, רק הבחנה גסה בין שקט לדיבור.
+ */
+function detectSpeechStartSeconds(energies: number[], windowSeconds: number): number {
+  const maxEnergy = Math.max(...energies, 1);
+  const noiseFloor = maxEnergy * 0.08;
+  const sustainWindows = Math.max(1, Math.round(0.1 / windowSeconds));
+
+  for (let i = 0; i <= energies.length - sustainWindows; i++) {
+    let allAboveFloor = true;
+    for (let j = 0; j < sustainWindows; j++) {
+      if (energies[i + j] < noiseFloor) {
+        allAboveFloor = false;
+        break;
+      }
+    }
+    if (allAboveFloor) return i * windowSeconds;
+  }
+  return 0; // לא זוהתה התחלה ברורה — fallback להתחלה מהאפס, כמו קודם.
+}
+
+/**
  * מזהה תזמון גס למילים בהקלטת הקראה, לפי רגישות לעוצמת הסאונד — לא זיהוי
  * דיבור אמיתי, לפי בקשה מפורשת "לא צריך להיות מדויק במאה אחוז". מחלקת את
- * משך ההקלטה ל-wordCount קטעים: כל גבול בין שתי מילים "נמשך" מהזמן המשוער
- * (חלוקה שווה) לנקודת העוצמה-הנמוכה ביותר בסביבתו — כלומר לרגע הכי דומה
- * לרווח/שקט קצר בין מילים. תמיד מחזירה בדיוק wordCount נקודות התחלה
- * (הראשונה 0), כדי שלא תהיה תלות בכמות "שיאים" שהתגלו בפועל בהקלטה.
+ * הטווח הפעיל (מ-speechStartSeconds ועד סוף ההקלטה) ל-wordCount קטעים: כל
+ * גבול בין שתי מילים "נמשך" מהזמן המשוער (חלוקה שווה) לנקודת העוצמה-הנמוכה
+ * ביותר בסביבתו — כלומר לרגע הכי דומה לרווח/שקט קצר בין מילים. תמיד מחזירה
+ * בדיוק wordCount נקודות התחלה (הראשונה = speechStartSeconds), כדי שלא
+ * תהיה תלות בכמות "שיאים" שהתגלו בפועל בהקלטה.
  */
-function detectWordTimestamps(energies: number[], windowSeconds: number, totalSeconds: number, wordCount: number): number[] {
-  if (wordCount <= 1) return [0];
+function detectWordTimestamps(
+  energies: number[],
+  windowSeconds: number,
+  totalSeconds: number,
+  wordCount: number,
+  speechStartSeconds: number
+): number[] {
+  if (wordCount <= 1) return [speechStartSeconds];
 
-  const idealGap = totalSeconds / wordCount;
+  const activeSeconds = Math.max(0.1, totalSeconds - speechStartSeconds);
+  const idealGap = activeSeconds / wordCount;
   const searchRadiusSeconds = Math.min(idealGap * 0.4, 0.35);
-  const timestamps: number[] = [0];
+  const timestamps: number[] = [speechStartSeconds];
 
   for (let k = 1; k < wordCount; k++) {
-    const idealTime = k * idealGap;
+    const idealTime = speechStartSeconds + k * idealGap;
     const loIndex = Math.max(0, Math.floor((idealTime - searchRadiusSeconds) / windowSeconds));
     const hiIndex = Math.min(energies.length - 1, Math.ceil((idealTime + searchRadiusSeconds) / windowSeconds));
 
@@ -373,9 +429,10 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
           const windowSeconds = 0.02;
           const { samples, sampleRate } = await extractPcmSamples(candidatePath);
           const energies = computeShortTimeEnergy(samples, sampleRate, windowSeconds);
+          const speechStartSeconds = detectSpeechStartSeconds(energies, windowSeconds);
           audioPath = candidatePath;
           narrationTotalSeconds = durationSeconds;
-          wordTimestamps = detectWordTimestamps(energies, windowSeconds, durationSeconds, totalWordCount);
+          wordTimestamps = detectWordTimestamps(energies, windowSeconds, durationSeconds, totalWordCount, speechStartSeconds);
         }
       } catch (err) {
         console.error("Failed to analyze narration audio, falling back to fixed pacing:", err);
@@ -392,7 +449,8 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
       params.signal,
       params.onProgress,
       wordTimestamps,
-      narrationTotalSeconds
+      narrationTotalSeconds,
+      wordTimestamps?.[0] ?? 0
     );
     if (params.signal?.aborted) throw new ReelCancelledError();
     const silentPath = path.join(workDir, "reel-silent.mp4");
