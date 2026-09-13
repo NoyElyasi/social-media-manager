@@ -1,4 +1,4 @@
-import { getProfileSettings } from "@/server/settings/profile";
+import { getProfileSettings, parseBackgroundEntries } from "@/server/settings/profile";
 import { getMetaConnectionStatus } from "@/server/settings/meta";
 import { prisma } from "@/server/db";
 import { buildFileUrlFromPath } from "@/lib/files";
@@ -12,10 +12,10 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const profile = await getProfileSettings();
-  const reelBackgroundPaths: string[] = JSON.parse(profile.reelBackgroundImagePaths || "[]");
-  const carouselBackgroundPaths: string[] = JSON.parse(profile.carouselBackgroundImagePaths || "[]");
+  const reelBackgroundEntries = parseBackgroundEntries(profile.reelBackgroundImagePaths);
+  const carouselBackgroundEntries = parseBackgroundEntries(profile.carouselBackgroundImagePaths);
   const darkCarouselBackgroundPaths: string[] = JSON.parse(profile.darkCarouselBackgroundPaths || "[]");
-  const coverBackgroundPaths: string[] = JSON.parse(profile.coverBackgroundImagePaths || "[]");
+  const coverBackgroundEntries = parseBackgroundEntries(profile.coverBackgroundImagePaths);
   const aiThemeOptions: string[] = JSON.parse(profile.aiThemeOptions || "[]");
   const themeSongs = JSON.parse(profile.themeSongsJson || "{}");
   const metaStatus = await getMetaConnectionStatus();
@@ -56,7 +56,7 @@ export default async function SettingsPage() {
           kind="carousel"
           title="תבניות רקע לפוסט הקרוסלה"
           hint="אפשר להעלות כמה תבניות ולבחור מבינהן בזמן יצירת פוסט. בלי בחירה — נשאר הרקע הלבן הרגיל."
-          initial={carouselBackgroundPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) }))}
+          initial={carouselBackgroundEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path), category: e.category }))}
           initialDarkPaths={darkCarouselBackgroundPaths}
         />
       </div>
@@ -65,7 +65,7 @@ export default async function SettingsPage() {
           kind="reel"
           title="תבניות רקע לריל"
           hint="אפשר להעלות כמה תבניות ולבחור מבינהן בזמן יצירת פוסט. בלי בחירה — נבחר צבע רקע אוטומטי."
-          initial={reelBackgroundPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) }))}
+          initial={reelBackgroundEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path), category: e.category }))}
         />
       </div>
       <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
@@ -73,7 +73,7 @@ export default async function SettingsPage() {
           kind="cover"
           title="תבניות רקע לעמוד שער (בקרוסלה)"
           hint="אם בוחרים תבנית כזו ביצירת פוסט, מתווסף עמוד ראשון נוסף עם הרקע הזה והתיוג הראשי של הפוסט מוצג עליו גדול, במרכז."
-          initial={coverBackgroundPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) }))}
+          initial={coverBackgroundEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path), category: e.category }))}
         />
       </div>
     </div>

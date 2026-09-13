@@ -76,12 +76,12 @@ export default function EditablePostText({
     fetch("/api/settings/profile")
       .then((r) => r.json())
       .then((data) => {
-        const carouselPaths: string[] = data.profile?.carouselBackgroundImagePaths ?? [];
-        const reelPaths: string[] = data.profile?.reelBackgroundImagePaths ?? [];
-        const coverPaths: string[] = data.profile?.coverBackgroundImagePaths ?? [];
-        setCarouselBackgrounds(carouselPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
-        setReelBackgrounds(reelPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
-        setCoverBackgrounds(coverPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
+        const carouselEntries: { path: string }[] = data.profile?.carouselBackgroundImagePaths ?? [];
+        const reelEntries: { path: string }[] = data.profile?.reelBackgroundImagePaths ?? [];
+        const coverEntries: { path: string }[] = data.profile?.coverBackgroundImagePaths ?? [];
+        setCarouselBackgrounds(carouselEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path) })));
+        setReelBackgrounds(reelEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path) })));
+        setCoverBackgrounds(coverEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path) })));
       });
   }, [showBackgroundEditor]);
 

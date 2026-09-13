@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { buildFileUrlFromPath } from "@/lib/files";
 
@@ -14,12 +14,18 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 export interface BackgroundItem {
   path: string;
   url: string;
+  /** "סקין"/קטגוריה חופשית (למשל "אחת ביום", "מכתב ביום", "טיפ ביום") — "" = בלי קטגוריה. */
+  category?: string;
 }
 
+const UNCATEGORIZED_LABEL = "כללי";
+
 /**
- * גלריית תבניות רקע לבחירה (ריל או קרוסלה) — העלאה מוסיפה מיידית, מחיקה
+ * גלריית תבניות רקע לבחירה (ריל/קרוסלה/שער) — העלאה מוסיפה מיידית, מחיקה
  * מסירה מיידית (בלי קשר לטופס ההגדרות הכללי), כדי שאפשר לבנות אוסף לאורך
- * זמן בלי כפתור "שמור" נפרד. אותו קומפוננט משמש לשני הסוגים.
+ * זמן בלי כפתור "שמור" נפרד. אותו קומפוננט משמש לשלושת הסוגים.
+ * קטגוריה ("סקין") היא תג חופשי שנוצר תוך כדי העלאה — לא רשימה סגורה
+ * שמנוהלת בנפרד, לפי בקשה מפורשת "ליצור קטגוריות כל פעם שיש קטגוריה חדשה".
  */
 export default function BackgroundGallery({
   kind,
@@ -39,7 +45,16 @@ export default function BackgroundGallery({
   const [items, setItems] = useState(initial);
   const [darkPaths, setDarkPaths] = useState(new Set(initialDarkPaths ?? []));
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
+  const [uploadCategory, setUploadCategory] = useState("");
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [editingPath, setEditingPath] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const existingCategories = useMemo(
+    () => [...new Set(items.map((i) => i.category?.trim()).filter((c): c is string => !!c))].sort(),
+    [items]
+  );
+  const visibleItems = activeFilter === null ? items : items.filter((i) => (i.category?.trim() || "") === activeFilter);
 
   async function toggleDark(item: BackgroundItem) {
     setError(null);
@@ -47,7 +62,7 @@ export default function BackgroundGallery({
     const res = await fetch("/api/settings/backgrounds", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: item.path, isDark }),
+      body: JSON.stringify({ kind, path: item.path, isDark }),
     });
     if (!res.ok) {
       setError("שגיאה בסימון התבנית — נסו שוב");
@@ -62,6 +77,24 @@ export default function BackgroundGallery({
     router.refresh();
   }
 
+  async function saveCategory(item: BackgroundItem, category: string) {
+    setError(null);
+    setEditingPath(null);
+    const trimmed = category.trim();
+    if (trimmed === (item.category?.trim() || "")) return;
+    const res = await fetch("/api/settings/backgrounds", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, path: item.path, category: trimmed }),
+    });
+    if (!res.ok) {
+      setError("שגיאה בעדכון הקטגוריה — נסו שוב");
+      return;
+    }
+    setItems((prev) => prev.map((i) => (i.path === item.path ? { ...i, category: trimmed } : i)));
+    router.refresh();
+  }
+
   async function uploadOne(file: File): Promise<void> {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext !== "png" && ext !== "jpg" && ext !== "jpeg") {
@@ -73,15 +106,15 @@ export default function BackgroundGallery({
     const res = await fetch("/api/settings/backgrounds", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind, imageBase64, ext }),
+      body: JSON.stringify({ kind, imageBase64, ext, category: uploadCategory.trim() }),
     });
     if (!res.ok) {
       setError(`שגיאה בהעלאת ${file.name} — נסו שוב`);
       return;
     }
-    const { paths } = await res.json();
-    const latestPath: string = paths[paths.length - 1];
-    setItems((prev) => [...prev, { path: latestPath, url: buildFileUrlFromPath(latestPath) }]);
+    const { entries } = await res.json();
+    const latest = entries[entries.length - 1];
+    setItems((prev) => [...prev, { path: latest.path, url: buildFileUrlFromPath(latest.path), category: latest.category }]);
   }
 
   /** מעלה כמה קבצים ברצף — לפי בקשה מפורשת "לא רוצה להוסיף רקע-רקע", כדי לא להצטרך לבחור קובץ בכל פעם מחדש. */
@@ -119,8 +152,34 @@ export default function BackgroundGallery({
       <label className="text-sm font-medium">{title}</label>
       <p className="text-xs text-neutral-500">{hint}</p>
 
+      {items.length > 0 && (
+        <div className="flex flex-wrap gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveFilter(null)}
+            className={`rounded-full px-3 py-1 ${
+              activeFilter === null ? "bg-brand-red text-white" : "bg-brand-pink/10 text-brand-maroon hover:bg-brand-pink/20"
+            }`}
+          >
+            הכל
+          </button>
+          {existingCategories.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setActiveFilter(cat)}
+              className={`rounded-full px-3 py-1 ${
+                activeFilter === cat ? "bg-brand-red text-white" : "bg-brand-pink/10 text-brand-maroon hover:bg-brand-pink/20"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-3">
-        {items.map((item) => (
+        {visibleItems.map((item) => (
           <div key={item.path} className="relative flex flex-col items-center gap-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={item.url} alt="" className="h-32 w-24 rounded-md object-cover border border-brand-pink/40" />
@@ -132,6 +191,29 @@ export default function BackgroundGallery({
             >
               ✕
             </button>
+            {editingPath === item.path ? (
+              <input
+                type="text"
+                autoFocus
+                defaultValue={item.category ?? ""}
+                onBlur={(e) => saveCategory(item, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                  if (e.key === "Escape") setEditingPath(null);
+                }}
+                placeholder="קטגוריה/סקין..."
+                className="w-24 rounded-full border border-brand-pink/40 px-2 py-0.5 text-[11px] text-center"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingPath(item.path)}
+                title="לחצי לשנות קטגוריה/סקין"
+                className="rounded-full border border-brand-pink/40 bg-white px-2 py-0.5 text-[11px] text-brand-maroon/60 hover:bg-brand-pink/10"
+              >
+                {item.category?.trim() || UNCATEGORIZED_LABEL}
+              </button>
+            )}
             {kind === "carousel" && (
               <button
                 type="button"
@@ -148,8 +230,23 @@ export default function BackgroundGallery({
             )}
           </div>
         ))}
+      </div>
 
-        <label className="flex h-32 w-24 items-center justify-center rounded-md border border-dashed border-brand-pink text-xs text-brand-maroon/70 hover:bg-brand-pink/10 cursor-pointer text-center">
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="text"
+          list={`bg-categories-${kind}`}
+          value={uploadCategory}
+          onChange={(e) => setUploadCategory(e.target.value)}
+          placeholder="קטגוריה/סקין להעלאה (אופציונלי — אפשר גם חדשה)"
+          className="rounded-lg border border-brand-pink/40 p-1.5 text-xs bg-white"
+        />
+        <datalist id={`bg-categories-${kind}`}>
+          {existingCategories.map((cat) => (
+            <option key={cat} value={cat} />
+          ))}
+        </datalist>
+        <label className="flex h-8 items-center rounded-md border border-dashed border-brand-pink px-3 text-xs text-brand-maroon/70 hover:bg-brand-pink/10 cursor-pointer">
           {uploadProgress ? `מעלה ${uploadProgress.done}/${uploadProgress.total}...` : "+ הוספה (אפשר לבחור כמה)"}
           <input
             type="file"

@@ -113,12 +113,12 @@ export default function NewPostPage() {
     fetch("/api/settings/profile")
       .then((res) => res.json())
       .then((data) => {
-        const paths: string[] = data.profile?.carouselBackgroundImagePaths ?? [];
-        const reelPaths: string[] = data.profile?.reelBackgroundImagePaths ?? [];
-        const coverPaths: string[] = data.profile?.coverBackgroundImagePaths ?? [];
-        setCarouselBackgrounds(paths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
-        setReelBackgrounds(reelPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
-        setCoverBackgrounds(coverPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
+        const entries: { path: string }[] = data.profile?.carouselBackgroundImagePaths ?? [];
+        const reelEntries: { path: string }[] = data.profile?.reelBackgroundImagePaths ?? [];
+        const coverEntries: { path: string }[] = data.profile?.coverBackgroundImagePaths ?? [];
+        setCarouselBackgrounds(entries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path) })));
+        setReelBackgrounds(reelEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path) })));
+        setCoverBackgrounds(coverEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path) })));
         setFacebookProfileUrl(data.profile?.facebookProfileUrl ?? null);
         setAiThemeOptions(data.profile?.aiThemeOptions ?? []);
       })

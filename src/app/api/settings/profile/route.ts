@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { z, flattenError } from "zod";
-import { getProfileSettings, updateProfileSettings } from "@/server/settings/profile";
+import { getProfileSettings, updateProfileSettings, parseBackgroundEntries } from "@/server/settings/profile";
 import { getStorageService } from "@/server/storage";
 
 export async function GET() {
@@ -9,10 +9,10 @@ export async function GET() {
   return NextResponse.json({
     profile: {
       ...profile,
-      reelBackgroundImagePaths: JSON.parse(profile.reelBackgroundImagePaths || "[]"),
-      carouselBackgroundImagePaths: JSON.parse(profile.carouselBackgroundImagePaths || "[]"),
+      reelBackgroundImagePaths: parseBackgroundEntries(profile.reelBackgroundImagePaths),
+      carouselBackgroundImagePaths: parseBackgroundEntries(profile.carouselBackgroundImagePaths),
       darkCarouselBackgroundPaths: JSON.parse(profile.darkCarouselBackgroundPaths || "[]"),
-      coverBackgroundImagePaths: JSON.parse(profile.coverBackgroundImagePaths || "[]"),
+      coverBackgroundImagePaths: parseBackgroundEntries(profile.coverBackgroundImagePaths),
       aiThemeOptions: JSON.parse(profile.aiThemeOptions || "[]"),
       themeSongs: JSON.parse(profile.themeSongsJson || "{}"),
     },

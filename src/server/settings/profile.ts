@@ -74,22 +74,47 @@ const BACKGROUND_FIELD: Record<
   cover: "coverBackgroundImagePaths",
 };
 
-/** מוסיפה נתיב תבנית רקע חדשה (שהועלתה) לרשימת התבניות הזמינות לבחירה, לפי סוג (ריל/קרוסלה). */
-export async function addBackgroundImagePath(kind: BackgroundKind, filePath: string): Promise<string[]> {
+/**
+ * קטגוריה/"סקין" חופשי לתבנית רקע (למשל "אחת ביום", "מכתב ביום", "טיפ
+ * ביום") — מוקלד חופשי בזמן ההעלאה, לא רשימה סגורה שמנוהלת בנפרד. "" = בלי
+ * קטגוריה (תבניות ישנות, מלפני הפיצ'ר הזה).
+ */
+export interface BackgroundEntry {
+  path: string;
+  category: string;
+}
+
+/** מפרשת את הרשימה השמורה — תומכת גם בפורמט הישן (מערך של נתיבים כמחרוזות בלבד), לפני שהתבנית קיבלה קטגוריה. */
+export function parseBackgroundEntries(json: string): BackgroundEntry[] {
+  let raw: unknown[];
+  try {
+    raw = JSON.parse(json || "[]");
+  } catch {
+    return [];
+  }
+  return raw.map((item) => (typeof item === "string" ? { path: item, category: "" } : (item as BackgroundEntry)));
+}
+
+/** מוסיפה נתיב תבנית רקע חדשה (שהועלתה) לרשימת התבניות הזמינות לבחירה, לפי סוג (ריל/קרוסלה/שער) וקטגוריה. */
+export async function addBackgroundImagePath(
+  kind: BackgroundKind,
+  filePath: string,
+  category: string
+): Promise<BackgroundEntry[]> {
   const profile = await getProfileSettings();
   const field = BACKGROUND_FIELD[kind];
-  const paths: string[] = JSON.parse(profile[field] || "[]");
-  paths.push(filePath);
-  await prisma.profileSettings.update({ where: { id: "default" }, data: { [field]: JSON.stringify(paths) } });
-  return paths;
+  const entries = parseBackgroundEntries(profile[field]);
+  entries.push({ path: filePath, category });
+  await prisma.profileSettings.update({ where: { id: "default" }, data: { [field]: JSON.stringify(entries) } });
+  return entries;
 }
 
 /** מסירה נתיב תבנית רקע מרשימת הבחירה (לא מוחקת את הקובץ מהדיסק — פוסטים קיימים שכבר משתמשים בה ימשיכו לעבוד). */
-export async function removeBackgroundImagePath(kind: BackgroundKind, filePath: string): Promise<string[]> {
+export async function removeBackgroundImagePath(kind: BackgroundKind, filePath: string): Promise<BackgroundEntry[]> {
   const profile = await getProfileSettings();
   const field = BACKGROUND_FIELD[kind];
-  const paths: string[] = JSON.parse(profile[field] || "[]").filter((p: string) => p !== filePath);
-  const data: Record<string, string> = { [field]: JSON.stringify(paths) };
+  const entries = parseBackgroundEntries(profile[field]).filter((e) => e.path !== filePath);
+  const data: Record<string, string> = { [field]: JSON.stringify(entries) };
 
   // גם מנקים סימון "כהה" ישן אם היה — כדי שלא יישאר נתיב-רפאים ברשימה הזו.
   if (kind === "carousel") {
@@ -100,7 +125,20 @@ export async function removeBackgroundImagePath(kind: BackgroundKind, filePath: 
   }
 
   await prisma.profileSettings.update({ where: { id: "default" }, data });
-  return paths;
+  return entries;
+}
+
+/** משנה את הקטגוריה של תבנית רקע קיימת (למשל אם טעו בהקלדה בהעלאה, או רוצים לשייך מחדש). */
+export async function setBackgroundCategory(
+  kind: BackgroundKind,
+  filePath: string,
+  category: string
+): Promise<BackgroundEntry[]> {
+  const profile = await getProfileSettings();
+  const field = BACKGROUND_FIELD[kind];
+  const entries = parseBackgroundEntries(profile[field]).map((e) => (e.path === filePath ? { ...e, category } : e));
+  await prisma.profileSettings.update({ where: { id: "default" }, data: { [field]: JSON.stringify(entries) } });
+  return entries;
 }
 
 /** מסמנת/מבטלת סימון תבנית רקע קרוסלה כ"כהה" — קובע את גוון פס ההתקדמות/מספור העמודים בתחתית העמוד. */
