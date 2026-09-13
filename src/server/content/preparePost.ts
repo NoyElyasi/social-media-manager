@@ -5,11 +5,20 @@ import { getStorageService } from "../storage";
 import { scanForIdentifyingDetails } from "./privacyScanner";
 import { prepareFacebookDraft } from "./facebook";
 import { prepareInstagramCarousel, stripSlideMarkers, type SplitMode } from "./instagramCarousel";
+import { suggestSongs, type ThemeSongs } from "./songSuggestions";
 import { prepareInstagramReel, ReelCancelledError, type RevealMode, type ReelNarration } from "./instagramReel";
 import { getProfileSettings, loadProfileImageDataUri } from "../settings/profile";
 import { ALWAYS_FIRST_HASHTAG, type SelectedTarget } from "@/lib/labels";
 
 export type { SelectedTarget };
+
+function parseThemeSongs(themeSongsJson: string): ThemeSongs {
+  try {
+    return JSON.parse(themeSongsJson || "{}");
+  } catch {
+    return {};
+  }
+}
 
 /** מנקה תגיות משותפות: מסירה כפילויות ואת התגית הקבועה (שמתווספת אוטומטית בזמן רינדור, לא נשמרת בקלט). */
 function normalizeSharedHashtags(hashtags: string[] | undefined | null): string[] {
@@ -59,6 +68,8 @@ export interface CreatePostInput {
   coverBackgroundPath?: string | null;
   /** תגיות שהמשתמשת הזינה בעצמה, במקום ההצעה האוטומטית (לכל היעדים). */
   manualHashtags?: string[] | null;
+  /** נושא הפוסט (מתוך aiThemeOptions), נבחר ידנית ביצירה — קובע את הצעת השיר (ראו suggestSongs). */
+  aiTheme?: string | null;
   /** הקלטת הקראה מסונכרנת לריל (ראו ReelNarration) — רק אם instagram_reel נבחר. */
   reelNarration?: ReelNarration | null;
   /** מאפשר עצירה מבוקשת (כפתור "עצור") באמצע יצירת ריל. */
@@ -97,6 +108,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
       hashtags: JSON.stringify(sharedHashtags),
       splitMode,
       revealMode,
+      aiTheme: input.aiTheme ?? null,
       folderPath: postFolderPath,
       privacyFlags: JSON.stringify(privacyFlags),
     },
@@ -106,6 +118,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
   const carouselBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.carouselBackgroundPath);
   const reelBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.reelBackgroundPath);
   const coverBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.coverBackgroundPath);
+  const songs = suggestSongs(input.aiTheme, parseThemeSongs(profile.themeSongsJson));
 
   try {
     for (const target of input.selectedTargets) {
@@ -144,6 +157,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           profileImageDataUri,
           backgroundImageDataUri: carouselBackgroundImageDataUri,
           coverBackgroundImageDataUri,
+          songs,
           storage,
         });
         await prisma.platformContent.create({
@@ -259,6 +273,7 @@ export async function updatePostRawText(
 
   const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
   const sharedHashtags: string[] = JSON.parse(post.hashtags || "[]");
+  const songs = suggestSongs(post.aiTheme, parseThemeSongs(profile.themeSongsJson));
 
   for (const content of post.platformContents) {
     if (content.type === "facebook_post") {
@@ -295,6 +310,7 @@ export async function updatePostRawText(
         profileImageDataUri,
         backgroundImageDataUri,
         coverBackgroundImageDataUri,
+        songs,
         storage,
       });
       await prisma.platformContent.update({
@@ -375,6 +391,7 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
   const splitMode = post.splitMode as SplitMode;
   const revealMode = post.revealMode as RevealMode;
   const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
+  const songs = suggestSongs(post.aiTheme, parseThemeSongs(profile.themeSongsJson));
 
   for (const content of post.platformContents) {
     if (content.type === "instagram_carousel") {
@@ -391,6 +408,7 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
         profileImageDataUri,
         backgroundImageDataUri,
         coverBackgroundImageDataUri,
+        songs,
         storage,
       });
       await prisma.platformContent.update({
@@ -472,6 +490,7 @@ export async function addTargetToPost(
   const subfolder = await storage.createSubfolder(post.folderPath, SUBFOLDER_NAMES[target]);
 
   if (target === "instagram_carousel") {
+    const songs = suggestSongs(post.aiTheme, parseThemeSongs(profile.themeSongsJson));
     const result = await prepareInstagramCarousel({
       rawText: post.rawText,
       splitMode,
@@ -479,6 +498,7 @@ export async function addTargetToPost(
       folderPath: subfolder,
       displayName: profile.displayName,
       profileImageDataUri,
+      songs,
       storage,
     });
     await prisma.platformContent.create({

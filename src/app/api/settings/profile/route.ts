@@ -13,6 +13,7 @@ export async function GET() {
       carouselBackgroundImagePaths: JSON.parse(profile.carouselBackgroundImagePaths || "[]"),
       coverBackgroundImagePaths: JSON.parse(profile.coverBackgroundImagePaths || "[]"),
       aiThemeOptions: JSON.parse(profile.aiThemeOptions || "[]"),
+      themeSongs: JSON.parse(profile.themeSongsJson || "{}"),
     },
   });
 }
@@ -25,6 +26,7 @@ const updateSchema = z.object({
   // לינק מלא לפרופיל שלה בפייסבוק — פייסבוק הסירו את החיפוש-בתוך-פרופיל בקישור ישיר.
   facebookProfileUrl: z.string().optional(),
   aiThemeOptions: z.array(z.string()).optional(),
+  themeSongs: z.record(z.string(), z.array(z.object({ title: z.string(), artist: z.string() }))).optional(),
 });
 
 export async function PUT(req: NextRequest) {
@@ -50,6 +52,7 @@ export async function PUT(req: NextRequest) {
     profileImagePath,
     facebookProfileUrl: parsed.data.facebookProfileUrl,
     aiThemeOptions: parsed.data.aiThemeOptions,
+    themeSongs: parsed.data.themeSongs,
   });
 
   return NextResponse.json({ profile: updated });

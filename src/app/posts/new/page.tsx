@@ -21,6 +21,7 @@ interface DraftShape {
   splitMode: "auto" | "manual";
   revealMode: "word" | "letter";
   manualHashtags: string;
+  aiTheme: string | null;
   carouselBackgroundPath: string | null;
   reelBackgroundPath: string | null;
   coverBackgroundPath: string | null;
@@ -51,6 +52,8 @@ export default function NewPostPage() {
   const [splitMode, setSplitMode] = useState<"auto" | "manual">(() => loadDraft().splitMode ?? "auto");
   const [revealMode, setRevealMode] = useState<"word" | "letter">(() => loadDraft().revealMode ?? "word");
   const [manualHashtags, setManualHashtags] = useState(() => loadDraft().manualHashtags ?? "");
+  const [aiTheme, setAiTheme] = useState<string | null>(() => loadDraft().aiTheme ?? null);
+  const [aiThemeOptions, setAiThemeOptions] = useState<string[]>([]);
   const [carouselBackgroundPath, setCarouselBackgroundPath] = useState<string | null>(
     () => loadDraft().carouselBackgroundPath ?? null
   );
@@ -88,6 +91,7 @@ export default function NewPostPage() {
       splitMode,
       revealMode,
       manualHashtags,
+      aiTheme,
       carouselBackgroundPath,
       reelBackgroundPath,
       coverBackgroundPath,
@@ -99,6 +103,7 @@ export default function NewPostPage() {
     splitMode,
     revealMode,
     manualHashtags,
+    aiTheme,
     carouselBackgroundPath,
     reelBackgroundPath,
     coverBackgroundPath,
@@ -116,6 +121,7 @@ export default function NewPostPage() {
         setReelBackgrounds(reelPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
         setCoverBackgrounds(coverPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) })));
         setFacebookProfileUrl(data.profile?.facebookProfileUrl ?? null);
+        setAiThemeOptions(data.profile?.aiThemeOptions ?? []);
       })
       .catch(() => {});
   }, []);
@@ -183,6 +189,7 @@ export default function NewPostPage() {
           splitMode,
           revealMode,
           manualHashtags: manualHashtags.trim() ? manualHashtags.trim().split(/\s+/) : null,
+          aiTheme,
           carouselBackgroundPath,
           reelBackgroundPath,
           coverBackgroundPath,
@@ -311,6 +318,22 @@ export default function NewPostPage() {
           className="rounded-lg border border-brand-pink/40 p-2 text-sm bg-white"
           placeholder={`${ALWAYS_FIRST_HASHTAG} #תגית2 #תגית3`}
         />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="font-medium text-sm">נושא הפוסט (אופציונלי — קובע איזה שיר יוצע לקרוסלה)</label>
+        <select
+          value={aiTheme ?? ""}
+          onChange={(e) => setAiTheme(e.target.value || null)}
+          className="rounded-lg border border-brand-pink/40 p-2 text-sm bg-white"
+        >
+          <option value="">לא נבחר</option>
+          {aiThemeOptions.map((theme) => (
+            <option key={theme} value={theme}>
+              {theme}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* 2. בחירת הפלט — קובע אילו קטגוריות אפשרויות יופיעו מכאן ואילך */}

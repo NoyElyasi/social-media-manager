@@ -15,6 +15,7 @@ const createPostSchema = z.object({
   reelBackgroundPath: z.string().nullable().optional(),
   coverBackgroundPath: z.string().nullable().optional(),
   manualHashtags: z.array(z.string()).optional().nullable(),
+  aiTheme: z.string().nullable().optional(),
   reelNarration: z
     .object({
       audioBase64: z.string(),

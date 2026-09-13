@@ -6,6 +6,7 @@ import ProfileSettingsForm from "@/components/ProfileSettingsForm";
 import BackgroundGallery from "@/components/BackgroundGallery";
 import MetaConnectionForm from "@/components/MetaConnectionForm";
 import AiThemeOptionsForm from "@/components/AiThemeOptionsForm";
+import SongsByThemeForm from "@/components/SongsByThemeForm";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function SettingsPage() {
   const carouselBackgroundPaths: string[] = JSON.parse(profile.carouselBackgroundImagePaths || "[]");
   const coverBackgroundPaths: string[] = JSON.parse(profile.coverBackgroundImagePaths || "[]");
   const aiThemeOptions: string[] = JSON.parse(profile.aiThemeOptions || "[]");
+  const themeSongs = JSON.parse(profile.themeSongsJson || "{}");
   const metaStatus = await getMetaConnectionStatus();
   const latestSyncedPost = await prisma.instagramMedia.findFirst({ orderBy: { timestamp: "desc" }, select: { timestamp: true } });
 
@@ -43,6 +45,10 @@ export default async function SettingsPage() {
       <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
         <h2 className="mb-3 font-bold text-brand-maroon">נושאי תיוג (לסיווג ידני של פוסטים)</h2>
         <AiThemeOptionsForm initial={aiThemeOptions} />
+      </div>
+      <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
+        <h2 className="mb-3 font-bold text-brand-maroon">הצעת שיר לפי נושא</h2>
+        <SongsByThemeForm themes={aiThemeOptions} initial={themeSongs} />
       </div>
       <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
         <BackgroundGallery
