@@ -22,7 +22,7 @@ export default function EditablePostText({
   initialCarouselBackgroundPath,
   initialReelBackgroundPath,
   initialCoverBackgroundPath,
-  hasExistingNarration,
+  existingNarrationUrl,
 }: {
   postId: string;
   initialRawText: string;
@@ -33,7 +33,7 @@ export default function EditablePostText({
   initialCarouselBackgroundPath: string | null;
   initialReelBackgroundPath: string | null;
   initialCoverBackgroundPath: string | null;
-  hasExistingNarration: boolean;
+  existingNarrationUrl: string | null;
 }) {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -232,6 +232,27 @@ export default function EditablePostText({
           </label>
         </div>
       )}
+      {hasReel && updateReel && (
+        <div className="flex flex-col gap-2">
+          {existingNarrationUrl && reelNarration === undefined && (
+            <div className="flex flex-col gap-2 rounded-lg border border-green-200 bg-green-50 p-2">
+              <p className="text-xs text-green-700">
+                🎙️ יש הקלטה משויכת לריל הזה — היא תישמר אוטומטית. אפשר להאזין לה, להסיר אותה, או להעלות/להקליט אחת חדשה למטה (זה יחליף אותה).
+              </p>
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+              <audio src={existingNarrationUrl} controls className="w-full" />
+              <button
+                type="button"
+                onClick={() => setReelNarration(null)}
+                className="self-start text-xs text-brand-red hover:underline"
+              >
+                הסירי הקלטה
+              </button>
+            </div>
+          )}
+          <NarrationInput key={`${rawText}-${splitMode}`} onCaptured={setReelNarration} />
+        </div>
+      )}
       {(hasCarousel || hasReel) && (
         <div className="flex flex-col gap-2">
           <button
@@ -274,23 +295,6 @@ export default function EditablePostText({
                     onSelect={setReelBackgroundPath}
                     noneLabel="בלי תבנית (צבע אוטומטי)"
                   />
-                </div>
-              )}
-              {hasReel && updateReel && (
-                <div className="flex flex-col gap-1">
-                  {hasExistingNarration && reelNarration === undefined && (
-                    <div className="flex items-center gap-2 text-xs text-green-700">
-                      <p>🎙️ יש הקלטה משויכת לריל הזה — היא תישמר אוטומטית, אין צורך להקליט מחדש (אלא אם רוצים להחליף).</p>
-                      <button
-                        type="button"
-                        onClick={() => setReelNarration(null)}
-                        className="shrink-0 text-brand-red hover:underline"
-                      >
-                        הסירי הקלטה
-                      </button>
-                    </div>
-                  )}
-                  <NarrationInput key={`${rawText}-${splitMode}`} onCaptured={setReelNarration} />
                 </div>
               )}
               <p className="text-xs text-brand-maroon/60">

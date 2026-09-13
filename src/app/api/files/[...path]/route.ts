@@ -12,6 +12,13 @@ const EXT_TO_MIME: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".mp4": "video/mp4",
   ".txt": "text/plain; charset=utf-8",
+  // הקלטות הקראה (ראו NarrationInput) — בלי Content-Type תקין, <audio> בדפדפן
+  // לא ינגן את הקובץ (application/octet-stream נופל לרוב להורדה, לא לניגון).
+  ".m4a": "audio/mp4",
+  ".webm": "audio/webm",
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".ogg": "audio/ogg",
 };
 
 /**

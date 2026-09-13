@@ -7,6 +7,7 @@ import PostExtras from "@/components/PostExtras";
 import OpenFolderButton from "@/components/OpenFolderButton";
 import DeletePostButton from "@/components/DeletePostButton";
 import AiLabelBadge from "@/components/AiLabelBadge";
+import { buildFileUrlFromPath } from "@/lib/files";
 
 export const dynamic = "force-dynamic";
 
@@ -68,9 +69,12 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
             initialReelBackgroundPath={
               visiblePlatformContents.find((pc) => pc.type === "instagram_reel")?.backgroundImagePath ?? null
             }
-            hasExistingNarration={
-              !!visiblePlatformContents.find((pc) => pc.type === "instagram_reel")?.narrationAudioPath
-            }
+            existingNarrationUrl={(() => {
+              const narrationPath = visiblePlatformContents.find(
+                (pc) => pc.type === "instagram_reel"
+              )?.narrationAudioPath;
+              return narrationPath ? buildFileUrlFromPath(narrationPath) : null;
+            })()}
             initialCoverBackgroundPath={
               visiblePlatformContents.find((pc) => pc.type === "instagram_carousel")?.coverImagePath ?? null
             }

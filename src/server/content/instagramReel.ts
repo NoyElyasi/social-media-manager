@@ -331,6 +331,28 @@ function computeShortTimeEnergy(samples: Int16Array, sampleRate: number, windowS
 }
 
 /**
+ * מחליקה את עוצמת הקול (ממוצע נע) לפני שמחפשים בה שקטים — בלי זה, עיצורים
+ * חדים בתוך מילה (למשל "ת", "ק") יוצרים "שקט" רגעי בן חלון-שניים שנראה
+ * לאלגוריתם כמו רווח בין מילים, גם כשבפועל אין הפסקה. ההחלקה הזו היא
+ * ההבדל המרכזי בין "לא מדויק מספיק" לזיהוי סביר.
+ */
+function smoothEnergies(energies: number[], windowCount: number): number[] {
+  if (windowCount <= 1) return energies;
+  const half = Math.floor(windowCount / 2);
+  const smoothed = new Array(energies.length);
+  for (let i = 0; i < energies.length; i++) {
+    let sum = 0;
+    let count = 0;
+    for (let j = Math.max(0, i - half); j <= Math.min(energies.length - 1, i + half); j++) {
+      sum += energies[j];
+      count++;
+    }
+    smoothed[i] = sum / count;
+  }
+  return smoothed;
+}
+
+/**
  * מזהה מתי בפועל מתחיל דיבור בהקלטה — לפי משוב מפורש שההתחלה תמיד שקטה
  * ("לוקח לי זמן להתחיל להקריא"), ובלי הזיהוי הזה המילה הראשונה של הריל
  * הייתה מוצגת מיד בזמן 0, לפני שנאמרה בפועל, מה שמפרק את הסנכרון לכל אורך
@@ -355,31 +377,48 @@ function detectSpeechStartSeconds(energies: number[], windowSeconds: number): nu
   return 0; // לא זוהתה התחלה ברורה — fallback להתחלה מהאפס, כמו קודם.
 }
 
+// "משקל תזמון" גס למילה — מילים ארוכות יותר לוקח יותר זמן להקריא מקצרות,
+// וסימני פיסוק שמסמנים הפסקה טבעית (נקודה/שאלה/קריאה יותר, פסיק פחות)
+// מרחיבים את הזמן המשוער לפני המילה הבאה. לא ניתוח לשוני מדויק — רק קירוב
+// טוב יותר מ"כל מילה אורכת אותו זמן", שהיה לא ריאלי במיוחד במשפטים ארוכים.
+function wordTimingWeight(word: string): number {
+  const bare = word.replace(/[.,!?;:"׳״]+$/g, "");
+  let weight = Math.max(1, bare.length);
+  if (/[.!?]$/.test(word)) weight += 3;
+  else if (/[,;:]$/.test(word)) weight += 1.5;
+  return weight;
+}
+
 /**
  * מזהה תזמון גס למילים בהקלטת הקראה, לפי רגישות לעוצמת הסאונד — לא זיהוי
- * דיבור אמיתי, לפי בקשה מפורשת "לא צריך להיות מדויק במאה אחוז". מחלקת את
- * הטווח הפעיל (מ-speechStartSeconds ועד סוף ההקלטה) ל-wordCount קטעים: כל
- * גבול בין שתי מילים "נמשך" מהזמן המשוער (חלוקה שווה) לנקודת העוצמה-הנמוכה
- * ביותר בסביבתו — כלומר לרגע הכי דומה לרווח/שקט קצר בין מילים. תמיד מחזירה
- * בדיוק wordCount נקודות התחלה (הראשונה = speechStartSeconds), כדי שלא
- * תהיה תלות בכמות "שיאים" שהתגלו בפועל בהקלטה.
+ * דיבור אמיתי, לפי בקשה מפורשת "לא צריך להיות מדויק במאה אחוז" (אבל כן
+ * מדויק יותר מחלוקה שווה בין מילים — ראו wordTimingWeight). מעריכה זמן
+ * "צפוי" לכל גבול בין שתי מילים לפי האורך המצטבר של המילים עד כה, ואז
+ * "נמשכת" מהזמן הצפוי הזה לנקודת העוצמה-הנמוכה ביותר בסביבתו הקרובה —
+ * כלומר לרגע הכי דומה לרווח/שקט קצר בין מילים. תמיד מחזירה בדיוק
+ * words.length נקודות התחלה (הראשונה = speechStartSeconds).
  */
 function detectWordTimestamps(
   energies: number[],
   windowSeconds: number,
   totalSeconds: number,
-  wordCount: number,
+  words: string[],
   speechStartSeconds: number
 ): number[] {
-  if (wordCount <= 1) return [speechStartSeconds];
+  if (words.length <= 1) return [speechStartSeconds];
 
   const activeSeconds = Math.max(0.1, totalSeconds - speechStartSeconds);
-  const idealGap = activeSeconds / wordCount;
-  const searchRadiusSeconds = Math.min(idealGap * 0.4, 0.35);
-  const timestamps: number[] = [speechStartSeconds];
+  const weights = words.map(wordTimingWeight);
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  const averageGap = activeSeconds / words.length;
+  const searchRadiusSeconds = Math.min(averageGap * 0.6, 0.4);
 
-  for (let k = 1; k < wordCount; k++) {
-    const idealTime = speechStartSeconds + k * idealGap;
+  const timestamps: number[] = [speechStartSeconds];
+  let cumulativeWeight = 0;
+
+  for (let k = 1; k < words.length; k++) {
+    cumulativeWeight += weights[k - 1];
+    const idealTime = speechStartSeconds + activeSeconds * (cumulativeWeight / totalWeight);
     const loIndex = Math.max(0, Math.floor((idealTime - searchRadiusSeconds) / windowSeconds));
     const hiIndex = Math.min(energies.length - 1, Math.ceil((idealTime + searchRadiusSeconds) / windowSeconds));
 
@@ -430,12 +469,12 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
     // אם יש הקלטה — מזהים תזמון מילים גס לפי עוצמת הסאונד שלה (ראו
     // detectWordTimestamps). אם משהו נכשל בפענוח/ניתוח האודיו, מתעלמים
     // מההקלטה בשקט וחוזרים לקצב הקבוע — לא מפילים את כל היצירה.
-    const totalWordCount = countTotalWords(captions);
+    const allWords = captions.flatMap((c) => c.split(/\s+/).filter(Boolean));
     let audioPath: string | null = null;
     let narrationTotalSeconds: number | null = null;
     let wordTimestamps: number[] | null = null;
 
-    if (params.narration && totalWordCount > 0) {
+    if (params.narration && allWords.length > 0) {
       try {
         const ext = audioExtensionFromMimeType(params.narration.audioMimeType);
         const candidatePath = path.join(workDir, `narration.${ext}`);
@@ -445,11 +484,14 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
         if (durationSeconds && durationSeconds > 0) {
           const windowSeconds = 0.02;
           const { samples, sampleRate } = await extractPcmSamples(candidatePath);
-          const energies = computeShortTimeEnergy(samples, sampleRate, windowSeconds);
+          const rawEnergies = computeShortTimeEnergy(samples, sampleRate, windowSeconds);
+          // חלון החלקה של כ-80ms — מספיק כדי לא לתפוס עיצורים חדים בתוך מילה
+          // כ"שקט", אבל לא כך שיטשטש הפסקות אמיתיות בין מילים (ראו smoothEnergies).
+          const energies = smoothEnergies(rawEnergies, Math.round(0.08 / windowSeconds));
           const speechStartSeconds = detectSpeechStartSeconds(energies, windowSeconds);
           audioPath = candidatePath;
           narrationTotalSeconds = durationSeconds;
-          wordTimestamps = detectWordTimestamps(energies, windowSeconds, durationSeconds, totalWordCount, speechStartSeconds);
+          wordTimestamps = detectWordTimestamps(energies, windowSeconds, durationSeconds, allWords, speechStartSeconds);
         }
       } catch (err) {
         console.error("Failed to analyze narration audio, falling back to fixed pacing:", err);
