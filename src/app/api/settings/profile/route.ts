@@ -11,6 +11,7 @@ export async function GET() {
       ...profile,
       reelBackgroundImagePaths: JSON.parse(profile.reelBackgroundImagePaths || "[]"),
       carouselBackgroundImagePaths: JSON.parse(profile.carouselBackgroundImagePaths || "[]"),
+      darkCarouselBackgroundPaths: JSON.parse(profile.darkCarouselBackgroundPaths || "[]"),
       coverBackgroundImagePaths: JSON.parse(profile.coverBackgroundImagePaths || "[]"),
       aiThemeOptions: JSON.parse(profile.aiThemeOptions || "[]"),
       themeSongs: JSON.parse(profile.themeSongsJson || "{}"),

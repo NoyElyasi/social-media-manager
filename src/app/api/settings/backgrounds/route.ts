@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { nanoid } from "nanoid";
 import { z, flattenError } from "zod";
-import { addBackgroundImagePath, removeBackgroundImagePath, type BackgroundKind } from "@/server/settings/profile";
+import {
+  addBackgroundImagePath,
+  removeBackgroundImagePath,
+  setCarouselBackgroundDark,
+  type BackgroundKind,
+} from "@/server/settings/profile";
 import { getStorageService } from "@/server/storage";
 
 const FOLDER_BY_KIND: Record<BackgroundKind, string> = {
@@ -50,4 +55,21 @@ export async function DELETE(req: NextRequest) {
 
   const paths = await removeBackgroundImagePath(parsed.data.kind, parsed.data.path);
   return NextResponse.json({ paths });
+}
+
+const setDarkSchema = z.object({
+  path: z.string().min(1),
+  isDark: z.boolean(),
+});
+
+/** מסמנת/מבטלת סימון תבנית רקע קרוסלה כ"כהה" (ראו setCarouselBackgroundDark). */
+export async function PATCH(req: NextRequest) {
+  const body = await req.json();
+  const parsed = setDarkSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: flattenError(parsed.error) }, { status: 400 });
+  }
+
+  const darkPaths = await setCarouselBackgroundDark(parsed.data.path, parsed.data.isDark);
+  return NextResponse.json({ darkPaths });
 }

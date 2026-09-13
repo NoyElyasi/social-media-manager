@@ -26,16 +26,41 @@ export default function BackgroundGallery({
   title,
   hint,
   initial,
+  initialDarkPaths,
 }: {
   kind: "reel" | "carousel" | "cover";
   title: string;
   hint: string;
   initial: BackgroundItem[];
+  /** רלוונטי רק ל-kind="carousel" — אילו נתיבים מסומנים כתבנית כהה (ראו setCarouselBackgroundDark). */
+  initialDarkPaths?: string[];
 }) {
   const router = useRouter();
   const [items, setItems] = useState(initial);
+  const [darkPaths, setDarkPaths] = useState(new Set(initialDarkPaths ?? []));
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function toggleDark(item: BackgroundItem) {
+    setError(null);
+    const isDark = !darkPaths.has(item.path);
+    const res = await fetch("/api/settings/backgrounds", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: item.path, isDark }),
+    });
+    if (!res.ok) {
+      setError("שגיאה בסימון התבנית — נסו שוב");
+      return;
+    }
+    setDarkPaths((prev) => {
+      const next = new Set(prev);
+      if (isDark) next.add(item.path);
+      else next.delete(item.path);
+      return next;
+    });
+    router.refresh();
+  }
 
   async function uploadOne(file: File): Promise<void> {
     const ext = file.name.split(".").pop()?.toLowerCase();
@@ -96,7 +121,7 @@ export default function BackgroundGallery({
 
       <div className="flex flex-wrap gap-3">
         {items.map((item) => (
-          <div key={item.path} className="relative">
+          <div key={item.path} className="relative flex flex-col items-center gap-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={item.url} alt="" className="h-32 w-24 rounded-md object-cover border border-brand-pink/40" />
             <button
@@ -107,6 +132,20 @@ export default function BackgroundGallery({
             >
               ✕
             </button>
+            {kind === "carousel" && (
+              <button
+                type="button"
+                onClick={() => toggleDark(item)}
+                title="תבנית כהה — פס ההתקדמות/מספור העמודים יוצג בגוונים בהירים כדי שלא יבלע ברקע"
+                className={`rounded-full px-2 py-0.5 text-[11px] border ${
+                  darkPaths.has(item.path)
+                    ? "border-brand-maroon bg-brand-maroon text-white"
+                    : "border-brand-pink/40 bg-white text-brand-maroon/60 hover:bg-brand-pink/10"
+                }`}
+              >
+                🌙 תבנית כהה
+              </button>
+            )}
           </div>
         ))}
 

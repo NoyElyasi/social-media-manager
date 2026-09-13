@@ -27,6 +27,17 @@ function parseThemeSongs(themeSongsJson: string): ThemeSongs {
   }
 }
 
+/** בודקת אם תבנית רקע קרוסלה נבחרת מסומנת "כהה" בהגדרות (ראו setCarouselBackgroundDark). */
+function isDarkCarouselBackground(darkCarouselBackgroundPathsJson: string, backgroundPath: string | null): boolean {
+  if (!backgroundPath) return false;
+  try {
+    const darkPaths: string[] = JSON.parse(darkCarouselBackgroundPathsJson || "[]");
+    return darkPaths.includes(backgroundPath);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * מחזירה את ההקלטה שיש להעביר ל-prepareInstagramReel ברינדור הזה — לפי
  * משוב מפורש שרינדור מחדש (שינוי רקע/תגיות) לא צריך למחוק הקלטה קיימת.
@@ -186,6 +197,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           displayName: profile.displayName,
           profileImageDataUri,
           backgroundImageDataUri: carouselBackgroundImageDataUri,
+          isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, input.carouselBackgroundPath ?? null),
           coverBackgroundImageDataUri,
           songs,
           storage,
@@ -339,6 +351,7 @@ export async function updatePostRawText(
         displayName: profile.displayName,
         profileImageDataUri,
         backgroundImageDataUri,
+        isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, backgroundPath),
         coverBackgroundImageDataUri,
         songs,
         storage,
@@ -438,6 +451,7 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
         displayName: profile.displayName,
         profileImageDataUri,
         backgroundImageDataUri,
+        isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, content.backgroundImagePath),
         coverBackgroundImageDataUri,
         songs,
         storage,

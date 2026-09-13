@@ -165,6 +165,11 @@ model ProfileSettings {
   carouselBackgroundImagePaths String   @default("[]")
   // תבניות רקע לעמוד השער (הראשון, עם התיוג הראשי במרכז) — ראו PlatformContent.coverImagePath.
   coverBackgroundImagePaths String   @default("[]")
+  // אילו מהנתיבים שב-carouselBackgroundImagePaths מסומנים כתבנית כהה — קובע
+  // אם פס ההתקדמות/מספור העמודים בתחתית העמוד מצייר בגוונים בהירים (לא
+  // נבלע ברקע) או בגוונים הרגילים של המותג. מסומן ידנית בהגדרות, לא מזוהה
+  // אוטומטית מהתמונה.
+  darkCarouselBackgroundPaths String @default("[]")
   highlights                String   @default("[]") // JSON array of highlight names
   // רשימת נושאים לתיוג ידני של פוסטים (ראו InstagramMediaLabelEditor) —
   // ניתנת לעריכה בהגדרות (הוספה/הסרה), לא קבועה בקוד.

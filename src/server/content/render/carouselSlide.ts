@@ -26,6 +26,18 @@ const CONTENT_RIGHT_INSET = 100;
 const CONTENT_RIGHT_OFFSET = HORIZONTAL_PADDING + CONTENT_RIGHT_INSET;
 const FOOTER_BOTTOM_OFFSET = 56;
 
+// פס התקדמות מתחת למספור העמודים — בגוונים של המותג (אדום על ורוד), או
+// בגוונים בהירים כשהתבנית מסומנת "כהה" בהגדרות (ראו setCarouselBackgroundDark)
+// כדי שלא יבלע ברקע. לפי בקשה מפורשת שיתמלא ב"אחוזים לפי מספר הדפים שנותרו".
+const PROGRESS_BAR_WIDTH = 260;
+const PROGRESS_BAR_HEIGHT = 6;
+const PROGRESS_BAR_TOP_GAP = 14;
+const PROGRESS_TRACK_COLOR = "#E7A9B8";
+const PROGRESS_FILL_COLOR = "#C41E3A";
+const PROGRESS_TRACK_COLOR_DARK = "rgba(255,255,255,0.35)";
+const PROGRESS_FILL_COLOR_DARK = "#FFFFFF";
+const FOOTER_TEXT_COLOR_DARK = "#FFFFFF";
+
 // גדול יותר לפי בקשה מפורשת ("הלוגו של תמונת הפרופיל קטן מידי") — היה 84.
 const AVATAR_SIZE = 120;
 const AVATAR_NAME_FONT_SIZE = 38;
@@ -50,6 +62,8 @@ export interface CarouselSlideInput {
   profileImageDataUri?: string | null;
   /** תבנית רקע שהועלתה ונבחרה בזמן יצירת הפוסט — מחליפה את הרקע הלבן לגמרי (בלי בחירה: לבן כבררת מחדל, כמו קודם). */
   backgroundImageDataUri?: string | null;
+  /** התבנית מסומנת "כהה" בהגדרות — פס ההתקדמות ומספור העמודים יוצגו בגוונים בהירים (ראו setCarouselBackgroundDark). */
+  isDarkBackground?: boolean;
 }
 
 function avatarNode(displayName: string, profileImageDataUri: string | null | undefined) {
@@ -85,6 +99,8 @@ function avatarNode(displayName: string, profileImageDataUri: string | null | un
 export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
   const availableWidth = CAROUSEL_WIDTH - 2 * HORIZONTAL_PADDING - CONTENT_RIGHT_INSET;
   const fontSize = BODY_FONT_SIZE;
+  const progress = Math.min(1, Math.max(0, input.pageIndex / input.pageCount));
+  const filledWidth = Math.round(PROGRESS_BAR_WIDTH * progress);
 
   return h(
     "div",
@@ -192,7 +208,9 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
           bottom: FOOTER_BOTTOM_OFFSET,
           left: 0,
           right: 0,
-          justifyContent: "center",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: PROGRESS_BAR_TOP_GAP,
         },
       },
       h(
@@ -201,10 +219,32 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
           style: {
             display: "flex",
             fontSize: 24,
-            color: FB_SECONDARY_COLOR,
+            color: input.isDarkBackground ? FOOTER_TEXT_COLOR_DARK : FB_SECONDARY_COLOR,
           },
         },
         `${input.pageIndex} / ${input.pageCount}`
+      ),
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            width: PROGRESS_BAR_WIDTH,
+            height: PROGRESS_BAR_HEIGHT,
+            borderRadius: PROGRESS_BAR_HEIGHT / 2,
+            overflow: "hidden",
+            backgroundColor: input.isDarkBackground ? PROGRESS_TRACK_COLOR_DARK : PROGRESS_TRACK_COLOR,
+          },
+        },
+        h("div", {
+          style: {
+            display: "flex",
+            width: filledWidth,
+            height: PROGRESS_BAR_HEIGHT,
+            borderRadius: PROGRESS_BAR_HEIGHT / 2,
+            backgroundColor: input.isDarkBackground ? PROGRESS_FILL_COLOR_DARK : PROGRESS_FILL_COLOR,
+          },
+        })
       )
     )
   );

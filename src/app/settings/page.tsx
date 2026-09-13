@@ -14,6 +14,7 @@ export default async function SettingsPage() {
   const profile = await getProfileSettings();
   const reelBackgroundPaths: string[] = JSON.parse(profile.reelBackgroundImagePaths || "[]");
   const carouselBackgroundPaths: string[] = JSON.parse(profile.carouselBackgroundImagePaths || "[]");
+  const darkCarouselBackgroundPaths: string[] = JSON.parse(profile.darkCarouselBackgroundPaths || "[]");
   const coverBackgroundPaths: string[] = JSON.parse(profile.coverBackgroundImagePaths || "[]");
   const aiThemeOptions: string[] = JSON.parse(profile.aiThemeOptions || "[]");
   const themeSongs = JSON.parse(profile.themeSongsJson || "{}");
@@ -56,6 +57,7 @@ export default async function SettingsPage() {
           title="תבניות רקע לפוסט הקרוסלה"
           hint="אפשר להעלות כמה תבניות ולבחור מבינהן בזמן יצירת פוסט. בלי בחירה — נשאר הרקע הלבן הרגיל."
           initial={carouselBackgroundPaths.map((path) => ({ path, url: buildFileUrlFromPath(path) }))}
+          initialDarkPaths={darkCarouselBackgroundPaths}
         />
       </div>
       <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">

@@ -89,6 +89,28 @@ export async function removeBackgroundImagePath(kind: BackgroundKind, filePath: 
   const profile = await getProfileSettings();
   const field = BACKGROUND_FIELD[kind];
   const paths: string[] = JSON.parse(profile[field] || "[]").filter((p: string) => p !== filePath);
-  await prisma.profileSettings.update({ where: { id: "default" }, data: { [field]: JSON.stringify(paths) } });
+  const data: Record<string, string> = { [field]: JSON.stringify(paths) };
+
+  // גם מנקים סימון "כהה" ישן אם היה — כדי שלא יישאר נתיב-רפאים ברשימה הזו.
+  if (kind === "carousel") {
+    const darkPaths: string[] = JSON.parse(profile.darkCarouselBackgroundPaths || "[]").filter(
+      (p: string) => p !== filePath
+    );
+    data.darkCarouselBackgroundPaths = JSON.stringify(darkPaths);
+  }
+
+  await prisma.profileSettings.update({ where: { id: "default" }, data });
   return paths;
+}
+
+/** מסמנת/מבטלת סימון תבנית רקע קרוסלה כ"כהה" — קובע את גוון פס ההתקדמות/מספור העמודים בתחתית העמוד. */
+export async function setCarouselBackgroundDark(filePath: string, isDark: boolean): Promise<string[]> {
+  const profile = await getProfileSettings();
+  const current: string[] = JSON.parse(profile.darkCarouselBackgroundPaths || "[]");
+  const next = isDark ? [...new Set([...current, filePath])] : current.filter((p) => p !== filePath);
+  await prisma.profileSettings.update({
+    where: { id: "default" },
+    data: { darkCarouselBackgroundPaths: JSON.stringify(next) },
+  });
+  return next;
 }
