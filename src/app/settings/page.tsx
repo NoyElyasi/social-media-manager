@@ -56,7 +56,13 @@ export default async function SettingsPage() {
           kind="carousel"
           title="תבניות רקע לפוסט הקרוסלה"
           hint="אפשר להעלות כמה תבניות ולבחור מבינהן בזמן יצירת פוסט. בלי בחירה — נשאר הרקע הלבן הרגיל."
-          initial={carouselBackgroundEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path), category: e.category }))}
+          initial={carouselBackgroundEntries.map((e) => ({
+            path: e.path,
+            url: buildFileUrlFromPath(e.path),
+            category: e.category,
+            textTopOffset: e.textTopOffset,
+            textRightInset: e.textRightInset,
+          }))}
           initialDarkPaths={darkCarouselBackgroundPaths}
         />
       </div>

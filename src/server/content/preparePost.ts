@@ -13,7 +13,7 @@ import {
   type RevealMode,
   type ReelNarration,
 } from "./instagramReel";
-import { getProfileSettings, loadProfileImageDataUri } from "../settings/profile";
+import { getProfileSettings, loadProfileImageDataUri, parseBackgroundEntries } from "../settings/profile";
 import { ALWAYS_FIRST_HASHTAG, type SelectedTarget } from "@/lib/labels";
 import type { StorageService } from "../storage/types";
 
@@ -36,6 +36,16 @@ function isDarkCarouselBackground(darkCarouselBackgroundPathsJson: string, backg
   } catch {
     return false;
   }
+}
+
+/** מיקום טקסט מותאם לתבנית הרקע הנבחרת (ראו setBackgroundTextPosition) — {null,null} אם אין תבנית/כיוונון. */
+function getCarouselTextPosition(
+  carouselBackgroundImagePathsJson: string,
+  backgroundPath: string | null
+): { textTopOffset: number | null; textRightInset: number | null } {
+  if (!backgroundPath) return { textTopOffset: null, textRightInset: null };
+  const entry = parseBackgroundEntries(carouselBackgroundImagePathsJson).find((e) => e.path === backgroundPath);
+  return { textTopOffset: entry?.textTopOffset ?? null, textRightInset: entry?.textRightInset ?? null };
 }
 
 /**
@@ -198,6 +208,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           profileImageDataUri,
           backgroundImageDataUri: carouselBackgroundImageDataUri,
           isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, input.carouselBackgroundPath ?? null),
+          ...getCarouselTextPosition(profile.carouselBackgroundImagePaths, input.carouselBackgroundPath ?? null),
           coverBackgroundImageDataUri,
           songs,
           storage,
@@ -352,6 +363,7 @@ export async function updatePostRawText(
         profileImageDataUri,
         backgroundImageDataUri,
         isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, backgroundPath),
+        ...getCarouselTextPosition(profile.carouselBackgroundImagePaths, backgroundPath),
         coverBackgroundImageDataUri,
         songs,
         storage,
@@ -452,6 +464,7 @@ export async function updatePostHashtags(postId: string, hashtags: string[]) {
         profileImageDataUri,
         backgroundImageDataUri,
         isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, content.backgroundImagePath),
+        ...getCarouselTextPosition(profile.carouselBackgroundImagePaths, content.backgroundImagePath),
         coverBackgroundImageDataUri,
         songs,
         storage,

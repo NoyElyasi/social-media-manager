@@ -23,7 +23,6 @@ const BODY_LINE_GAP = 20;
 // מהראש) ולא צמוד מידי לימין (ראו CONTENT_RIGHT_INSET, בדיוק כמו CAPTION_RIGHT_INSET בריל).
 const CONTENT_TOP_OFFSET = 340;
 const CONTENT_RIGHT_INSET = 100;
-const CONTENT_RIGHT_OFFSET = HORIZONTAL_PADDING + CONTENT_RIGHT_INSET;
 const FOOTER_BOTTOM_OFFSET = 56;
 
 // פס התקדמות מתחת למספור העמודים — בגוונים של המותג (אדום על ורוד), או
@@ -64,6 +63,9 @@ export interface CarouselSlideInput {
   backgroundImageDataUri?: string | null;
   /** התבנית מסומנת "כהה" בהגדרות — פס ההתקדמות ומספור העמודים יוצגו בגוונים בהירים (ראו setCarouselBackgroundDark). */
   isDarkBackground?: boolean;
+  /** מיקום טקסט מותאם לתבנית הזו (ראו setBackgroundTextPosition) — override לקבועים הרגילים, כדי שהטקסט לא יתנגש בעיטורים של הרקע. null/undefined = ברירת המחדל (CONTENT_TOP_OFFSET/CONTENT_RIGHT_INSET). */
+  textTopOffset?: number | null;
+  textRightInset?: number | null;
 }
 
 function avatarNode(displayName: string, profileImageDataUri: string | null | undefined) {
@@ -97,7 +99,10 @@ function avatarNode(displayName: string, profileImageDataUri: string | null | un
 }
 
 export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
-  const availableWidth = CAROUSEL_WIDTH - 2 * HORIZONTAL_PADDING - CONTENT_RIGHT_INSET;
+  const topOffset = input.textTopOffset ?? CONTENT_TOP_OFFSET;
+  const rightInset = input.textRightInset ?? CONTENT_RIGHT_INSET;
+  const rightOffset = HORIZONTAL_PADDING + rightInset;
+  const availableWidth = CAROUSEL_WIDTH - 2 * HORIZONTAL_PADDING - rightInset;
   const fontSize = BODY_FONT_SIZE;
   const progress = Math.min(1, Math.max(0, input.pageIndex / input.pageCount));
   const filledWidth = Math.round(PROGRESS_BAR_WIDTH * progress);
@@ -143,8 +148,8 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
           position: "absolute",
           flexDirection: "column",
           alignItems: "flex-end",
-          top: CONTENT_TOP_OFFSET,
-          right: CONTENT_RIGHT_OFFSET,
+          top: topOffset,
+          right: rightOffset,
         },
       },
       // כותרת (תמונת פרופיל + שם) ותגיות — רק בעמוד הראשון, בדיוק כמו כותרת פוסט בפייסבוק

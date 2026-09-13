@@ -82,6 +82,11 @@ const BACKGROUND_FIELD: Record<
 export interface BackgroundEntry {
   path: string;
   category: string;
+  /** מיקום טקסט מותאם לתבנית הזו (רלוונטי לקרוסלה בלבד) — override לקבועים
+   * הרגילים ב-carouselSlide.ts, כדי שהטקסט לא יתנגש בעיטורים של הרקע הזה
+   * בפרט. undefined/null = ברירת המחדל (לא כל תבנית צריכה כיוונון). */
+  textTopOffset?: number | null;
+  textRightInset?: number | null;
 }
 
 /** מפרשת את הרשימה השמורה — תומכת גם בפורמט הישן (מערך של נתיבים כמחרוזות בלבד), לפני שהתבנית קיבלה קטגוריה. */
@@ -137,6 +142,21 @@ export async function setBackgroundCategory(
   const profile = await getProfileSettings();
   const field = BACKGROUND_FIELD[kind];
   const entries = parseBackgroundEntries(profile[field]).map((e) => (e.path === filePath ? { ...e, category } : e));
+  await prisma.profileSettings.update({ where: { id: "default" }, data: { [field]: JSON.stringify(entries) } });
+  return entries;
+}
+
+/** משנה מיקום טקסט מותאם לתבנית רקע קיימת (ראו BackgroundEntry) — null מנקה חזרה לברירת המחדל. */
+export async function setBackgroundTextPosition(
+  kind: BackgroundKind,
+  filePath: string,
+  position: { topOffset: number | null; rightInset: number | null }
+): Promise<BackgroundEntry[]> {
+  const profile = await getProfileSettings();
+  const field = BACKGROUND_FIELD[kind];
+  const entries = parseBackgroundEntries(profile[field]).map((e) =>
+    e.path === filePath ? { ...e, textTopOffset: position.topOffset, textRightInset: position.rightInset } : e
+  );
   await prisma.profileSettings.update({ where: { id: "default" }, data: { [field]: JSON.stringify(entries) } });
   return entries;
 }

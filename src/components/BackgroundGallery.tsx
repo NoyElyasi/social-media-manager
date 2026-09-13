@@ -16,6 +16,9 @@ export interface BackgroundItem {
   url: string;
   /** "סקין"/קטגוריה חופשית (למשל "אחת ביום", "מכתב ביום", "טיפ ביום") — "" = בלי קטגוריה. */
   category?: string;
+  /** מיקום טקסט מותאם לתבנית הזו (קרוסלה בלבד) — ראו setBackgroundTextPosition. null/undefined = ברירת המחדל. */
+  textTopOffset?: number | null;
+  textRightInset?: number | null;
 }
 
 const UNCATEGORIZED_LABEL = "כללי";
@@ -48,6 +51,7 @@ export default function BackgroundGallery({
   const [uploadCategory, setUploadCategory] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [editingPath, setEditingPath] = useState<string | null>(null);
+  const [editingPositionPath, setEditingPositionPath] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const existingCategories = useMemo(
@@ -92,6 +96,33 @@ export default function BackgroundGallery({
       return;
     }
     setItems((prev) => prev.map((i) => (i.path === item.path ? { ...i, category: trimmed } : i)));
+    router.refresh();
+  }
+
+  async function saveTextPosition(item: BackgroundItem, topOffset: string, rightInset: string) {
+    setError(null);
+    setEditingPositionPath(null);
+    const parsedTop = topOffset.trim() === "" ? null : Number(topOffset);
+    const parsedRight = rightInset.trim() === "" ? null : Number(rightInset);
+    if (
+      (parsedTop !== null && Number.isNaN(parsedTop)) ||
+      (parsedRight !== null && Number.isNaN(parsedRight))
+    ) {
+      setError("מיקום טקסט לא תקין — יש להזין מספרים");
+      return;
+    }
+    const res = await fetch("/api/settings/backgrounds", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, path: item.path, textTopOffset: parsedTop, textRightInset: parsedRight }),
+    });
+    if (!res.ok) {
+      setError("שגיאה בעדכון מיקום הטקסט — נסו שוב");
+      return;
+    }
+    setItems((prev) =>
+      prev.map((i) => (i.path === item.path ? { ...i, textTopOffset: parsedTop, textRightInset: parsedRight } : i))
+    );
     router.refresh();
   }
 
@@ -228,6 +259,61 @@ export default function BackgroundGallery({
                 🌙 תבנית כהה
               </button>
             )}
+            {kind === "carousel" &&
+              (editingPositionPath === item.path ? (
+                <div className="flex flex-col items-center gap-1 rounded-md border border-brand-pink/40 bg-white p-1.5">
+                  <label className="flex items-center gap-1 text-[10px] text-brand-maroon/70">
+                    גובה
+                    <input
+                      type="number"
+                      autoFocus
+                      defaultValue={item.textTopOffset ?? ""}
+                      placeholder="ברירת מחדל"
+                      className="w-16 rounded border border-brand-pink/40 px-1 py-0.5 text-[11px] text-center"
+                      id={`top-${item.path}`}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                        if (e.key === "Escape") setEditingPositionPath(null);
+                      }}
+                    />
+                  </label>
+                  <label className="flex items-center gap-1 text-[10px] text-brand-maroon/70">
+                    מהימין
+                    <input
+                      type="number"
+                      defaultValue={item.textRightInset ?? ""}
+                      placeholder="ברירת מחדל"
+                      className="w-16 rounded border border-brand-pink/40 px-1 py-0.5 text-[11px] text-center"
+                      id={`right-${item.path}`}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                        if (e.key === "Escape") setEditingPositionPath(null);
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const top = (document.getElementById(`top-${item.path}`) as HTMLInputElement).value;
+                      const right = (document.getElementById(`right-${item.path}`) as HTMLInputElement).value;
+                      void saveTextPosition(item, top, right);
+                    }}
+                    className="rounded-full bg-brand-red px-2 py-0.5 text-[10px] text-white"
+                  >
+                    שמירה
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEditingPositionPath(item.path)}
+                  title="לחצי לכוונן היכן הטקסט מתחיל בתבנית הזו — שימושי כשהטקסט מתנגש בעיטור של הרקע"
+                  className="rounded-full border border-brand-pink/40 bg-white px-2 py-0.5 text-[11px] text-brand-maroon/60 hover:bg-brand-pink/10"
+                >
+                  ↕ מיקום טקסט
+                  {(item.textTopOffset != null || item.textRightInset != null) && " ✓"}
+                </button>
+              ))}
           </div>
         ))}
       </div>

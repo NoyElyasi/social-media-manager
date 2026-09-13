@@ -7,6 +7,7 @@ import {
   removeBackgroundImagePath,
   setCarouselBackgroundDark,
   setBackgroundCategory,
+  setBackgroundTextPosition,
   type BackgroundKind,
 } from "@/server/settings/profile";
 import { getStorageService } from "@/server/storage";
@@ -64,9 +65,11 @@ const patchSchema = z.object({
   path: z.string().min(1),
   isDark: z.boolean().optional(),
   category: z.string().optional(),
+  textTopOffset: z.number().nullable().optional(),
+  textRightInset: z.number().nullable().optional(),
 });
 
-/** מעדכנת תבנית רקע קיימת — סימון "כהה" (קרוסלה בלבד, ראו setCarouselBackgroundDark) ו/או קטגוריה. */
+/** מעדכנת תבנית רקע קיימת — סימון "כהה" (קרוסלה בלבד), קטגוריה, ו/או מיקום טקסט מותאם. */
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
   const parsed = patchSchema.safeParse(body);
@@ -82,6 +85,12 @@ export async function PATCH(req: NextRequest) {
   }
   if (parsed.data.category !== undefined) {
     entries = await setBackgroundCategory(parsed.data.kind, parsed.data.path, parsed.data.category.trim());
+  }
+  if (parsed.data.textTopOffset !== undefined || parsed.data.textRightInset !== undefined) {
+    entries = await setBackgroundTextPosition(parsed.data.kind, parsed.data.path, {
+      topOffset: parsed.data.textTopOffset ?? null,
+      rightInset: parsed.data.textRightInset ?? null,
+    });
   }
 
   return NextResponse.json({ darkPaths, entries });
