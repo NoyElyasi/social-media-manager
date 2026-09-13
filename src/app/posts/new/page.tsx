@@ -9,7 +9,7 @@ import HashtagBadge from "@/components/HashtagBadge";
 import BackgroundPicker from "@/components/BackgroundPicker";
 import type { BackgroundItem } from "@/components/BackgroundGallery";
 import { buildFileUrlFromPath } from "@/lib/files";
-import NarrationRecorder, { type CapturedNarration } from "@/components/NarrationRecorder";
+import NarrationInput, { type CapturedNarration } from "@/components/NarrationInput";
 
 const MANUAL_SLIDE_BREAK = "///";
 const GLUE_MARKER = "&&";
@@ -64,8 +64,7 @@ export default function NewPostPage() {
     () => loadDraft().coverBackgroundPath ?? null
   );
   // לא נשמר בטיוטה המקומית (base64 של הקלטה יכול להיות כבד) — ומתאפס בכל
-  // שינוי טקסט/חילוק דרך ה-key על NarrationRecorder, כי תזמוני המילים כבר
-  // לא רלוונטיים לטקסט חדש.
+  // שינוי טקסט/חילוק דרך ה-key על NarrationInput, כי המילים בטקסט השתנו.
   const [reelNarration, setReelNarration] = useState<CapturedNarration | null>(null);
   const [carouselBackgrounds, setCarouselBackgrounds] = useState<BackgroundItem[]>([]);
   const [reelBackgrounds, setReelBackgrounds] = useState<BackgroundItem[]>([]);
@@ -481,12 +480,7 @@ export default function NewPostPage() {
               />
             </div>
           )}
-          <NarrationRecorder
-            key={`${rawText}-${splitMode}`}
-            rawText={rawText}
-            splitMode={splitMode}
-            onCaptured={setReelNarration}
-          />
+          <NarrationInput key={`${rawText}-${splitMode}`} onCaptured={setReelNarration} />
         </div>
       )}
 

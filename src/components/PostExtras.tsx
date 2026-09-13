@@ -9,7 +9,7 @@ import HashtagBadge from "./HashtagBadge";
 import BackgroundPicker from "./BackgroundPicker";
 import type { BackgroundItem } from "./BackgroundGallery";
 import { buildFileUrlFromPath } from "@/lib/files";
-import NarrationRecorder, { type CapturedNarration } from "./NarrationRecorder";
+import NarrationInput, { type CapturedNarration } from "./NarrationInput";
 
 export default function PostExtras({
   postId,
@@ -182,12 +182,7 @@ export default function PostExtras({
                 onSelect={setReelBackgroundPath}
                 noneLabel="בלי תבנית (צבע אוטומטי)"
               />
-              <NarrationRecorder
-                key={`${rawText}-${splitMode}`}
-                rawText={rawText}
-                splitMode={splitMode}
-                onCaptured={setReelNarration}
-              />
+              <NarrationInput key={`${rawText}-${splitMode}`} onCaptured={setReelNarration} />
               <button
                 type="button"
                 onClick={() => addTarget("instagram_reel")}

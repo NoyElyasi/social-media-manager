@@ -20,7 +20,6 @@ const createPostSchema = z.object({
     .object({
       audioBase64: z.string(),
       audioMimeType: z.string(),
-      wordTimestamps: z.array(z.number()),
     })
     .nullable()
     .optional(),

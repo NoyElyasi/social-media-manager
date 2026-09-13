@@ -18,7 +18,7 @@ const execFileAsync = promisify(execFile);
 export type RevealMode = RevealGranularity;
 
 // כתוביות קצרות לריל — מסך אחד קטן וקריא, לא פסקה שלמה (סעיף 4.4).
-export const MAX_CHARS_PER_CAPTION = 50;
+const MAX_CHARS_PER_CAPTION = 50;
 
 // קצב "כתיבה בלייב" של מילה חדשה על המסך — לא קצב קריאה, רק אפקט חזותי.
 // לפי בקשה מפורשת "בקצב מהיר יותר" (היה 0.28).
@@ -45,21 +45,16 @@ export interface InstagramReelResult {
 }
 
 /**
- * הקלטת הקראה שהמשתמשת סינכרנה ידנית (לחיצה על כל מילה בזמן ההקלטה, ראו
- * NarrationRecorder) — כשקיימת, קצב הופעת הטקסט בריל נגזר מהתזמונים
- * האמיתיים האלה במקום מהקבועים הקבועים (WORD_REVEAL_SECONDS/LETTER_REVEAL_SECONDS/
- * READ_SECONDS_PER_WORD), והאודיו מוטמע כפס קול בתוך reel.mp4. הלחיצה היא
- * תמיד פר-מילה (גם במצב "אות-אות") — במצב הזה, משך הזמן שנקבע למילה מתחלק
- * שווה בשווה בין האותיות שלה, כך שהיא עדיין "נכתבת" אות-אות אבל בקצב
- * שתואם בדיוק למתי המשתמשת סיימה לומר את המילה השלמה.
+ * הקלטה של המשתמשת מקריאה את הפוסט (מוקלטת בכלי או מועלית כקובץ מוכן) —
+ * כשקיימת, קצב הופעת הטקסט בריל נגזר מניתוח עוצמת הסאונד של ההקלטה עצמה
+ * (ראו detectWordTimestamps) במקום מהקבועים הקבועים (WORD_REVEAL_SECONDS/
+ * LETTER_REVEAL_SECONDS/READ_SECONDS_PER_WORD), והאודיו מוטמע כפס קול בתוך
+ * reel.mp4. זו הערכה גסה לפי "רגישות" לעוצמת הקול — לא זיהוי דיבור מדויק,
+ * לפי בקשה מפורשת שלא חייבת להיות מדויקת ב-100%.
  */
 export interface ReelNarration {
   audioBase64: string;
   audioMimeType: string;
-  /** שנייה שבה המשתמשת התחילה לומר כל מילה, יחסית לתחילת ההקלטה — מערך אחד
-   * שטוח, לפי סדר המילים המדויק שיוצא מ-splitIntoSlides+פיצול לרווחים
-   * (בדיוק כמו ב-countTotalWords/renderCaptionFrames). */
-  wordTimestamps: number[];
 }
 
 /** נזרקת כשהיצירה בוטלה במפורש (signal) באמצע — לא שגיאה אמיתית. */
@@ -255,6 +250,83 @@ async function probeAudioDurationSeconds(filePath: string): Promise<number | nul
   }
 }
 
+/** מפענחת קובץ אודיו כלשהו ל-PCM גולמי (מונו, 16kHz, 16-bit) — פורמט פשוט לניתוח עוצמה. */
+async function extractPcmSamples(audioPath: string): Promise<{ samples: Int16Array; sampleRate: number }> {
+  const sampleRate = 16000;
+  const pcmPath = audioPath + ".pcm";
+  await execFileAsync(ffmpegInstaller.path, [
+    "-y",
+    "-i", audioPath,
+    "-f", "s16le",
+    "-ar", String(sampleRate),
+    "-ac", "1",
+    pcmPath,
+  ]);
+  const buf = await fs.readFile(pcmPath);
+  await fs.rm(pcmPath, { force: true });
+
+  const sampleCount = Math.floor(buf.length / 2);
+  const samples = new Int16Array(sampleCount);
+  for (let i = 0; i < sampleCount; i++) {
+    samples[i] = buf.readInt16LE(i * 2);
+  }
+  return { samples, sampleRate };
+}
+
+/** עוצמת קול ממוצעת (RMS) בכל חלון קצר — ה"פרופיל קול" שהזיהוי מבוסס עליו. */
+function computeShortTimeEnergy(samples: Int16Array, sampleRate: number, windowSeconds: number): number[] {
+  const windowSize = Math.max(1, Math.floor(sampleRate * windowSeconds));
+  const numWindows = Math.max(1, Math.floor(samples.length / windowSize));
+  const energies: number[] = new Array(numWindows);
+  for (let w = 0; w < numWindows; w++) {
+    let sum = 0;
+    const start = w * windowSize;
+    for (let i = 0; i < windowSize; i++) {
+      const s = samples[start + i] ?? 0;
+      sum += s * s;
+    }
+    energies[w] = Math.sqrt(sum / windowSize);
+  }
+  return energies;
+}
+
+/**
+ * מזהה תזמון גס למילים בהקלטת הקראה, לפי רגישות לעוצמת הסאונד — לא זיהוי
+ * דיבור אמיתי, לפי בקשה מפורשת "לא צריך להיות מדויק במאה אחוז". מחלקת את
+ * משך ההקלטה ל-wordCount קטעים: כל גבול בין שתי מילים "נמשך" מהזמן המשוער
+ * (חלוקה שווה) לנקודת העוצמה-הנמוכה ביותר בסביבתו — כלומר לרגע הכי דומה
+ * לרווח/שקט קצר בין מילים. תמיד מחזירה בדיוק wordCount נקודות התחלה
+ * (הראשונה 0), כדי שלא תהיה תלות בכמות "שיאים" שהתגלו בפועל בהקלטה.
+ */
+function detectWordTimestamps(energies: number[], windowSeconds: number, totalSeconds: number, wordCount: number): number[] {
+  if (wordCount <= 1) return [0];
+
+  const idealGap = totalSeconds / wordCount;
+  const searchRadiusSeconds = Math.min(idealGap * 0.4, 0.35);
+  const timestamps: number[] = [0];
+
+  for (let k = 1; k < wordCount; k++) {
+    const idealTime = k * idealGap;
+    const loIndex = Math.max(0, Math.floor((idealTime - searchRadiusSeconds) / windowSeconds));
+    const hiIndex = Math.min(energies.length - 1, Math.ceil((idealTime + searchRadiusSeconds) / windowSeconds));
+
+    let bestIndex = Math.round(idealTime / windowSeconds);
+    let bestEnergy = Infinity;
+    for (let i = loIndex; i <= hiIndex; i++) {
+      if (energies[i] < bestEnergy) {
+        bestEnergy = energies[i];
+        bestIndex = i;
+      }
+    }
+
+    const candidateTime = bestIndex * windowSeconds;
+    // ביטחון נוסף למונוטוניות (בפועל כבר מובטח כי חלונות החיפוש לא חופפים).
+    timestamps.push(Math.max(candidateTime, timestamps[k - 1] + 0.05));
+  }
+
+  return timestamps;
+}
+
 /** מטמיעה פס קול קיים בתוך הסרטון השקט — מחליפה את outputPath בגרסה עם אודיו. */
 async function muxAudioIntoVideo(videoPath: string, audioPath: string, outputPath: string): Promise<void> {
   await execFileAsync(ffmpegInstaller.path, [
@@ -282,20 +354,32 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "reel-"));
   try {
-    // הקלטת ההקראה תקפה (בכל revealMode) רק כשכמות התזמונים תואמת בדיוק
-    // לכמות המילים בטקסט הנוכחי (אחרת הטקסט השתנה מאז ההקלטה, והתזמונים
-    // לא רלוונטיים יותר) — במקרה אחר מתעלמים ממנה בשקט וחוזרים לקצב הקבוע.
+    // אם יש הקלטה — מזהים תזמון מילים גס לפי עוצמת הסאונד שלה (ראו
+    // detectWordTimestamps). אם משהו נכשל בפענוח/ניתוח האודיו, מתעלמים
+    // מההקלטה בשקט וחוזרים לקצב הקבוע — לא מפילים את כל היצירה.
     const totalWordCount = countTotalWords(captions);
     let audioPath: string | null = null;
     let narrationTotalSeconds: number | null = null;
     let wordTimestamps: number[] | null = null;
 
-    if (params.narration && params.narration.wordTimestamps.length === totalWordCount) {
-      const ext = audioExtensionFromMimeType(params.narration.audioMimeType);
-      audioPath = path.join(workDir, `narration.${ext}`);
-      await fs.writeFile(audioPath, Buffer.from(params.narration.audioBase64, "base64"));
-      narrationTotalSeconds = await probeAudioDurationSeconds(audioPath);
-      wordTimestamps = params.narration.wordTimestamps;
+    if (params.narration && totalWordCount > 0) {
+      try {
+        const ext = audioExtensionFromMimeType(params.narration.audioMimeType);
+        const candidatePath = path.join(workDir, `narration.${ext}`);
+        await fs.writeFile(candidatePath, Buffer.from(params.narration.audioBase64, "base64"));
+        const durationSeconds = await probeAudioDurationSeconds(candidatePath);
+
+        if (durationSeconds && durationSeconds > 0) {
+          const windowSeconds = 0.02;
+          const { samples, sampleRate } = await extractPcmSamples(candidatePath);
+          const energies = computeShortTimeEnergy(samples, sampleRate, windowSeconds);
+          audioPath = candidatePath;
+          narrationTotalSeconds = durationSeconds;
+          wordTimestamps = detectWordTimestamps(energies, windowSeconds, durationSeconds, totalWordCount);
+        }
+      } catch (err) {
+        console.error("Failed to analyze narration audio, falling back to fixed pacing:", err);
+      }
     }
 
     const { framePaths, durations } = await renderCaptionFrames(

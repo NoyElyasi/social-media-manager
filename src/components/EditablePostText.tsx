@@ -7,7 +7,7 @@ import ReelProgress from "@/components/ReelProgress";
 import BackgroundPicker from "@/components/BackgroundPicker";
 import type { BackgroundItem } from "@/components/BackgroundGallery";
 import { buildFileUrlFromPath } from "@/lib/files";
-import NarrationRecorder, { type CapturedNarration } from "@/components/NarrationRecorder";
+import NarrationInput, { type CapturedNarration } from "@/components/NarrationInput";
 
 const MANUAL_SLIDE_BREAK = "///";
 const GLUE_MARKER = "&&";
@@ -268,12 +268,7 @@ export default function EditablePostText({
                 </div>
               )}
               {hasReel && updateReel && (
-                <NarrationRecorder
-                  key={`${rawText}-${splitMode}`}
-                  rawText={rawText}
-                  splitMode={splitMode}
-                  onCaptured={setReelNarration}
-                />
+                <NarrationInput key={`${rawText}-${splitMode}`} onCaptured={setReelNarration} />
               )}
               <p className="text-xs text-brand-maroon/60">
                 הבחירה כאן תיכנס לתוקף רק בלחיצה על &quot;שמור טקסט&quot; למטה.
