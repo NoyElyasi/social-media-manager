@@ -42,6 +42,10 @@ interface Row {
 
 const REEL_LENGTH_THRESHOLD = 25;
 const MEANINGFUL_DIFF = 0.15;
+// שיקלול הציון ב"המלצות לרילים הבאים" — צפיות מקבלות משקל גבוה יותר מלייקים/
+// תגובות (לבקשת המשתמשת), אבל לא בלעדי, כדי שפוסט עם תגובות/לייקים גבוהים
+// במיוחד עדיין יוכל לעלות בדירוג.
+const NEXT_REEL_WEIGHTS = { views: 0.6, likes: 0.2, comments: 0.2 };
 const MIN_PER_GROUP = 2;
 const FREQUENT_GAP_DAYS = 2; // פער בין פוסטים עד כמה ימים נחשב "פרסום תדיר"
 const WEEKDAY_LABELS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -313,7 +317,13 @@ export default async function DashboardPage({
   const nextReelLikesRanks = percentileRanks(carouselsWithoutReel.map((c) => c.likesCount));
   const nextReelCommentsRanks = percentileRanks(carouselsWithoutReel.map((c) => c.commentsCount));
   const nextReelSuggestions = carouselsWithoutReel
-    .map((row, i) => ({ row, score: (nextReelViewsRanks[i] + nextReelLikesRanks[i] + nextReelCommentsRanks[i]) / 3 }))
+    .map((row, i) => ({
+      row,
+      score:
+        nextReelViewsRanks[i] * NEXT_REEL_WEIGHTS.views +
+        nextReelLikesRanks[i] * NEXT_REEL_WEIGHTS.likes +
+        nextReelCommentsRanks[i] * NEXT_REEL_WEIGHTS.comments,
+    }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
   const nextReelLinkedPosts =
@@ -598,7 +608,7 @@ export default async function DashboardPage({
         <div className="flex flex-col gap-2">
           <h2 className="font-semibold text-brand-maroon border-b border-brand-pink/30 pb-2">🎬 המלצות לרילים הבאים</h2>
           <p className="text-xs text-brand-maroon/50">
-            5 הקרוסלות המובילות (לפי שיקלול צפיות + לייקים + תגובות) שעדיין אין להן ריל תואם — זוהה לפי חפיפת תגיות עם
+            5 הקרוסלות המובילות (לפי שיקלול שנותן משקל גבוה יותר לצפיות, ואחריהן לייקים + תגובות) שעדיין אין להן ריל תואם — זוהה לפי חפיפת תגיות עם
             רילים קיימים, לא לפי קישור לתוכן בכלי.
           </p>
           <ChartScrollRow>
