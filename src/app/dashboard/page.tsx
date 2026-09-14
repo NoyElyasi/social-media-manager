@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/server/db";
 import { getProfileSettings } from "@/server/settings/profile";
+import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
 import { BarComparisonCard, ChartScrollRow, GroupedBarCard, LineTrendCard, PieBreakdownCard, type BarDatum } from "@/components/dashboard/ChartCard";
 import RecommendationCard, { type RecommendationBreakdownRow } from "@/components/dashboard/RecommendationCard";
 import InstagramMediaLabelEditor from "@/components/InstagramMediaLabelEditor";
@@ -164,6 +165,28 @@ function buildRecommendation(
   };
 }
 
+/** תגיות מתוך הכיתוב האמיתי באינסטגרם, בלי התגית הקבועה #אחתביום שמופיעה בכל פוסט ולכן לא עוזרת להבחין בין תכנים. */
+function extractHashtags(caption: string | null): Set<string> {
+  if (!caption) return new Set();
+  const matches = caption.match(/#[\p{L}\p{N}_]+/gu) ?? [];
+  return new Set(matches.filter((h) => h !== ALWAYS_FIRST_HASHTAG));
+}
+
+/**
+ * דירוג פרצנטיל (0-1) של כל ערך בתוך הקבוצה — כך שאפשר לשקלל כמה מדדים
+ * בסקאלות שונות בהוגנות (צפיות תמיד גדולות בהרבה מלייקים/תגובות, אז סכום גולמי
+ * היה נשלט כולו על ידי הצפיות). null נחשב כניקוד הנמוך ביותר (0), לא מדולג.
+ */
+function percentileRanks(values: (number | null)[]): number[] {
+  const withIndex = values.map((v, i) => ({ v, i })).filter((x): x is { v: number; i: number } => x.v !== null);
+  const sorted = [...withIndex].sort((a, b) => a.v - b.v);
+  const rankByIndex = new Map<number, number>();
+  sorted.forEach(({ i }, rank) => {
+    rankByIndex.set(i, sorted.length > 1 ? rank / (sorted.length - 1) : 1);
+  });
+  return values.map((_, i) => rankByIndex.get(i) ?? 0);
+}
+
 /** מוצאת את הדלי (יום/שעה) המוביל מבין כמה דליים, אם ההבדל משמעותי מספיק לעומת השאר. */
 function buildBestBucketRecommendation(
   title: string,
@@ -275,6 +298,33 @@ export default async function DashboardPage({
 
   const reels = rows.filter((r) => r.isReel);
   const carousels = rows.filter((r) => r.mediaType === "CAROUSEL_ALBUM");
+
+  // המלצות לרילים הבאים: קרוסלות שכבר פורסמו לאינסטגרם ואין להן עדיין ריל
+  // תואם (מזוהה לפי חפיפת תגיות בכיתוב האמיתי, לא לפי קישור מקומי — כי לא כל
+  // התוכן נוצר/קושר בכלי הזה), מדורגות לפי שיקלול (ממוצע דירוגי פרצנטיל, כדי
+  // שצפיות לא ישתלטו על הניקוד) של צפיות+לייקים+תגובות — "הפוסטים המובילים".
+  const reelHashtagSets = reels.map((r) => extractHashtags(r.caption));
+  const carouselsWithoutReel = carousels.filter((c) => {
+    const tags = extractHashtags(c.caption);
+    if (tags.size === 0) return true; // אין תגיות להשוות — לא ניתן להוכיח שיש ריל תואם
+    return !reelHashtagSets.some((reelTags) => [...tags].some((t) => reelTags.has(t)));
+  });
+  const nextReelViewsRanks = percentileRanks(carouselsWithoutReel.map((c) => c.viewsCount));
+  const nextReelLikesRanks = percentileRanks(carouselsWithoutReel.map((c) => c.likesCount));
+  const nextReelCommentsRanks = percentileRanks(carouselsWithoutReel.map((c) => c.commentsCount));
+  const nextReelSuggestions = carouselsWithoutReel
+    .map((row, i) => ({ row, score: (nextReelViewsRanks[i] + nextReelLikesRanks[i] + nextReelCommentsRanks[i]) / 3 }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+  const nextReelLinkedPosts =
+    nextReelSuggestions.length > 0
+      ? await prisma.platformContent.findMany({
+          where: { instagramMediaId: { in: nextReelSuggestions.map((s) => s.row.id) } },
+          select: { instagramMediaId: true, postId: true },
+        })
+      : [];
+  const postIdByMediaId = new Map(nextReelLinkedPosts.map((c) => [c.instagramMediaId as string, c.postId]));
+
   const oneTag = rows.filter((r) => r.hashtagCount <= 1);
   const manyTags = rows.filter((r) => r.hashtagCount >= 2);
   const shortReels = reels.filter((r) => r.durationSeconds !== null && r.durationSeconds <= REEL_LENGTH_THRESHOLD);
@@ -542,6 +592,56 @@ export default async function DashboardPage({
         <p className="rounded-lg border border-brand-pink/30 bg-white p-6 text-center text-brand-maroon/50">
           עוד לא סונכרן אף פוסט מהאינסטגרם. עברי להגדרות ולחצי על &quot;סנכרן את הדשבורד&quot;.
         </p>
+      )}
+
+      {nextReelSuggestions.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h2 className="font-semibold text-brand-maroon border-b border-brand-pink/30 pb-2">🎬 המלצות לרילים הבאים</h2>
+          <p className="text-xs text-brand-maroon/50">
+            5 הקרוסלות המובילות (לפי שיקלול צפיות + לייקים + תגובות) שעדיין אין להן ריל תואם — זוהה לפי חפיפת תגיות עם
+            רילים קיימים, לא לפי קישור לתוכן בכלי.
+          </p>
+          <ChartScrollRow>
+            {nextReelSuggestions.map(({ row, score }, idx) => {
+              const postId = postIdByMediaId.get(row.id);
+              return (
+                <div
+                  key={row.id}
+                  className="min-w-[190px] shrink-0 snap-start rounded-lg border border-brand-pink/40 bg-white p-2 text-xs flex flex-col gap-1"
+                >
+                  <a href={row.permalink} target="_blank" rel="noreferrer" className="flex flex-col gap-1 hover:opacity-80">
+                    <div className="relative">
+                      {row.thumbnailUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={row.thumbnailUrl} alt="" className="w-full h-28 rounded-md object-cover" />
+                      ) : (
+                        <div className="w-full h-28 rounded-md bg-brand-pink/10" />
+                      )}
+                      <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-red text-[11px] font-bold text-white">
+                        {idx + 1}
+                      </span>
+                    </div>
+                    <p className="truncate text-brand-maroon/60">{row.caption ?? "—"}</p>
+                    <p className="text-brand-maroon/70" dir="ltr">
+                      👁 {row.viewsCount ?? "—"} · ❤️ {row.likesCount ?? "—"} · 💬 {row.commentsCount ?? "—"}
+                    </p>
+                    <p className="text-brand-maroon/40">ניקוד שיקלול: {(score * 100).toFixed(0)}%</p>
+                  </a>
+                  {postId ? (
+                    <Link
+                      href={`/posts/${postId}`}
+                      className="rounded-md bg-brand-red px-2 py-1 text-center text-white hover:bg-brand-red-dark"
+                    >
+                      + הוסיפי ריל לתוכן הזה
+                    </Link>
+                  ) : (
+                    <p className="text-brand-maroon/40">התוכן לא מקושר לפוסט בכלי — אין אפשרות להוסיף ריל ישירות מכאן</p>
+                  )}
+                </div>
+              );
+            })}
+          </ChartScrollRow>
+        </div>
       )}
 
       {recommendations.length > 0 && (
