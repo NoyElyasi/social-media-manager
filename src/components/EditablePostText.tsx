@@ -76,12 +76,18 @@ export default function EditablePostText({
     fetch("/api/settings/profile")
       .then((r) => r.json())
       .then((data) => {
-        const carouselEntries: { path: string }[] = data.profile?.carouselBackgroundImagePaths ?? [];
-        const reelEntries: { path: string }[] = data.profile?.reelBackgroundImagePaths ?? [];
-        const coverEntries: { path: string }[] = data.profile?.coverBackgroundImagePaths ?? [];
-        setCarouselBackgrounds(carouselEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path) })));
-        setReelBackgrounds(reelEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path) })));
-        setCoverBackgrounds(coverEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path) })));
+        const carouselEntries: { path: string; category?: string }[] = data.profile?.carouselBackgroundImagePaths ?? [];
+        const reelEntries: { path: string; category?: string }[] = data.profile?.reelBackgroundImagePaths ?? [];
+        const coverEntries: { path: string; category?: string }[] = data.profile?.coverBackgroundImagePaths ?? [];
+        setCarouselBackgrounds(
+          carouselEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path), category: e.category }))
+        );
+        setReelBackgrounds(
+          reelEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path), category: e.category }))
+        );
+        setCoverBackgrounds(
+          coverEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path), category: e.category }))
+        );
       });
   }, [showBackgroundEditor]);
 

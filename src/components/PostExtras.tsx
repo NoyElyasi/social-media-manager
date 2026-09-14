@@ -45,8 +45,8 @@ export default function PostExtras({
     fetch("/api/settings/profile")
       .then((r) => r.json())
       .then((data) => {
-        const entries: { path: string }[] = data.profile?.reelBackgroundImagePaths ?? [];
-        setReelBackgrounds(entries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path) })));
+        const entries: { path: string; category?: string }[] = data.profile?.reelBackgroundImagePaths ?? [];
+        setReelBackgrounds(entries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path), category: e.category })));
       });
   }, [showReelBackgroundPicker]);
 
