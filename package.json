@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "export-data": "bash scripts/export-data.sh",
-    "import-data": "bash scripts/import-data.sh"
+    "import-data": "bash scripts/import-data.sh",
+    "sync-code": "bash scripts/sync-code.sh"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
