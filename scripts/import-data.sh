@@ -5,7 +5,13 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IN_FILE="${1:-$HOME/Desktop/data-transfer.tar.gz}"
+# מתעלמת מפרמטר שמתחיל ב-# — כדי לא להתפוצץ אם מישהו מדביק פקודה עם הערה
+# בסוף השורה במעטפת שלא מתעלמת מהערות אחרי פקודה (כמו zsh, בניגוד ל-bash).
+RAW_ARG="${1:-}"
+if [ -n "$RAW_ARG" ] && [ "${RAW_ARG#\#}" != "$RAW_ARG" ]; then
+  RAW_ARG=""
+fi
+IN_FILE="${RAW_ARG:-$HOME/Desktop/data-transfer.tar.gz}"
 
 cd "$PROJECT_DIR"
 
