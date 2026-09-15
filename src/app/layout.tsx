@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getProfileSettings } from "@/server/settings/profile";
 import { buildFileUrlFromPath } from "@/lib/files";
-import NavTabs from "@/components/NavTabs";
+import { MainNavTabs, NavActionIcons } from "@/components/NavTabs";
 import "./globals.css";
 
 /**
@@ -28,23 +28,24 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="he" dir="rtl" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-brand-cream text-brand-maroon">
         <header className="border-b border-brand-pink/40 bg-brand-card">
-          <nav className="relative mx-auto max-w-4xl flex items-center justify-between px-6 py-4">
-            <Link href="/" className="flex items-center gap-3">
-              {logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={logoUrl} alt="" className="h-10 w-10 rounded-md object-cover" />
-              ) : (
-                <span className="rounded-md bg-brand-pink px-2 py-1 text-xs font-black leading-tight text-white">
-                  #אחת
-                  <br />
-                  ביום
-                </span>
-              )}
-              <span className="font-bold text-lg text-brand-maroon">ניהול פרסום</span>
-            </Link>
-            <div className="absolute left-1/2 -translate-x-1/2">
-              <NavTabs />
+          <nav className="mx-auto max-w-4xl flex items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-6">
+              <Link href="/" className="flex items-center gap-3">
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoUrl} alt="" className="h-10 w-10 rounded-md object-cover" />
+                ) : (
+                  <span className="rounded-md bg-brand-pink px-2 py-1 text-xs font-black leading-tight text-white">
+                    #אחת
+                    <br />
+                    ביום
+                  </span>
+                )}
+                <span className="font-bold text-lg text-brand-maroon">ניהול פרסום</span>
+              </Link>
+              <MainNavTabs />
             </div>
+            <NavActionIcons />
           </nav>
         </header>
         <main className="flex-1 mx-auto w-full max-w-4xl px-6 py-8">{children}</main>
