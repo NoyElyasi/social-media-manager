@@ -7,6 +7,7 @@ import BackgroundGallery from "@/components/BackgroundGallery";
 import MetaConnectionForm from "@/components/MetaConnectionForm";
 import AiThemeOptionsForm from "@/components/AiThemeOptionsForm";
 import SongsByThemeForm from "@/components/SongsByThemeForm";
+import SyncCodeButton from "@/components/SyncCodeButton";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export default async function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold text-brand-maroon">הגדרות</h1>
+      <SyncCodeButton />
       <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
         <h2 className="mb-3 font-bold text-brand-maroon">חיבור לאינסטגרם/פייסבוק</h2>
         <MetaConnectionForm

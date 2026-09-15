@@ -1,10 +1,11 @@
 export interface StreamEvent {
-  type: "progress" | "done" | "cancelled" | "error";
+  type: "progress" | "done" | "cancelled" | "error" | "log";
   rendered?: number;
   total?: number;
   post?: unknown;
   result?: unknown;
   message?: string;
+  line?: string; // ל-type "log" — שורת פלט גולמית (ראו /api/settings/sync-code)
 }
 
 /** קורא תשובת זרם NDJSON (שורת JSON אחת לאירוע) וקוראת ל-onEvent לכל אירוע. */
