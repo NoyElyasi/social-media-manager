@@ -8,7 +8,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 
 echo "מושכת עדכוני קוד מ-GitHub..."
-git pull
+git pull origin main
 
 echo "מתקינה תלויות (אם השתנו)..."
 npm install
