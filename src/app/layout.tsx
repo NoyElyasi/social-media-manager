@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getProfileSettings } from "@/server/settings/profile";
 import { buildFileUrlFromPath } from "@/lib/files";
+import NavTabs from "@/components/NavTabs";
 import "./globals.css";
 
 /**
@@ -27,7 +28,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="he" dir="rtl" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-brand-cream text-brand-maroon">
         <header className="border-b border-brand-pink/40 bg-brand-card">
-          <nav className="mx-auto max-w-4xl flex items-center justify-between px-6 py-4">
+          <nav className="relative mx-auto max-w-4xl flex items-center justify-between px-6 py-4">
             <Link href="/" className="flex items-center gap-3">
               {logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -41,19 +42,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               )}
               <span className="font-bold text-lg text-brand-maroon">ניהול פרסום</span>
             </Link>
-            <div className="flex gap-4 text-sm font-medium">
-              <Link href="/" className="text-brand-maroon/70 hover:text-brand-maroon">
-                פוסטים קודמים
-              </Link>
-              <Link href="/dashboard" className="text-brand-maroon/70 hover:text-brand-maroon">
-                דשבורד
-              </Link>
-              <Link href="/posts/new" className="text-brand-red hover:text-brand-red-dark">
-                פוסט חדש
-              </Link>
-              <Link href="/settings" className="text-brand-maroon/70 hover:text-brand-maroon">
-                הגדרות
-              </Link>
+            <div className="absolute left-1/2 -translate-x-1/2">
+              <NavTabs />
             </div>
           </nav>
         </header>
