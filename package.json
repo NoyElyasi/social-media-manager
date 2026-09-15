@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "export-data": "bash scripts/export-data.sh",
+    "import-data": "bash scripts/import-data.sh"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
