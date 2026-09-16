@@ -5,7 +5,7 @@ import { getStorageService } from "../storage";
 import { scanForIdentifyingDetails } from "./privacyScanner";
 import { prepareFacebookDraft } from "./facebook";
 import { prepareInstagramCarousel, stripSlideMarkers, type SplitMode } from "./instagramCarousel";
-import { suggestSongs, type ThemeSongs } from "./songSuggestions";
+import { suggestSongs, detectThemeFromText, type ThemeSongs } from "./songSuggestions";
 import {
   prepareInstagramReel,
   ReelCancelledError,
@@ -151,6 +151,12 @@ export async function createAndPreparePost(input: CreatePostInput) {
   const splitMode: SplitMode = input.splitMode ?? "auto";
   const revealMode: RevealMode = input.revealMode ?? "word";
 
+  // בחירה ידנית (אם יש) גוברת; בלעדיה, מזהות נושא אוטומטית מהטקסט (ראו
+  // detectThemeFromText) — כדי שהצעת השיר תמיד תתבסס על נושא אמיתי, ולא
+  // תיפול כל הזמן ל"אחר" רק כי לא נבחר נושא ידנית ביצירה.
+  const themeOptions: string[] = JSON.parse(profile.aiThemeOptions || "[]");
+  const effectiveTheme = input.aiTheme ?? detectThemeFromText(cleanText, themeOptions);
+
   const post = await prisma.post.create({
     data: {
       slug: dateSlug,
@@ -159,7 +165,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
       hashtags: JSON.stringify(sharedHashtags),
       splitMode,
       revealMode,
-      aiTheme: input.aiTheme ?? null,
+      aiTheme: effectiveTheme,
       folderPath: postFolderPath,
       privacyFlags: JSON.stringify(privacyFlags),
     },
@@ -169,7 +175,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
   const carouselBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.carouselBackgroundPath);
   const reelBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.reelBackgroundPath);
   const coverBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.coverBackgroundPath);
-  const songs = suggestSongs(input.aiTheme, parseThemeSongs(profile.themeSongsJson));
+  const songs = suggestSongs(effectiveTheme, parseThemeSongs(profile.themeSongsJson));
 
   try {
     for (const target of input.selectedTargets) {

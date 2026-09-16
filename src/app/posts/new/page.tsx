@@ -326,13 +326,15 @@ export default function NewPostPage() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="font-medium text-sm">נושא הפוסט (אופציונלי — קובע איזה שיר יוצע לקרוסלה)</label>
+        <label className="font-medium text-sm">
+          נושא הפוסט (אופציונלי — קובע איזה שיר יוצע לקרוסלה. בלי בחירה, מזהים אוטומטית מהטקסט)
+        </label>
         <select
           value={aiTheme ?? ""}
           onChange={(e) => setAiTheme(e.target.value || null)}
           className="rounded-lg border border-brand-pink/40 p-2 text-sm bg-white"
         >
-          <option value="">לא נבחר</option>
+          <option value="">לא נבחר (זיהוי אוטומטי)</option>
           {aiThemeOptions.map((theme) => (
             <option key={theme} value={theme}>
               {theme}
