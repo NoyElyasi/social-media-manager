@@ -156,7 +156,11 @@ export default function PostExtras({
                   type="button"
                   onClick={() => setShowReelBackgroundPicker((v) => !v)}
                   disabled={addingTarget !== null}
-                  className="rounded-md border border-brand-pink/40 px-3 py-1.5 text-sm hover:bg-brand-pink/10 disabled:opacity-50"
+                  className={`rounded-md border px-3 py-1.5 text-sm disabled:opacity-50 ${
+                    showReelBackgroundPicker
+                      ? "border-brand-red bg-brand-red text-white"
+                      : "border-brand-pink/40 hover:bg-brand-pink/10"
+                  }`}
                 >
                   {addingTarget === t.value ? "מכין..." : `+ ${t.label}`}
                 </button>
