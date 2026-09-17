@@ -19,7 +19,7 @@ interface DraftShape {
   rawText: string;
   selectedTargets: SelectedTarget[];
   splitMode: "auto" | "manual";
-  revealMode: "word" | "letter";
+  revealMode: "word" | "letter" | "word-center";
   manualHashtags: string;
   aiTheme: string | null;
   postFormat: "regular" | "letter" | "tip";
@@ -51,7 +51,7 @@ export default function NewPostPage() {
     () => loadDraft().selectedTargets ?? ["instagram_carousel"]
   );
   const [splitMode, setSplitMode] = useState<"auto" | "manual">(() => loadDraft().splitMode ?? "auto");
-  const [revealMode, setRevealMode] = useState<"word" | "letter">(() => loadDraft().revealMode ?? "word");
+  const [revealMode, setRevealMode] = useState<"word" | "letter" | "word-center">(() => loadDraft().revealMode ?? "word");
   const [manualHashtags, setManualHashtags] = useState(() => loadDraft().manualHashtags ?? "");
   const [aiTheme, setAiTheme] = useState<string | null>(() => loadDraft().aiTheme ?? null);
   const [postFormat, setPostFormat] = useState<"regular" | "letter" | "tip">(() => loadDraft().postFormat ?? "regular");
@@ -497,6 +497,15 @@ export default function NewPostPage() {
                   onChange={() => setRevealMode("letter")}
                 />
                 אות-אות
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="revealMode"
+                  checked={revealMode === "word-center"}
+                  onChange={() => setRevealMode("word-center")}
+                />
+                מילה במרכז (כל מילה מוחקת את הקודמת)
               </label>
             </div>
           </div>

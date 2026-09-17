@@ -6,7 +6,7 @@ import { promisify } from "util";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import type { StorageService } from "../storage/types";
 import { splitIntoSlides, type SplitMode } from "./instagramCarousel";
-import { buildReelFrameNode, REEL_WIDTH, REEL_HEIGHT } from "./render/reelFrame";
+import { buildReelFrameNode, buildWordCenterFrameNode, REEL_WIDTH, REEL_HEIGHT } from "./render/reelFrame";
 import { renderNodeToSvg } from "./render/renderImage";
 import { rasterizeInParallel } from "./render/parallelRasterize";
 import { pickBackgroundColor } from "./render/palette";
@@ -15,8 +15,10 @@ import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
 
 const execFileAsync = promisify(execFile);
 
-/** "word" (מילה-מילה, ברירת מחדל) או "letter" (אות-אות) — אפקט הכתיבה בריל. */
-export type RevealMode = RevealGranularity;
+/** "word" (מילה-מילה) / "letter" (אות-אות) — מצטבר על שורות קבועות (ראו
+ * buildReelFrameNode) — או "word-center" — מילה בודדת גדולה במרכז המסך,
+ * שמוחקת את הקודמת (ראו buildWordCenterFrameNode). אפקט הכתיבה בריל. */
+export type RevealMode = RevealGranularity | "word-center";
 
 // כתוביות קצרות לריל — מסך אחד קטן וקריא, לא פסקה שלמה (סעיף 4.4).
 const MAX_CHARS_PER_CAPTION = 50;
@@ -34,6 +36,10 @@ const LETTER_REVEAL_SECONDS = 0.045;
 // שהצמצום הקודם התברר כמהיר מידי.
 const READ_SECONDS_PER_WORD = 0.37;
 const MIN_CAPTION_SECONDS = 0.6;
+// עצירה נוספת אחרי מילה שמסתיימת בסימן פיסוק שמסמן סוף משפט — לפי בקשה
+// מפורשת "מנוחה בין המשפטים" במצב "מילה במרכז". לא רלוונטי למצבי word/letter
+// (יש להם כבר holdExtraSeconds בסוף כתובית).
+const SENTENCE_PAUSE_SECONDS = 0.45;
 
 export interface InstagramReelResult {
   file: string;
@@ -93,7 +99,7 @@ async function renderCaptionFrames(
   backgroundHex: string,
   backgroundImageDataUri: string | null | undefined,
   displayHashtags: string[],
-  revealMode: RevealMode,
+  revealMode: RevealGranularity,
   framesDir: string,
   signal: AbortSignal | undefined,
   onProgress: ((renderedFrames: number, totalFrames: number) => void) | undefined,
@@ -177,6 +183,75 @@ async function renderCaptionFrames(
       }
     }
     globalWordIndex += words.length;
+  }
+
+  if (signal?.aborted) throw new ReelCancelledError();
+
+  try {
+    await rasterizeInParallel(jobs, REEL_WIDTH, (doneCount) => onProgress?.(doneCount, jobs.length), signal);
+  } catch (err) {
+    if (signal?.aborted) throw new ReelCancelledError();
+    throw err;
+  }
+
+  return { framePaths, durations };
+}
+
+/**
+ * גרסת "מילה במרכז" של renderCaptionFrames — כל היעד שונה מספיק (מסגרת = מילה
+ * בודדת שמוחקת את הקודמת, לא שורות מצטברות) שלא הגיוני לשתף לוגיקה עם
+ * renderCaptionFrames המקורית; משתפת רק את מנגנון ה-jobs/rasterizeInParallel.
+ * גבולות הכתוביות (מ-splitIntoSlides) לא רלוונטיים כאן — כל הטקסט זורם
+ * כרצף מילים אחיד, ועצירה בין "משפטים" מזוהה ישירות מסימני פיסוק בסוף מילה.
+ */
+async function renderWordCenterFrames(
+  captions: string[],
+  backgroundHex: string,
+  backgroundImageDataUri: string | null | undefined,
+  displayHashtags: string[],
+  framesDir: string,
+  signal: AbortSignal | undefined,
+  onProgress: ((renderedFrames: number, totalFrames: number) => void) | undefined,
+  wordTimestamps: number[] | null,
+  narrationTotalSeconds: number | null,
+  leadInSeconds: number
+): Promise<{ framePaths: string[]; durations: number[] }> {
+  const framePaths: string[] = [];
+  const durations: number[] = [];
+  const jobs: { svg: string; filePath: string }[] = [];
+  let frameIndex = 0;
+
+  async function addFrame(word: string, duration: number): Promise<void> {
+    if (signal?.aborted) throw new ReelCancelledError();
+    const svg = await renderNodeToSvg(
+      buildWordCenterFrameNode({ word, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags }),
+      REEL_WIDTH,
+      REEL_HEIGHT
+    );
+    const filePath = path.join(framesDir, `frame-${String(frameIndex).padStart(5, "0")}.png`);
+    jobs.push({ svg, filePath });
+    framePaths.push(filePath);
+    durations.push(duration);
+    frameIndex++;
+  }
+
+  const allWords = captions.flatMap((c) => c.split(/\s+/).filter(Boolean));
+
+  if (leadInSeconds > 0.05 && allWords.length > 0) {
+    await addFrame("", leadInSeconds);
+  }
+
+  for (let i = 0; i < allWords.length; i++) {
+    const word = allWords[i];
+    const baseDuration = wordTimestamps
+      ? Math.max(
+          0.05,
+          (i + 1 < wordTimestamps.length ? wordTimestamps[i + 1] : narrationTotalSeconds ?? wordTimestamps[i] + READ_SECONDS_PER_WORD) -
+            wordTimestamps[i]
+        )
+      : READ_SECONDS_PER_WORD;
+    const isSentenceEnd = /[.!?]$/.test(word);
+    await addFrame(word, baseDuration + (isSentenceEnd ? SENTENCE_PAUSE_SECONDS : 0));
   }
 
   if (signal?.aborted) throw new ReelCancelledError();
@@ -481,19 +556,33 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
       }
     }
 
-    const { framePaths, durations } = await renderCaptionFrames(
-      captions,
-      backgroundHex,
-      params.backgroundImageDataUri,
-      displayHashtags,
-      revealMode,
-      workDir,
-      params.signal,
-      params.onProgress,
-      wordTimestamps,
-      narrationTotalSeconds,
-      wordTimestamps?.[0] ?? 0
-    );
+    const { framePaths, durations } =
+      revealMode === "word-center"
+        ? await renderWordCenterFrames(
+            captions,
+            backgroundHex,
+            params.backgroundImageDataUri,
+            displayHashtags,
+            workDir,
+            params.signal,
+            params.onProgress,
+            wordTimestamps,
+            narrationTotalSeconds,
+            wordTimestamps?.[0] ?? 0
+          )
+        : await renderCaptionFrames(
+            captions,
+            backgroundHex,
+            params.backgroundImageDataUri,
+            displayHashtags,
+            revealMode,
+            workDir,
+            params.signal,
+            params.onProgress,
+            wordTimestamps,
+            narrationTotalSeconds,
+            wordTimestamps?.[0] ?? 0
+          );
     if (params.signal?.aborted) throw new ReelCancelledError();
     const silentPath = path.join(workDir, "reel-silent.mp4");
     await encodeVideo(framePaths, durations, silentPath);

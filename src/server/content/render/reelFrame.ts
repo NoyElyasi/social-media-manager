@@ -31,6 +31,11 @@ const HASHTAG_BOTTOM_OFFSET = REEL_HEIGHT - CAPTION_TOP_OFFSET + HASHTAG_GAP_ABO
 // לא צבע אחיד), נבחר ידנית כדי להתאים לפלטת המותג הבהירה (קרם/ורוד).
 const TEMPLATE_TEXT_COLOR = "#4A1420";
 
+// גדול משמעותית מגודל הכתובית הרגילה (REEL_FONT_SIZE) — במצב "מילה
+// במרכז" יש מילה אחת בודדת על המסך בכל רגע, אז אפשר וכדאי שתהיה גדולה
+// ודרמטית יותר מטקסט רגיל שמצטבר בכמה שורות.
+const WORD_CENTER_FONT_SIZE = 130;
+
 export interface ReelFrameInput {
   /** הטקסט המלא של הכתובית הנוכחית — קבוע לאורך כל אנימציית הכתיבה שלה, כדי
    * שהפריסה/מיקום השורות תמיד יחושבו על הטקסט השלם (ראו revealedUnitCount). */
@@ -116,5 +121,87 @@ export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
         { count: input.revealedUnitCount, granularity: input.revealMode }
       )
     )
+  );
+}
+
+export interface WordCenterFrameInput {
+  /** מילה בודדת להצגה במרכז המסך, או "" למסגרת ריקה (למשל שקט לפני ההתחלה). */
+  word: string;
+  backgroundHex: string;
+  backgroundImageDataUri?: string | null;
+  hashtags: string[];
+}
+
+/**
+ * מסגרת בודדת באנימציית "מילה במרכז": מילה אחת גדולה במרכז המסך (לא
+ * שורות מצטברות כמו ב-buildReelFrameNode) — כשמילה חדשה מופיעה, הקודמת
+ * נמחקת לגמרי, לפי בקשה מפורשת. ההאשטגים נשארים באותו מיקום קבוע כמו
+ * בשאר מצבי הכתיבה, כדי שהמראה הכללי של הריל יישאר עקבי.
+ */
+export function buildWordCenterFrameNode(input: WordCenterFrameInput): SatoriNode {
+  const hasTemplate = !!input.backgroundImageDataUri;
+  const textColor = hasTemplate ? TEMPLATE_TEXT_COLOR : pickAccessibleTextColor(input.backgroundHex).color;
+
+  return h(
+    "div",
+    {
+      style: {
+        display: "flex",
+        position: "relative",
+        flexDirection: "column",
+        width: REEL_WIDTH,
+        height: REEL_HEIGHT,
+        backgroundColor: input.backgroundHex,
+        fontFamily: "Noto Sans Hebrew, Noto Sans Hebrew Latin",
+      },
+    },
+    hasTemplate &&
+      h("img", {
+        src: input.backgroundImageDataUri,
+        width: REEL_WIDTH,
+        height: REEL_HEIGHT,
+        style: { position: "absolute", top: 0, left: 0, width: REEL_WIDTH, height: REEL_HEIGHT, objectFit: "cover" },
+      }),
+    input.hashtags.length > 0 &&
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            position: "absolute",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            bottom: HASHTAG_BOTTOM_OFFSET,
+            right: CAPTION_RIGHT_OFFSET,
+          },
+        },
+        ...renderPreparedLines(
+          prepareRtlWordLines(input.hashtags.join(" "), HASHTAG_FONT_SIZE, REEL_WIDTH - 2 * HORIZONTAL_PADDING),
+          { fontSize: HASHTAG_FONT_SIZE, fontWeight: 700, color: textColor, justifyContent: "flex-end" }
+        )
+      ),
+    input.word &&
+      h(
+        "div",
+        {
+          style: {
+            display: "flex",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: REEL_WIDTH,
+            height: REEL_HEIGHT,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingLeft: HORIZONTAL_PADDING,
+            paddingRight: HORIZONTAL_PADDING,
+          },
+        },
+        h(
+          "span",
+          { style: { fontSize: WORD_CENTER_FONT_SIZE, fontWeight: 700, color: textColor, textAlign: "center" } },
+          input.word
+        )
+      )
   );
 }
