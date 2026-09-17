@@ -461,6 +461,16 @@ export default async function DashboardPage({
     .filter((r) => r.likesCount !== null)
     .map((r) => ({ date: r.timestamp.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" }), value: r.likesCount as number }));
 
+  // מגמת חשיפה וצפיות — כמו trendData אבל לצפיות+הגעה יחד (שני קווים), כי
+  // זה מה שהכי קשור לשאלה "איך מגדילים חשיפה", לא לייקים.
+  const viewsReachTrendData = rows
+    .filter((r) => r.viewsCount !== null || r.reachCount !== null)
+    .map((r) => ({
+      date: r.timestamp.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" }),
+      views: r.viewsCount ?? null,
+      reach: r.reachCount ?? null,
+    }));
+
   const recommendations = [
     // הכי חשובות: יום/שעה/תדירות פרסום — מגיעות ראשונות (priority: true)
     buildBestBucketRecommendation(
@@ -744,80 +754,96 @@ export default async function DashboardPage({
         </ChartScrollRow>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <h2 className="font-semibold text-brand-maroon border-b border-brand-pink/30 pb-2">
-          לייקים ותגובות — פחות משפיעים על האלגוריתם, אבל עדיין מידע שימושי
-        </h2>
-        <ChartScrollRow>
-          <GroupedBarCard
-            title="ריל לעומת קרוסלה — לייקים ותגובות"
-            data={formatLikesCommentsData}
-            bars={[
-              { key: "likes", label: "לייקים", color: "#c41e3a" },
-              { key: "comments", label: "תגובות", color: "#e7a9b8" },
-            ]}
-          />
-          <BarComparisonCard title="כמות תגיות → לייקים" data={hashtagLikesData} />
-          <BarComparisonCard title="יום בשבוע → לייקים" data={weekdayLikesData} note="דרושים פוסטים ב-3 ימים שונים לפחות" />
-          <BarComparisonCard title="שעת פרסום → לייקים" data={hourLikesData} note="דרושים פוסטים בכמה שעות שונות" />
-          <BarComparisonCard
-            title="נושא → לייקים"
-            data={themeLikesData}
-            note="דרושים לפחות 2 פוסטים מאותו נושא, בשני נושאים שונים — סווגי בגלריה למטה"
-          />
-          <BarComparisonCard
-            title="מכתב לעומת פוסט רגיל → לייקים"
-            data={formatStyleLikesData}
-            note="סמני 'פוסט מסוג מכתב' בגלריה למטה — כל פוסט אחר נחשב אוטומטית 'רגיל'"
-          />
-          <BarComparisonCard
-            title="ריאליסטי לעומת אבסורדי → לייקים"
-            data={toneLikesData}
-            note="רק לפוסטים שנוצרו בכלי, קושרו, וסווגו ב-AI"
-          />
-        </ChartScrollRow>
-      </div>
+      <LineTrendCard
+        title="מגמת חשיפה וצפיות לאורך זמן"
+        data={viewsReachTrendData}
+        series={[
+          { dataKey: "views", label: "צפיות", color: "#c41e3a" },
+          { dataKey: "reach", label: "הגעה (ייחודי)", color: "#e7a9b8" },
+        ]}
+      />
 
-      <LineTrendCard title="מגמת לייקים לאורך זמן" data={trendData} />
-
-      {testSuggestions.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h2 className="font-semibold text-brand-maroon border-b border-brand-pink/30 pb-2">הצעות לטסטים</h2>
-          <p className="text-xs text-brand-maroon/50">
-            נעלם מכאן ועובר לגרפים מעלה אוטומטית ברגע שיצטברו מספיק פוסטים באותו דלי.
-          </p>
-          <ChartScrollRow>
-            {testSuggestions.map((s) => (
-              <RecommendationCard
-                key={`${s.scope}-${s.label}`}
-                icon="🧪"
-                action={s.note}
-                detail={s.detail}
-                breakdown={s.breakdown}
+      <details className="rounded-lg border border-brand-pink/30 bg-white">
+        <summary className="cursor-pointer font-semibold text-brand-maroon p-3">
+          📊 כל הנתונים המלאים (לייקים/תגובות, מגמת לייקים, הצעות לטסטים, קהל עוקבים)
+        </summary>
+        <div className="flex flex-col gap-6 p-3 pt-2 border-t border-brand-pink/20">
+          <div className="flex flex-col gap-2">
+            <h2 className="font-semibold text-brand-maroon border-b border-brand-pink/30 pb-2">
+              לייקים ותגובות — פחות משפיעים על האלגוריתם, אבל עדיין מידע שימושי
+            </h2>
+            <ChartScrollRow>
+              <GroupedBarCard
+                title="ריל לעומת קרוסלה — לייקים ותגובות"
+                data={formatLikesCommentsData}
+                bars={[
+                  { key: "likes", label: "לייקים", color: "#c41e3a" },
+                  { key: "comments", label: "תגובות", color: "#e7a9b8" },
+                ]}
               />
-            ))}
-          </ChartScrollRow>
-        </div>
-      )}
+              <BarComparisonCard title="כמות תגיות → לייקים" data={hashtagLikesData} />
+              <BarComparisonCard title="יום בשבוע → לייקים" data={weekdayLikesData} note="דרושים פוסטים ב-3 ימים שונים לפחות" />
+              <BarComparisonCard title="שעת פרסום → לייקים" data={hourLikesData} note="דרושים פוסטים בכמה שעות שונות" />
+              <BarComparisonCard
+                title="נושא → לייקים"
+                data={themeLikesData}
+                note="דרושים לפחות 2 פוסטים מאותו נושא, בשני נושאים שונים — סווגי בגלריה למטה"
+              />
+              <BarComparisonCard
+                title="מכתב לעומת פוסט רגיל → לייקים"
+                data={formatStyleLikesData}
+                note="סמני 'פוסט מסוג מכתב' בגלריה למטה — כל פוסט אחר נחשב אוטומטית 'רגיל'"
+              />
+              <BarComparisonCard
+                title="ריאליסטי לעומת אבסורדי → לייקים"
+                data={toneLikesData}
+                note="רק לפוסטים שנוצרו בכלי, קושרו, וסווגו ב-AI"
+              />
+            </ChartScrollRow>
+          </div>
 
-      <div className="flex flex-col gap-2">
-        <h2 className="font-semibold text-brand-maroon border-b border-brand-pink/30 pb-2">קהל העוקבים</h2>
-        <p className="text-xs text-brand-maroon/50">תמונת מצב עדכנית (לא היסטוריה) — מתעדכנת עם סנכרון הדשבורד.</p>
-        <ChartScrollRow>
-          <PieBreakdownCard title="מין" data={genderData} />
-          <PieBreakdownCard title="גיל" data={ageData} />
-          <PieBreakdownCard title="מדינה" data={countryData} note="דרוש סנכרון" />
-          <GroupedBarCard
-            title="חשיפה: עוקבים לעומת לא-עוקבים"
-            data={reachByFollowTypeData}
-            bars={[
-              { key: "nonFollower", label: "לא עוקבים", color: "#c41e3a" },
-              { key: "follower", label: "עוקבים", color: "#e7a9b8" },
-            ]}
-            note="דרוש סנכרון — מדד ברמת החשבון (לא לכל פוסט), מצטבר מתאריך הסנכרון"
-          />
-        </ChartScrollRow>
-      </div>
+          <LineTrendCard title="מגמת לייקים לאורך זמן" data={trendData} />
+
+          {testSuggestions.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <h2 className="font-semibold text-brand-maroon border-b border-brand-pink/30 pb-2">הצעות לטסטים</h2>
+              <p className="text-xs text-brand-maroon/50">
+                נעלם מכאן ועובר לגרפים מעלה אוטומטית ברגע שיצטברו מספיק פוסטים באותו דלי.
+              </p>
+              <ChartScrollRow>
+                {testSuggestions.map((s) => (
+                  <RecommendationCard
+                    key={`${s.scope}-${s.label}`}
+                    icon="🧪"
+                    action={s.note}
+                    detail={s.detail}
+                    breakdown={s.breakdown}
+                  />
+                ))}
+              </ChartScrollRow>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <h2 className="font-semibold text-brand-maroon border-b border-brand-pink/30 pb-2">קהל העוקבים</h2>
+            <p className="text-xs text-brand-maroon/50">תמונת מצב עדכנית (לא היסטוריה) — מתעדכנת עם סנכרון הדשבורד.</p>
+            <ChartScrollRow>
+              <PieBreakdownCard title="מין" data={genderData} />
+              <PieBreakdownCard title="גיל" data={ageData} />
+              <PieBreakdownCard title="מדינה" data={countryData} note="דרוש סנכרון" />
+              <GroupedBarCard
+                title="חשיפה: עוקבים לעומת לא-עוקבים"
+                data={reachByFollowTypeData}
+                bars={[
+                  { key: "nonFollower", label: "לא עוקבים", color: "#c41e3a" },
+                  { key: "follower", label: "עוקבים", color: "#e7a9b8" },
+                ]}
+                note="דרוש סנכרון — מדד ברמת החשבון (לא לכל פוסט), מצטבר מתאריך הסנכרון"
+              />
+            </ChartScrollRow>
+          </div>
+        </div>
+      </details>
 
       <div id="gallery" className="flex flex-col gap-3">
         <h2 className="font-semibold text-brand-maroon border-b border-brand-pink/30 pb-2">כל הפוסטים המסונכרנים</h2>

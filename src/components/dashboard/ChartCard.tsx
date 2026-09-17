@@ -106,15 +106,19 @@ export function GroupedBarCard({
 }
 
 /** כרטיס גרף קו — מגמה כרונולוגית (למשל לייקים לאורך זמן). */
+/** קו בודד ("value") כברירת מחדל, או כמה קווים (למשל צפיות+הגעה יחד) דרך series. */
 export function LineTrendCard({
   title,
   data,
   unit,
+  series,
 }: {
   title: string;
-  data: { date: string; value: number }[];
+  data: Record<string, number | string | null>[];
   unit?: string;
+  series?: { dataKey: string; label: string; color: string }[];
 }) {
+  const lines = series ?? [{ dataKey: "value", label: title, color: BRAND_RED }];
   return (
     <div className="w-full rounded-lg border border-brand-pink/30 bg-white p-4 text-sm flex flex-col gap-2">
       <p className="font-medium text-brand-maroon">{title}</p>
@@ -126,7 +130,10 @@ export function LineTrendCard({
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: BRAND_MAROON }} />
               <YAxis tick={{ fontSize: 11, fill: BRAND_MAROON }} width={44} />
               <Tooltip formatter={(v) => `${v}${unit ?? ""}`} />
-              <Line type="monotone" dataKey="value" stroke={BRAND_RED} strokeWidth={2} dot={{ r: 3 }} />
+              {lines.length > 1 && <Legend />}
+              {lines.map((s) => (
+                <Line key={s.dataKey} type="monotone" dataKey={s.dataKey} name={s.label} stroke={s.color} strokeWidth={2} dot={{ r: 3 }} />
+              ))}
             </LineChart>
           </ResponsiveContainer>
         </div>
