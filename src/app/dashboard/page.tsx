@@ -5,6 +5,7 @@ import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
 import { BarComparisonCard, ChartScrollRow, GroupedBarCard, LineTrendCard, PieBreakdownCard, type BarDatum } from "@/components/dashboard/ChartCard";
 import RecommendationCard, { type RecommendationBreakdownRow } from "@/components/dashboard/RecommendationCard";
 import InstagramMediaLabelEditor from "@/components/InstagramMediaLabelEditor";
+import ExcludeFromReelSuggestionsButton from "@/components/ExcludeFromReelSuggestionsButton";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ interface Row {
   caption: string | null;
   permalink: string;
   thumbnailUrl: string | null;
+  excludedFromReelSuggestions: boolean;
 }
 
 const REEL_LENGTH_THRESHOLD = 25;
@@ -297,6 +299,7 @@ export default async function DashboardPage({
       caption: m.caption,
       permalink: m.permalink,
       thumbnailUrl: m.thumbnailUrl,
+      excludedFromReelSuggestions: m.excludedFromReelSuggestions,
     };
   });
 
@@ -309,6 +312,7 @@ export default async function DashboardPage({
   // שצפיות לא ישתלטו על הניקוד) של צפיות+לייקים+תגובות — "הפוסטים המובילים".
   const reelHashtagSets = reels.map((r) => extractHashtags(r.caption));
   const carouselsWithoutReel = carousels.filter((c) => {
+    if (c.excludedFromReelSuggestions) return false; // סומן ידנית "לא רוצה בהמלצות"
     const tags = extractHashtags(c.caption);
     if (tags.size === 0) return true; // אין תגיות להשוות — לא ניתן להוכיח שיש ריל תואם
     return !reelHashtagSets.some((reelTags) => [...tags].some((t) => reelTags.has(t)));
@@ -630,6 +634,7 @@ export default async function DashboardPage({
                       <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-red text-[11px] font-bold text-white">
                         {idx + 1}
                       </span>
+                      <ExcludeFromReelSuggestionsButton mediaId={row.id} />
                     </div>
                     <p className="truncate text-brand-maroon/60">{row.caption ?? "—"}</p>
                     <p className="text-brand-maroon/70" dir="ltr">

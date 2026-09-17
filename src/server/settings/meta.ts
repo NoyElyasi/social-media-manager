@@ -543,13 +543,16 @@ async function fetchAudienceDemographicsSafely(
 /** תיוג ידני (במקום AI) של פוסט מאינסטגרם — לא תלוי בקישור לתוכן מקומי בכלל. */
 export async function classifyInstagramMediaManually(
   mediaId: string,
-  input: { aiTheme?: string | null; aiFormat?: string | null }
+  input: { aiTheme?: string | null; aiFormat?: string | null; excludedFromReelSuggestions?: boolean }
 ) {
   return prisma.instagramMedia.update({
     where: { id: mediaId },
     data: {
       ...(input.aiTheme !== undefined ? { aiTheme: input.aiTheme } : {}),
       ...(input.aiFormat !== undefined ? { aiFormat: input.aiFormat } : {}),
+      ...(input.excludedFromReelSuggestions !== undefined
+        ? { excludedFromReelSuggestions: input.excludedFromReelSuggestions }
+        : {}),
     },
   });
 }

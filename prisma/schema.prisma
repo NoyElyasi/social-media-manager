@@ -147,6 +147,10 @@ model InstagramMedia {
   aiTheme           String?
   aiFormat          String?
   aiTone            String?
+  // סומן ידנית בדשבורד ("המלצות לרילים הבאים") כפוסט שלא רוצים שיוצע יותר
+  // כמועמד לריל — למשל תוכן שלא מתאים בכלל לפורמט ריל. לא משפיע על שום
+  // דבר אחר (לא מוחק, לא מסתיר מהגלריה הרגילה).
+  excludedFromReelSuggestions Boolean @default(false)
   syncedAt          DateTime @updatedAt
 }
 
