@@ -1,16 +1,37 @@
 import Link from "next/link";
 import { prisma } from "@/server/db";
-import { PLATFORM_LABELS, STATUS_LABELS, STATUS_COLORS } from "@/lib/labels";
+import { PLATFORM_LABELS, STATUS_LABELS, STATUS_COLORS, ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
 import DeletePostIconButton from "@/components/DeletePostIconButton";
 
 export const dynamic = "force-dynamic";
 
-/** כותרת הכרטיס — התיוג של הפוסט (נושא + מכתב/טיפ), לא תקציר הטקסט. */
-function postTitle(theme: string | null, format: string | null): string {
+/** התגית הראשונה שאינה #אחתביום — זו שמוצגת צמודה לה בעמוד השער (ראו buildCoverSlideNode). */
+function firstRealHashtag(hashtagsJson: string): string | null {
+  try {
+    const tags: string[] = JSON.parse(hashtagsJson || "[]");
+    return tags.find((t) => t !== ALWAYS_FIRST_HASHTAG) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * כותרת הכרטיס — התגית שצמודה ל-#אחתביום בעמוד השער (לא התיוג לצורכי
+ * הדשבורד — aiTheme). קודם בודקים את הקרוסלה (שם התגית הזו בפועל מוצגת),
+ * ואם אין — כל תוכן אחר של הפוסט, ולבסוף התגיות המשותפות של הפוסט עצמו.
+ */
+function postTitle(post: {
+  hashtags: string;
+  aiFormat: string | null;
+  platformContents: { type: string; hashtags: string }[];
+}): string {
+  const carousel = post.platformContents.find((pc) => pc.type === "instagram_carousel");
+  const anyContent = carousel ?? post.platformContents[0];
+  const tag = (anyContent && firstRealHashtag(anyContent.hashtags)) ?? firstRealHashtag(post.hashtags);
   const parts: string[] = [];
-  if (theme) parts.push(theme);
-  if (format === "letter") parts.push("✉️ מכתב");
-  if (format === "tip") parts.push("💡 טיפ");
+  if (tag) parts.push(tag);
+  if (post.aiFormat === "letter") parts.push("✉️ מכתב");
+  if (post.aiFormat === "tip") parts.push("💡 טיפ");
   return parts.length > 0 ? parts.join(" · ") : "ללא תיוג";
 }
 
@@ -31,7 +52,7 @@ export default async function HomePage({
   const q = searchQuery?.trim();
   if (q) {
     posts = posts.filter(
-      (p) => p.rawText.includes(q) || (p.aiTheme && p.aiTheme.includes(q)) || postTitle(p.aiTheme, p.aiFormat).includes(q)
+      (p) => p.rawText.includes(q) || postTitle(p).includes(q)
     );
   }
 
@@ -112,7 +133,7 @@ export default async function HomePage({
               <DeletePostIconButton postId={post.id} />
               <Link href={`/posts/${post.id}`} className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-brand-maroon">{postTitle(post.aiTheme, post.aiFormat)}</h3>
+                  <h3 className="font-bold text-brand-maroon">{postTitle(post)}</h3>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-neutral-500">
                       {new Date(post.createdAt).toLocaleDateString("he-IL")}
