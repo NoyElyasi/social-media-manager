@@ -121,6 +121,8 @@ export interface CreatePostInput {
   manualHashtags?: string[] | null;
   /** נושא הפוסט (מתוך aiThemeOptions), נבחר ידנית ביצירה — קובע את הצעת השיר (ראו suggestSongs). */
   aiTheme?: string | null;
+  /** סוג הפוסט, נבחר ידנית ביצירה — "regular" (ברירת מחדל) נשמר כ-null, כדי שהתנהגות הסינון הקיימת (aiFormat !== "letter" = רגיל) תמשיך לעבוד בלי שינוי. */
+  aiFormat?: "regular" | "letter" | "tip";
   /** הקלטת הקראה מסונכרנת לריל (ראו ReelNarration) — רק אם instagram_reel נבחר. */
   reelNarration?: ReelNarration | null;
   /** מאפשר עצירה מבוקשת (כפתור "עצור") באמצע יצירת ריל. */
@@ -166,6 +168,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
       splitMode,
       revealMode,
       aiTheme: effectiveTheme,
+      aiFormat: input.aiFormat && input.aiFormat !== "regular" ? input.aiFormat : null,
       folderPath: postFolderPath,
       privacyFlags: JSON.stringify(privacyFlags),
     },

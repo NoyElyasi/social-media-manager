@@ -22,6 +22,7 @@ interface DraftShape {
   revealMode: "word" | "letter";
   manualHashtags: string;
   aiTheme: string | null;
+  postFormat: "regular" | "letter" | "tip";
   carouselBackgroundPath: string | null;
   reelBackgroundPath: string | null;
   coverBackgroundPath: string | null;
@@ -53,6 +54,7 @@ export default function NewPostPage() {
   const [revealMode, setRevealMode] = useState<"word" | "letter">(() => loadDraft().revealMode ?? "word");
   const [manualHashtags, setManualHashtags] = useState(() => loadDraft().manualHashtags ?? "");
   const [aiTheme, setAiTheme] = useState<string | null>(() => loadDraft().aiTheme ?? null);
+  const [postFormat, setPostFormat] = useState<"regular" | "letter" | "tip">(() => loadDraft().postFormat ?? "regular");
   const [aiThemeOptions, setAiThemeOptions] = useState<string[]>([]);
   const [carouselBackgroundPath, setCarouselBackgroundPath] = useState<string | null>(
     () => loadDraft().carouselBackgroundPath ?? null
@@ -91,6 +93,7 @@ export default function NewPostPage() {
       revealMode,
       manualHashtags,
       aiTheme,
+      postFormat,
       carouselBackgroundPath,
       reelBackgroundPath,
       coverBackgroundPath,
@@ -103,6 +106,7 @@ export default function NewPostPage() {
     revealMode,
     manualHashtags,
     aiTheme,
+    postFormat,
     carouselBackgroundPath,
     reelBackgroundPath,
     coverBackgroundPath,
@@ -195,6 +199,7 @@ export default function NewPostPage() {
           revealMode,
           manualHashtags: manualHashtags.trim() ? manualHashtags.trim().split(/\s+/) : null,
           aiTheme,
+          aiFormat: postFormat,
           carouselBackgroundPath,
           reelBackgroundPath,
           coverBackgroundPath,
@@ -341,6 +346,32 @@ export default function NewPostPage() {
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="font-medium text-sm">סוג הפוסט (אופציונלי)</label>
+        <div className="flex gap-2">
+          {(
+            [
+              { value: "regular", label: "רגיל" },
+              { value: "letter", label: "✉️ מכתב" },
+              { value: "tip", label: "💡 טיפ" },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setPostFormat(opt.value)}
+              className={`rounded-full px-3 py-1.5 text-sm transition-colors ${
+                postFormat === opt.value
+                  ? "bg-brand-pink/30 text-brand-maroon"
+                  : "border border-brand-pink/40 text-brand-maroon/60 hover:bg-brand-pink/10"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 2. בחירת הפלט — קובע אילו קטגוריות אפשרויות יופיעו מכאן ואילך */}
