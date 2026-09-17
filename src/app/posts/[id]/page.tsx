@@ -7,6 +7,7 @@ import PostExtras from "@/components/PostExtras";
 import OpenFolderButton from "@/components/OpenFolderButton";
 import DeletePostButton from "@/components/DeletePostButton";
 import AiLabelBadge from "@/components/AiLabelBadge";
+import PrivacyWarningsBadge from "@/components/PrivacyWarningsBadge";
 import { buildFileUrlFromPath } from "@/lib/files";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +52,10 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
           <p className="text-sm text-brand-maroon/60">
             {new Date(post.createdAt).toLocaleString("he-IL")} · {post.folderPath}
           </p>
-          <AiLabelBadge theme={post.aiTheme} format={post.aiFormat} tone={post.aiTone} />
+          <div className="flex items-center gap-2">
+            <AiLabelBadge theme={post.aiTheme} format={post.aiFormat} tone={post.aiTone} />
+            <PrivacyWarningsBadge flags={privacyFlags} labels={PRIVACY_FLAG_LABELS} />
+          </div>
         </div>
         <div className="mt-2 flex flex-col gap-4">
           <EditablePostText
@@ -88,22 +92,6 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
           />
         </div>
       </div>
-
-      {privacyFlags.length > 0 && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex flex-col gap-2">
-          <p className="font-bold text-red-700">⚠️ אזהרת פרטיות (סעיף 8)</p>
-          <p className="text-sm text-red-700">
-            נמצאו בטקסט פרטים שעשויים לחשוף זהות. זו רק אזהרה — ההחלטה אם לשנות את הטקסט נשארת בידיים שלך.
-          </p>
-          <ul className="text-sm text-red-800 flex flex-col gap-1">
-            {privacyFlags.map((flag, i) => (
-              <li key={i}>
-                <span className="font-medium">{PRIVACY_FLAG_LABELS[flag.type]}:</span> &quot;{flag.match}&quot;
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
 
       <div className="flex flex-col gap-5">
         {contents.map((content) => (
