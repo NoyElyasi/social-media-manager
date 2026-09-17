@@ -2,12 +2,24 @@ import Link from "next/link";
 import { prisma } from "@/server/db";
 import { PLATFORM_LABELS, STATUS_LABELS, STATUS_COLORS } from "@/lib/labels";
 import DeletePostIconButton from "@/components/DeletePostIconButton";
-import AiLabelBadge from "@/components/AiLabelBadge";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage({ searchParams }: { searchParams: Promise<{ theme?: string }> }) {
-  const { theme: selectedTheme } = await searchParams;
+/** כותרת הכרטיס — התיוג של הפוסט (נושא + מכתב/טיפ), לא תקציר הטקסט. */
+function postTitle(theme: string | null, format: string | null): string {
+  const parts: string[] = [];
+  if (theme) parts.push(theme);
+  if (format === "letter") parts.push("✉️ מכתב");
+  if (format === "tip") parts.push("💡 טיפ");
+  return parts.length > 0 ? parts.join(" · ") : "ללא תיוג";
+}
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ theme?: string; q?: string }>;
+}) {
+  const { theme: selectedTheme, q: searchQuery } = await searchParams;
 
   const allPosts = await prisma.post.findMany({
     orderBy: { createdAt: "desc" },
@@ -15,7 +27,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   });
 
   const themes = [...new Set(allPosts.map((p) => p.aiTheme).filter((t): t is string => !!t))];
-  const posts = selectedTheme ? allPosts.filter((p) => p.aiTheme === selectedTheme) : allPosts;
+  let posts = selectedTheme ? allPosts.filter((p) => p.aiTheme === selectedTheme) : allPosts;
+  const q = searchQuery?.trim();
+  if (q) {
+    posts = posts.filter(
+      (p) => p.rawText.includes(q) || (p.aiTheme && p.aiTheme.includes(q)) || postTitle(p.aiTheme, p.aiFormat).includes(q)
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -47,10 +65,34 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         ))}
       </div>
 
+      <form method="GET" className="flex gap-2">
+        {selectedTheme && <input type="hidden" name="theme" value={selectedTheme} />}
+        <input
+          type="text"
+          name="q"
+          defaultValue={q ?? ""}
+          placeholder="חיפוש לפי תיוג או מילה שקיימת בטקסט..."
+          className="flex-1 rounded-lg border border-brand-pink/40 p-2 text-sm bg-white"
+        />
+        <button type="submit" className="rounded-lg border border-brand-pink/40 px-4 py-2 text-sm hover:bg-brand-pink/10">
+          חיפוש
+        </button>
+        {q && (
+          <Link
+            href={selectedTheme ? `/?theme=${encodeURIComponent(selectedTheme)}` : "/"}
+            className="rounded-lg border border-brand-pink/40 px-4 py-2 text-sm hover:bg-brand-pink/10"
+          >
+            נקה
+          </Link>
+        )}
+      </form>
+
       {posts.length === 0 && (
         <p className="text-neutral-500 text-center py-20">
           {allPosts.length === 0 ? (
             <>אין עדיין פוסטים. לחצו על &quot;פוסט חדש&quot; כדי להתחיל.</>
+          ) : q ? (
+            <>אין פוסטים שמתאימים לחיפוש &quot;{q}&quot;.</>
           ) : (
             <>אין פוסטים עם התווית הזו.</>
           )}
@@ -70,11 +112,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               <DeletePostIconButton postId={post.id} />
               <Link href={`/posts/${post.id}`} className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-neutral-500">
-                    {new Date(post.createdAt).toLocaleDateString("he-IL")}
-                  </span>
+                  <h3 className="font-bold text-brand-maroon">{postTitle(post.aiTheme, post.aiFormat)}</h3>
                   <div className="flex items-center gap-2">
-                    <AiLabelBadge theme={post.aiTheme} format={post.aiFormat} tone={post.aiTone} />
+                    <span className="text-sm text-neutral-500">
+                      {new Date(post.createdAt).toLocaleDateString("he-IL")}
+                    </span>
                     {privacyFlags.length > 0 && (
                       <span className="text-xs rounded-full bg-red-100 text-red-700 px-2 py-1">
                         ⚠️ {privacyFlags.length} אזהרות פרטיות
