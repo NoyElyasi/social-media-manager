@@ -7,7 +7,8 @@ import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import type { StorageService } from "../storage/types";
 import { splitIntoSlides, type SplitMode } from "./instagramCarousel";
 import { buildReelFrameNode, REEL_WIDTH, REEL_HEIGHT } from "./render/reelFrame";
-import { renderNodeToPng } from "./render/renderImage";
+import { renderNodeToSvg } from "./render/renderImage";
+import { rasterizeInParallel } from "./render/parallelRasterize";
 import { pickBackgroundColor } from "./render/palette";
 import type { RevealGranularity } from "./render/rtlText";
 import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
@@ -87,15 +88,6 @@ export interface PrepareReelParams {
   narration?: ReelNarration | null;
 }
 
-function countTotalWords(captions: string[]): number {
-  return captions.reduce((sum, c) => sum + c.split(/\s+/).filter(Boolean).length, 0);
-}
-
-/** סופרת רק תווי תוכן (בלי רווחים) — אלה היחידות שנחשפות במצב "אות-אות". */
-function countTotalChars(captions: string[]): number {
-  return captions.reduce((sum, c) => sum + c.split(/\s+/).filter(Boolean).join("").length, 0);
-}
-
 async function renderCaptionFrames(
   captions: string[],
   backgroundHex: string,
@@ -118,29 +110,32 @@ async function renderCaptionFrames(
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
-  const totalFrames = revealMode === "letter" ? countTotalChars(captions) : countTotalWords(captions);
+  // "jobs" — פריסת SVG בלבד (satori, זול — כ-4% מהזמן), בלי הריסטור ל-PNG
+  // (resvg, יקר — כ-96%). הריסטור נעשה בבת אחת בסוף על כל המסגרות במקביל
+  // (ראו rasterizeInParallel) — זה מה שבאמת מזרז יצירת ריל על מחשב עם כמה
+  // ליבות, כי resvg.render() חוסם thread ולא ניתן להריץ אותו "במקביל"
+  // בתוך תהליך Node בודד.
+  const jobs: { svg: string; filePath: string }[] = [];
   const unitRevealSeconds = revealMode === "letter" ? LETTER_REVEAL_SECONDS : WORD_REVEAL_SECONDS;
   let frameIndex = 0;
   let globalWordIndex = 0;
 
-  if (leadInSeconds > 0.05 && captions.length > 0) {
-    const png = await renderNodeToPng(
-      buildReelFrameNode({
-        fullText: captions[0],
-        revealedUnitCount: 0,
-        revealMode,
-        backgroundHex,
-        backgroundImageDataUri,
-        hashtags: displayHashtags,
-      }),
+  async function addFrame(fullText: string, revealedUnitCount: number, duration: number): Promise<void> {
+    if (signal?.aborted) throw new ReelCancelledError();
+    const svg = await renderNodeToSvg(
+      buildReelFrameNode({ fullText, revealedUnitCount, revealMode, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags }),
       REEL_WIDTH,
       REEL_HEIGHT
     );
     const filePath = path.join(framesDir, `frame-${String(frameIndex).padStart(5, "0")}.png`);
-    await fs.writeFile(filePath, png);
+    jobs.push({ svg, filePath });
     framePaths.push(filePath);
-    durations.push(leadInSeconds);
+    durations.push(duration);
     frameIndex++;
+  }
+
+  if (leadInSeconds > 0.05 && captions.length > 0) {
+    await addFrame(captions[0], 0, leadInSeconds);
   }
 
   for (const caption of captions) {
@@ -170,39 +165,27 @@ async function renderCaptionFrames(
       const letterCount = revealMode === "letter" ? words[wIdx].length : 1;
 
       for (let l = 0; l < letterCount; l++) {
-        if (signal?.aborted) throw new ReelCancelledError();
-
-        const png = await renderNodeToPng(
-          buildReelFrameNode({
-            fullText: caption,
-            revealedUnitCount: unitIndexInCaption + 1,
-            revealMode,
-            backgroundHex,
-            backgroundImageDataUri,
-            hashtags: displayHashtags,
-          }),
-          REEL_WIDTH,
-          REEL_HEIGHT
-        );
-        const fileName = `frame-${String(frameIndex).padStart(5, "0")}.png`;
-        const filePath = path.join(framesDir, fileName);
-        await fs.writeFile(filePath, png);
-        framePaths.push(filePath);
-
         const isLastUnitInCaption = unitIndexInCaption === unitCount - 1;
+        const duration = wordSlotSeconds
+          ? wordSlotSeconds[wIdx] / letterCount
+          : isLastUnitInCaption
+            ? unitRevealSeconds + holdExtraSeconds
+            : unitRevealSeconds;
 
-        if (wordSlotSeconds) {
-          durations.push(wordSlotSeconds[wIdx] / letterCount);
-        } else {
-          durations.push(isLastUnitInCaption ? unitRevealSeconds + holdExtraSeconds : unitRevealSeconds);
-        }
-
-        frameIndex++;
+        await addFrame(caption, unitIndexInCaption + 1, duration);
         unitIndexInCaption++;
-        onProgress?.(frameIndex, totalFrames);
       }
     }
     globalWordIndex += words.length;
+  }
+
+  if (signal?.aborted) throw new ReelCancelledError();
+
+  try {
+    await rasterizeInParallel(jobs, REEL_WIDTH, (doneCount) => onProgress?.(doneCount, jobs.length), signal);
+  } catch (err) {
+    if (signal?.aborted) throw new ReelCancelledError();
+    throw err;
   }
 
   return { framePaths, durations };
