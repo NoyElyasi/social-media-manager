@@ -4,7 +4,7 @@ import { classifyInstagramMediaManually } from "@/server/settings/meta";
 
 const patchSchema = z.object({
   aiTheme: z.string().nullable().optional(),
-  aiFormat: z.enum(["letter", "regular"]).nullable().optional(),
+  aiFormat: z.enum(["letter", "tip", "regular"]).nullable().optional(),
   excludedFromReelSuggestions: z.boolean().optional(),
 });
 

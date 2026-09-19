@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+type Format = "regular" | "letter" | "tip";
+
+const FORMAT_OPTIONS: { value: Format; label: string }[] = [
+  { value: "regular", label: "רגיל" },
+  { value: "letter", label: "✉️ מכתב" },
+  { value: "tip", label: "💡 טיפ" },
+];
+
 export default function InstagramMediaLabelEditor({
   mediaId,
   initialTheme,
@@ -16,23 +24,25 @@ export default function InstagramMediaLabelEditor({
 }) {
   const router = useRouter();
   const [theme, setTheme] = useState(initialTheme ?? "");
-  const [isLetter, setIsLetter] = useState(initialFormat === "letter");
+  const [format, setFormat] = useState<Format>(
+    initialFormat === "letter" || initialFormat === "tip" ? initialFormat : "regular"
+  );
   const [saving, setSaving] = useState(false);
 
   // אם הערך הנוכחי הוסר מרשימת הנושאים בהגדרות, משאירים אותו זמין כאן
   // כדי לא "לאבד" תיוג קיים בלי התראה — היא תבחר משהו אחר אם תרצה.
   const themeOptions = theme && !availableThemes.includes(theme) ? [theme, ...availableThemes] : availableThemes;
 
-  async function save(next: { theme?: string; isLetter?: boolean }) {
+  async function save(next: { theme?: string; format?: Format }) {
     setSaving(true);
     const nextTheme = next.theme ?? theme;
-    const nextIsLetter = next.isLetter ?? isLetter;
+    const nextFormat = next.format ?? format;
     await fetch(`/api/settings/meta/media/${mediaId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         aiTheme: nextTheme.trim() === "" ? null : nextTheme.trim(),
-        aiFormat: nextIsLetter ? "letter" : "regular",
+        aiFormat: nextFormat,
       }),
     });
     setSaving(false);
@@ -44,7 +54,8 @@ export default function InstagramMediaLabelEditor({
       {theme && (
         <span className="self-start inline-flex items-center gap-1 rounded-full bg-purple-50 text-purple-700 px-2 py-0.5 text-xs">
           🏷️ {theme}
-          {isLetter && " · מכתב"}
+          {format === "letter" && " · ✉️ מכתב"}
+          {format === "tip" && " · 💡 טיפ"}
         </span>
       )}
       <select
@@ -63,18 +74,26 @@ export default function InstagramMediaLabelEditor({
           </option>
         ))}
       </select>
-      <label className="flex items-center gap-1 text-xs text-brand-maroon/70">
-        <input
-          type="checkbox"
-          checked={isLetter}
-          onChange={(e) => {
-            setIsLetter(e.target.checked);
-            save({ isLetter: e.target.checked });
-          }}
-          disabled={saving}
-        />
-        פוסט מסוג מכתב
-      </label>
+      <div className="flex gap-1">
+        {FORMAT_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            disabled={saving}
+            onClick={() => {
+              setFormat(opt.value);
+              save({ format: opt.value });
+            }}
+            className={`rounded-full px-2 py-0.5 text-[11px] disabled:opacity-50 ${
+              format === opt.value
+                ? "bg-brand-pink/30 text-brand-maroon"
+                : "border border-brand-pink/40 text-brand-maroon/60 hover:bg-brand-pink/10"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
