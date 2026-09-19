@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MetaConnectionStatus, BackfillReport } from "@/server/settings/meta";
 import { readNdjsonStream, estimateRemainingSeconds } from "@/lib/ndjsonStream";
@@ -26,10 +26,28 @@ export default function MetaConnectionForm({
 
   const [dashboardSinceDate, setDashboardSinceDate] = useState("2026-08-01");
   const [syncingDashboard, setSyncingDashboard] = useState(false);
+  const [syncingLatest, setSyncingLatest] = useState(false);
   const [dashboardSyncNote, setDashboardSyncNote] = useState<string | null>(null);
   const [syncProgress, setSyncProgress] = useState<{ rendered: number; total: number } | null>(null);
   const syncStartedAtRef = useRef<number | null>(null);
   const syncAbortRef = useRef<AbortController | null>(null);
+
+  // התצוגה של "סונכרן לאחרונה" — מתחילה מה-prop (שנקבע ברינדור השרת),
+  // ומתעדכנת בכל טעינה מחדש של הקומפוננטה (ראו useEffect) לנתון האמיתי-
+  // עדכני. חשוב כשעוברים טאב/עמוד וחוזרים באמצע/אחרי סנכרון: הסנכרון עצמו
+  // ממשיך לרוץ בשרת גם אם יצאנו מהעמוד (זו קריאת fetch רגילה, לא תלויה
+  // ברינדור של React), אז ה-prop הישן היה מטעה ("עדיין לא סונכרן") אחרי
+  // שהסנכרון בפועל כבר הסתיים בזמן שלא היינו כאן.
+  const [displaySyncAt, setDisplaySyncAt] = useState(lastDashboardSyncAt);
+  useEffect(() => {
+    fetch("/api/settings/profile")
+      .then((res) => res.json())
+      .then((data) => {
+        const fresh = data.profile?.lastDashboardSyncAt as string | null | undefined;
+        if (fresh) setDisplaySyncAt(fresh);
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleConnect(e: React.FormEvent) {
     e.preventDefault();
@@ -129,6 +147,55 @@ export default function MetaConnectionForm({
     }
   }
 
+  /** סנכרון זריז — רק 5 הפוסטים העדכניים ביותר, בלי לצאת מהיום שנבחר בשדה התאריך. */
+  async function handleSyncLatest() {
+    setSyncingLatest(true);
+    setError(null);
+    setDashboardSyncNote(null);
+
+    const controller = new AbortController();
+    syncAbortRef.current = controller;
+
+    try {
+      const res = await fetch("/api/settings/meta/sync-latest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limit: 5 }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data?.error || "כשל בסנכרון הזריז");
+      }
+
+      let finished = false;
+      await readNdjsonStream(res, (event) => {
+        if (event.type === "done") {
+          const result = event.result as { syncedCount: number } | undefined;
+          setDashboardSyncNote(`עודכנו ${result?.syncedCount ?? 0} פוסטים אחרונים ✓`);
+          setDisplaySyncAt(new Date().toISOString());
+          finished = true;
+        } else if (event.type === "cancelled") {
+          setDashboardSyncNote("העדכון בוטל");
+        } else if (event.type === "error") {
+          setError(event.message ?? "כשל בסנכרון הזריז");
+        }
+      });
+
+      if (finished) router.refresh();
+    } catch (err) {
+      if (controller.signal.aborted) {
+        setDashboardSyncNote("העדכון בוטל");
+      } else {
+        setError(err instanceof Error ? err.message : "שגיאה לא צפויה");
+      }
+    } finally {
+      setSyncingLatest(false);
+      syncAbortRef.current = null;
+    }
+  }
+
   async function handleDisconnect() {
     setBusy(true);
     const res = await fetch("/api/settings/meta", { method: "DELETE" });
@@ -201,8 +268,8 @@ export default function MetaConnectionForm({
             מבוסס אך ורק על הנתונים האלה, בלי תלות בתוכן מהכלי.
           </p>
           <p className="text-xs text-brand-maroon/50">
-            {lastDashboardSyncAt
-              ? `סונכרן לאחרונה ב-${new Date(lastDashboardSyncAt).toLocaleString("he-IL")}`
+            {displaySyncAt
+              ? `סונכרן לאחרונה ב-${new Date(displaySyncAt).toLocaleString("he-IL")}`
               : "עוד לא סונכרן"}
             {latestSyncedPostAt && ` · מסונכרן עד ${new Date(latestSyncedPostAt).toLocaleString("he-IL")}`}
           </p>
@@ -216,10 +283,19 @@ export default function MetaConnectionForm({
             <button
               type="button"
               onClick={handleSyncDashboard}
-              disabled={syncingDashboard}
+              disabled={syncingDashboard || syncingLatest}
               className="rounded-lg bg-brand-red px-3 py-2 text-sm text-white hover:bg-brand-red-dark disabled:opacity-50"
             >
               {syncingDashboard ? "מסנכרנת..." : "סנכרן את הדשבורד"}
+            </button>
+            <button
+              type="button"
+              onClick={handleSyncLatest}
+              disabled={syncingDashboard || syncingLatest}
+              title="מעדכנת רק את 5 הפוסטים העדכניים ביותר — מהיר יותר מסנכרון מלא"
+              className="rounded-lg border border-brand-red px-3 py-2 text-sm text-brand-red hover:bg-brand-red/10 disabled:opacity-50"
+            >
+              {syncingLatest ? "מעדכנת..." : "עדכון זריז (5 אחרונים)"}
             </button>
           </div>
           {syncProgress && syncStartedAtRef.current && (

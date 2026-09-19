@@ -229,6 +229,27 @@ async function fetchAllInstagramMediaSince(sinceDate: Date): Promise<InstagramMe
   return results;
 }
 
+/** שולפת רק את N הפוסטים העדכניים ביותר — עמוד יחיד, בלי דפדוף (ראו syncLatestInstagramMedia). */
+async function fetchLatestInstagramMedia(limit: number): Promise<InstagramMediaSummary[]> {
+  const { accessToken, instagramBusinessAccountId } = await requireMetaConnection();
+
+  const url = new URL(`${GRAPH_API_BASE}/${instagramBusinessAccountId}/media`);
+  url.searchParams.set(
+    "fields",
+    "id,caption,timestamp,permalink,media_type,media_product_type,thumbnail_url,media_url"
+  );
+  url.searchParams.set("limit", String(limit));
+  url.searchParams.set("access_token", accessToken);
+
+  const res = await fetch(url.toString());
+  const data = await res.json();
+  if (!res.ok) {
+    throw new MetaApiError(data?.error?.message || "כשל בשליפת הפוסטים מאינסטגרם");
+  }
+
+  return ((data.data ?? []) as RawInstagramMedia[]).slice(0, limit).map(mapRawMedia);
+}
+
 /** מקשרת פריט תוכן מקומי (PlatformContent) לפוסט ספציפי באינסטגרם, לפי בחירה ידנית. */
 export async function linkInstagramMedia(
   platformContentId: string,
@@ -325,13 +346,17 @@ async function fetchInstagramMediaMetrics(mediaId: string, accessToken: string):
  */
 export class SyncCancelledError extends Error {}
 
-export async function syncInstagramMediaSince(
-  sinceDate: Date,
+/**
+ * הלוגיקה המשותפת ל-syncInstagramMediaSince ול-syncLatestInstagramMedia:
+ * upsert לכל פריט ב-media (עם נתוני הביצועים שלו) ל-InstagramMedia. לא
+ * נוגעת בדמוגרפיה/lastDashboardSyncAt — אלה שונים בין שני מצבי הסנכרון
+ * (הסנכרון המהיר מדלג עליהם, ראו syncLatestInstagramMedia).
+ */
+async function syncMediaItems(
+  media: InstagramMediaSummary[],
+  accessToken: string,
   options?: { signal?: AbortSignal; onProgress?: (synced: number, total: number) => void }
-): Promise<{ syncedCount: number }> {
-  const { accessToken, instagramBusinessAccountId } = await requireMetaConnection();
-  const media = await fetchAllInstagramMediaSince(sinceDate);
-
+): Promise<number> {
   let syncedCount = 0;
   for (const item of media) {
     if (options?.signal?.aborted) throw new SyncCancelledError();
@@ -399,6 +424,16 @@ export async function syncInstagramMediaSince(
     syncedCount++;
     options?.onProgress?.(syncedCount, media.length);
   }
+  return syncedCount;
+}
+
+export async function syncInstagramMediaSince(
+  sinceDate: Date,
+  options?: { signal?: AbortSignal; onProgress?: (synced: number, total: number) => void }
+): Promise<{ syncedCount: number }> {
+  const { accessToken, instagramBusinessAccountId } = await requireMetaConnection();
+  const media = await fetchAllInstagramMediaSince(sinceDate);
+  const syncedCount = await syncMediaItems(media, accessToken, options);
 
   const audience = await fetchAudienceDemographicsSafely(accessToken);
   const reachByFollowType = await fetchReachByFollowType(instagramBusinessAccountId, accessToken, sinceDate).catch(
@@ -415,6 +450,29 @@ export async function syncInstagramMediaSince(
       ...(audience.countryJson !== null ? { audienceCountryJson: audience.countryJson } : {}),
       ...(reachByFollowType !== null ? { audienceReachByFollowJson: JSON.stringify(reachByFollowType) } : {}),
     },
+  });
+
+  return { syncedCount };
+}
+
+/**
+ * סנכרון מהיר — רק N הפוסטים העדכניים ביותר (לא מבוסס תאריך), בלי עדכון
+ * דמוגרפיה/חשיפה-לפי-עוקבים (אלה מדדים בכל-החשבון שדורשים טווח תאריכים,
+ * לא רלוונטי כשמסנכרנים "כמה פוסטים אחרונים"). מיועד לעדכון זריז בין
+ * סנכרונים מלאים, לא כתחליף להם.
+ */
+export async function syncLatestInstagramMedia(
+  limit: number,
+  options?: { signal?: AbortSignal; onProgress?: (synced: number, total: number) => void }
+): Promise<{ syncedCount: number }> {
+  const { accessToken } = await requireMetaConnection();
+  const media = await fetchLatestInstagramMedia(limit);
+  const syncedCount = await syncMediaItems(media, accessToken, options);
+
+  await getProfileSettings();
+  await prisma.profileSettings.update({
+    where: { id: "default" },
+    data: { lastDashboardSyncAt: new Date() },
   });
 
   return { syncedCount };
