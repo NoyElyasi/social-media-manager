@@ -2,6 +2,7 @@ import { prisma } from "@/server/db";
 import { PlatformType } from "@/generated/prisma/client";
 import {
   bestHourInBucket,
+  getDayHourEngagement,
   getDayHourStrength,
   getFormatPerformance,
   getMonthlyFormatPace,
@@ -11,6 +12,8 @@ import {
   WEEKDAY_FULL_LABELS,
   type ContentAngle,
   type DayStrength,
+  type EngagementDayStrength,
+  type EngagementHourBucketStrength,
   type FormatGap,
   type FormatPerformance,
   type HourBucketStrength,
@@ -32,6 +35,9 @@ function firstRealHashtag(hashtagsJson: string): string | null {
 }
 
 type StrengthData = { days: DayStrength[]; hourBuckets: HourBucketStrength[]; hourly: HourlyStrength[] };
+// מעורבות (לייקים+תגובות) — נפרד מ-StrengthData (הגעה) בכוונה, ראו getDayHourEngagement.
+// כרגע רק תצוגה (⚡ לעומת ❤️💬 בלוח) — לא משפיע על אף החלטה בתכנון עדיין.
+type EngagementData = { days: EngagementDayStrength[]; hourBuckets: EngagementHourBucketStrength[] };
 
 /**
  * תכנון שבועי — ראו הערות על ScheduledSlot/BlockedDay ב-prisma/schema.prisma.
@@ -168,6 +174,9 @@ export interface WeekSlot {
   note: string | null;
   dayIsStrong: boolean;
   hourIsStrong: boolean;
+  // מעורבות (לייקים+תגובות) — נפרד מ-dayIsStrong/hourIsStrong (הגעה), ראו EngagementData.
+  dayIsEngaging: boolean;
+  hourIsEngaging: boolean;
   // ריל/קרוסלה, מכתב/טיפ, והקרוסלה הספציפית שכדאי להפוך לריל (אם רלוונטי) —
   // כולם תמונת מצב קבועה מזמן היצירה (plannedType/plannedFormat/
   // plannedReelCandidateMediaId ב-DB), לא מחושבים מחדש בכל טעינה. ראו
@@ -189,6 +198,7 @@ export interface WeekPlan {
   days: { date: string; label: string; specialDays: SpecialDay[]; blockedNote: string | null; blockedDayId: string | null }[];
   slots: WeekSlot[];
   strength: StrengthData;
+  engagement: EngagementData;
   formatAlerts: FormatGap[];
   methodology: string[];
   topAngles: ContentAngle[];
@@ -199,7 +209,7 @@ async function loadWeekContext(weekStart: Date) {
   const weekEnd = addDays(weekStart, 7);
   const { monthStart, monthEnd } = monthRangeOf(weekStart);
 
-  const [existingSlots, blockedDays, specialDays, strength, monthlyPace, formatPerf, topAngles, skipDebt] = await Promise.all([
+  const [existingSlots, blockedDays, specialDays, strength, engagement, monthlyPace, formatPerf, topAngles, skipDebt] = await Promise.all([
     prisma.scheduledSlot.findMany({
       where: { date: { gte: weekStart, lt: weekEnd } },
       include: { platformContent: { include: { post: true } } },
@@ -207,6 +217,7 @@ async function loadWeekContext(weekStart: Date) {
     prisma.blockedDay.findMany({ where: { date: { gte: weekStart, lt: weekEnd } } }),
     getSpecialDays(weekStart, addDays(weekEnd, -1)),
     getDayHourStrength(),
+    getDayHourEngagement(),
     getMonthlyFormatPace(monthStart, monthEnd),
     getFormatPerformance(),
     getTopContentAngles(),
@@ -217,7 +228,7 @@ async function loadWeekContext(weekStart: Date) {
   // הפרסום החודשי בפועל עדיין נראה בסדר (למשל אם לא סונכרן אינסטגרם עדיין).
   const formatAlerts = monthlyPace.map((a) => (skipDebt.has(a.format) ? { ...a, isBehind: true } : a));
 
-  return { weekEnd, existingSlots, blockedDays, specialDays, strength, formatAlerts, formatPerf, topAngles };
+  return { weekEnd, existingSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles };
 }
 
 /** שולפת ומרכיבה מפה mediaId->NextReelCandidate, ל"הזכרת" הצעות שנתפסו בעבר (ראו plannedReelCandidateMediaId). */
@@ -258,7 +269,7 @@ function toSlot(row: {
   platformContent:
     | { id: string; type: string; text: string | null; postId: string; hashtags: string; post: { hashtags: string; notionUrl: string | null } }
     | null;
-}, strength: StrengthData, candidateMap: Map<string, NextReelCandidate>): WeekSlot {
+}, strength: StrengthData, engagement: EngagementData, candidateMap: Map<string, NextReelCandidate>): WeekSlot {
   const dateStr = formatCalendarDate(row.date);
   const dayOfWeek = row.date.getUTCDay();
   const bucketStart = [0, 4, 8, 12, 16, 20].filter((s) => row.hour >= s).pop() ?? 0;
@@ -270,6 +281,8 @@ function toSlot(row: {
     note: row.note,
     dayIsStrong: strength.days[dayOfWeek]?.isStrong ?? false,
     hourIsStrong: strength.hourBuckets.find((b) => b.startHour === bucketStart)?.isStrong ?? false,
+    dayIsEngaging: engagement.days[dayOfWeek]?.isStrong ?? false,
+    hourIsEngaging: engagement.hourBuckets.find((b) => b.startHour === bucketStart)?.isStrong ?? false,
     recommendedType: row.plannedType as "instagram_reel" | "instagram_carousel" | null,
     recommendedFormat: row.plannedFormat as "letter" | "tip" | null,
     recommendedReelCandidate: row.plannedReelCandidateMediaId ? candidateMap.get(row.plannedReelCandidateMediaId) ?? null : null,
@@ -292,9 +305,9 @@ function toSlot(row: {
 
 /** קורא את התכנון של שבוע נתון כמו שהוא ב-DB היום, בלי לגנרט/לשנות כלום. */
 export async function getWeekPlan(weekStart: Date): Promise<WeekPlan> {
-  const { existingSlots, blockedDays, specialDays, strength, formatAlerts, formatPerf, topAngles } = await loadWeekContext(weekStart);
+  const { existingSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles } = await loadWeekContext(weekStart);
   const candidateMap = await buildCandidateMap(existingSlots);
-  return buildPlanResponse(weekStart, existingSlots, blockedDays, specialDays, strength, formatAlerts, formatPerf, topAngles, candidateMap);
+  return buildPlanResponse(weekStart, existingSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles, candidateMap);
 }
 
 /**
@@ -312,7 +325,7 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
     return getWeekPlan(weekStart);
   }
 
-  const { existingSlots, blockedDays, specialDays, strength, formatAlerts, formatPerf, topAngles } = await loadWeekContext(weekStart);
+  const { existingSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles } = await loadWeekContext(weekStart);
 
   const manualSlots = existingSlots.filter((s) => s.isManual);
   const autoSlotIds = existingSlots.filter((s) => !s.isManual).map((s) => s.id);
@@ -506,7 +519,7 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
 
   const allSlots = [...manualSlots, ...createdSlots];
   const candidateMap = await buildCandidateMap(allSlots);
-  return buildPlanResponse(weekStart, allSlots, blockedDays, specialDays, strength, formatAlerts, formatPerf, topAngles, candidateMap);
+  return buildPlanResponse(weekStart, allSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles, candidateMap);
 }
 
 /** שבועות עתידיים (אחרי weekStart) שיש בהם כבר סלוט אוטומטי — למי שצריך ריענון לאחר שהשבוע הקרוב תפס תוכן/מועמדים. */
@@ -542,13 +555,14 @@ function buildPlanResponse(
   blockedDays: { id: string; date: Date; note: string | null }[],
   specialDays: SpecialDay[],
   strength: StrengthData,
+  engagement: EngagementData,
   formatAlerts: FormatGap[],
   formatPerf: FormatPerformance,
   topAngles: ContentAngle[],
   candidateMap: Map<string, NextReelCandidate>
 ): WeekPlan {
   const slots = slotsRaw
-    .map((row) => toSlot(row, strength, candidateMap))
+    .map((row) => toSlot(row, strength, engagement, candidateMap))
     .sort((a, b) => (a.date === b.date ? a.hour - b.hour : a.date.localeCompare(b.date)));
 
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -574,6 +588,7 @@ function buildPlanResponse(
     days,
     slots,
     strength,
+    engagement,
     formatAlerts,
     methodology: buildMethodologyLines(strength, formatPerf, totalSamples),
     topAngles,

@@ -126,7 +126,8 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-brand-maroon">{Number(day.date.slice(8, 10))}</span>
                         <div className="flex items-center gap-1">
-                          {day.isStrong && <span title="יום חזק">⚡</span>}
+                          {day.isStrong && <span title="הרבה חשיפה">⚡</span>}
+                          {day.isEngaging && <span title="הרבה אנגייג'מנט">❤️💬</span>}
                           {/* נקודה כחולה קטנה במקום תג מלא עם הטקסט — שם החג מוצג רק בהעברת עכבר, כדי לא לתפוס מקום. בועית מותאמת ולא ה-title המובנה של הדפדפן, כי הוא לא היה נראה טוב על אלמנט כה קטן. */}
                           {day.specialDays.map((sd) => (
                             <span key={sd.title} className="group relative inline-block">

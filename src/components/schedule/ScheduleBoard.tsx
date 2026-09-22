@@ -113,7 +113,8 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
                 <span className="text-sm font-semibold text-brand-maroon">{day.label}</span>
                 <span className="text-xs text-brand-maroon/50">{day.date.slice(5)}</span>
               </div>
-              {plan.strength.days[i]?.isStrong && <span className="text-[10px] text-green-700">⚡ יום חזק</span>}
+              {plan.strength.days[i]?.isStrong && <span className="text-[10px] text-green-700" title="הרבה חשיפה">⚡ יום חזק</span>}
+              {plan.engagement.days[i]?.isStrong && <span className="text-[10px] text-pink-700" title="הרבה אנגייג'מנט">❤️💬 יום מעורבות</span>}
               {day.specialDays.map((sd) => (
                 <span
                   key={sd.title}

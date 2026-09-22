@@ -32,7 +32,8 @@ export default function ScheduleSlotChip({ slot, onClick }: { slot: WeekSlot; on
         <span className="shrink-0 flex items-center gap-0.5">
           {slot.actualStatus === "done" && <span title="עלה בפועל">✅</span>}
           {slot.actualStatus === "skipped" && <span title="לא עלה בפועל">❌</span>}
-          {slot.hourIsStrong && <span>⚡</span>}
+          {slot.hourIsStrong && <span title="הרבה חשיפה">⚡</span>}
+          {slot.hourIsEngaging && <span title="הרבה אנגייג'מנט">❤️💬</span>}
           {!content && slot.recommendedFormat === "letter" && <span title="הרבה זמן בלי מכתב">✉️</span>}
           {!content && slot.recommendedFormat === "tip" && <span title="הרבה זמן בלי טיפ">💡</span>}
           {!slot.isManual && <span className="opacity-60">🤖</span>}
@@ -40,9 +41,10 @@ export default function ScheduleSlotChip({ slot, onClick }: { slot: WeekSlot; on
       </div>
       {content?.text && <div className="truncate opacity-80">{content.text}</div>}
       {!content && notionSegment && <div className="truncate opacity-80">📓 {notionSegment.preview || notionTagLabel}</div>}
-      {!content && !notionSegment && slot.note && <div className="truncate opacity-80">📝 {slot.note}</div>}
-      {!content && !notionSegment && !slot.note && candidate && <div className="truncate opacity-80">🎬 {candidate.caption ?? "(ללא כיתוב)"}</div>}
-      {!content && !notionSegment && !slot.note && !candidate && <div className="truncate opacity-70">אין מוכן ברשימה</div>}
+      {/* מועמד ריל ספציפי מוצג תמיד כשיש, גם אם יש הערה גנרית (כמו הערת "יום לבדיקה") — לפי בקשה מפורשת לראות איזה ריל מומלץ בלי ללחוץ. */}
+      {!content && !notionSegment && candidate && <div className="truncate opacity-80">🎬 {candidate.caption ?? "(ללא כיתוב)"}</div>}
+      {!content && !notionSegment && !candidate && slot.note && <div className="truncate opacity-80">📝 {slot.note}</div>}
+      {!content && !notionSegment && !candidate && !slot.note && <div className="truncate opacity-70">אין מוכן ברשימה</div>}
     </button>
   );
 }

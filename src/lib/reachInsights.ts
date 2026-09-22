@@ -54,9 +54,9 @@ export interface HourlyStrength {
   count: number;
 }
 
-function markStrong<T extends { avgReach: number | null; count: number; isStrong: boolean }>(buckets: T[], topN: number): void {
-  const eligible = buckets.filter((b) => b.avgReach !== null && b.count >= MIN_PER_GROUP);
-  const sorted = [...eligible].sort((a, b) => (b.avgReach as number) - (a.avgReach as number));
+function markStrong<T extends { count: number; isStrong: boolean }>(buckets: T[], topN: number, valueOf: (b: T) => number | null): void {
+  const eligible = buckets.filter((b) => valueOf(b) !== null && b.count >= MIN_PER_GROUP);
+  const sorted = [...eligible].sort((a, b) => (valueOf(b) as number) - (valueOf(a) as number));
   const strong = new Set(sorted.slice(0, topN));
   for (const b of buckets) {
     if (strong.has(b)) b.isStrong = true;
@@ -109,10 +109,74 @@ export async function getDayHourStrength(topN = 3): Promise<{ days: DayStrength[
     count: values.filter((v) => v !== null).length,
   }));
 
-  markStrong(days, topN);
-  markStrong(hourBuckets, topN);
+  markStrong(days, topN, (b) => b.avgReach);
+  markStrong(hourBuckets, topN, (b) => b.avgReach);
 
   return { days, hourBuckets, hourly };
+}
+
+export interface EngagementBucketStrength {
+  name: string;
+  avgEngagement: number | null;
+  count: number;
+  /** בין ה-topN המובילים לפי לייקים+תגובות (לא הגעה) — ראו getDayHourEngagement. */
+  isStrong: boolean;
+}
+
+export interface EngagementDayStrength extends EngagementBucketStrength {
+  dayOfWeek: number;
+}
+
+export interface EngagementHourBucketStrength extends EngagementBucketStrength {
+  startHour: number;
+}
+
+/**
+ * בדיוק כמו getDayHourStrength, אבל לפי לייקים+תגובות (מעורבות מהעוקבים
+ * הקיימים) ולא הגעה (חשיפה, כוללת לא-עוקבים) — לפי בקשה מפורשת להפריד בין
+ * "יום חזק לחשיפה" (מתאים לריל) ל"יום חזק למעורבות" (מתאים לפוסט/קרוסלה).
+ * לא משולב עם getDayHourStrength כדי לא לסכן קוד קיים שעובד.
+ */
+export async function getDayHourEngagement(topN = 3): Promise<{ days: EngagementDayStrength[]; hourBuckets: EngagementHourBucketStrength[] }> {
+  const media = await prisma.instagramMedia.findMany({ select: { timestamp: true, likesCount: true, commentsCount: true } });
+
+  const engagementOf = (m: { likesCount: number | null; commentsCount: number | null }): number | null =>
+    m.likesCount === null && m.commentsCount === null ? null : (m.likesCount ?? 0) + (m.commentsCount ?? 0);
+
+  const dayValues: (number | null)[][] = Array.from({ length: 7 }, () => []);
+  const hourBucketOf = (h: number) => HOUR_BUCKET_STARTS.filter((s) => h >= s).pop() ?? 0;
+  const hourValues = new Map<number, (number | null)[]>(HOUR_BUCKET_STARTS.map((s) => [s, []]));
+
+  for (const m of media) {
+    const { dayOfWeek, hour } = israelDayAndHour(m.timestamp);
+    const value = engagementOf(m);
+    dayValues[dayOfWeek].push(value);
+    hourValues.get(hourBucketOf(hour))!.push(value);
+  }
+
+  const days: EngagementDayStrength[] = dayValues.map((values, dayOfWeek) => ({
+    dayOfWeek,
+    name: WEEKDAY_FULL_LABELS[dayOfWeek],
+    avgEngagement: avg(values),
+    count: values.filter((v) => v !== null).length,
+    isStrong: false,
+  }));
+
+  const hourBuckets: EngagementHourBucketStrength[] = HOUR_BUCKET_STARTS.map((startHour) => {
+    const values = hourValues.get(startHour) ?? [];
+    return {
+      startHour,
+      name: `${String(startHour).padStart(2, "0")}-${String((startHour + 4) % 24).padStart(2, "0")}`,
+      avgEngagement: avg(values),
+      count: values.filter((v) => v !== null).length,
+      isStrong: false,
+    };
+  });
+
+  markStrong(days, topN, (b) => b.avgEngagement);
+  markStrong(hourBuckets, topN, (b) => b.avgEngagement);
+
+  return { days, hourBuckets };
 }
 
 /**

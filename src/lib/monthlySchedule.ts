@@ -49,6 +49,7 @@ export interface MonthDaySummary {
   date: string;
   label: string;
   isStrong: boolean;
+  isEngaging: boolean;
   specialDays: SpecialDay[];
   blockedDayId: string | null;
   blockedNote: string | null;
@@ -94,6 +95,7 @@ export async function getMonthPlan(monthStart: Date): Promise<MonthPlan> {
         date: day.date,
         label: day.label,
         isStrong: plan.strength.days[di]?.isStrong ?? false,
+        isEngaging: plan.engagement.days[di]?.isStrong ?? false,
         specialDays: day.specialDays,
         blockedDayId: day.blockedDayId,
         blockedNote: day.blockedNote,
@@ -103,7 +105,7 @@ export async function getMonthPlan(monthStart: Date): Promise<MonthPlan> {
           .sort((a, b) => a.hour - b.hour)
           .map((s) => ({
             hour: s.hour,
-            tag: s.content?.titleTag ?? s.recommendedNotionSegment?.tag ?? null,
+            tag: s.content?.titleTag ?? s.recommendedNotionSegment?.tag ?? s.recommendedReelCandidate?.caption ?? null,
             type: s.content?.type ?? s.recommendedType ?? null,
           })),
       };
