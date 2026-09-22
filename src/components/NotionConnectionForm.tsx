@@ -49,9 +49,27 @@ export default function NotionConnectionForm({
   const [tagsName, setTagsName] = useState(initialPropertyMap?.tags?.name ?? "");
 
   const [savedOk, setSavedOk] = useState(false);
+  const [openingEnv, setOpeningEnv] = useState(false);
+  const [openEnvError, setOpenEnvError] = useState<string | null>(null);
 
   function findProp(name: string): PropertyInfo | undefined {
     return properties?.find((p) => p.name === name);
+  }
+
+  async function handleOpenEnv() {
+    setOpeningEnv(true);
+    setOpenEnvError(null);
+    try {
+      const res = await fetch("/api/settings/open-env", { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        setOpenEnvError(data?.error ?? "שגיאה בפתיחת הקובץ");
+      }
+    } catch {
+      setOpenEnvError("שגיאה בפתיחת הקובץ");
+    } finally {
+      setOpeningEnv(false);
+    }
   }
 
   async function handleTest() {
@@ -111,9 +129,53 @@ export default function NotionConnectionForm({
   return (
     <div className="flex flex-col gap-4 text-sm">
       {!apiKeyConfigured && (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-800">
-          ⚠️ NOTION_API_KEY לא מוגדר. הוסיפי אותו לקובץ .env בשורש הפרויקט (ראו .env.example) ואז הפעילי מחדש את הכלי — בלעדיו החיבור לא יעבוד.
-        </p>
+        <div className="flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-800">
+          <p>
+            ⚠️ NOTION_API_KEY לא מוגדר. הוסיפי אותו לקובץ .env בשורש הפרויקט (ראו .env.example) ואז הפעילי מחדש את הכלי — בלעדיו החיבור לא יעבוד.
+          </p>
+          <div className="flex gap-2">
+            <a
+              href="https://www.notion.so/my-integrations"
+              target="_blank"
+              rel="noreferrer"
+              className="self-start rounded-md border border-amber-400 px-3 py-1.5 text-xs text-amber-800 hover:bg-amber-100"
+            >
+              🔑 פתחי את עמוד האינטגרציות ב-Notion (להעתקת הטוקן)
+            </a>
+            <button
+              type="button"
+              onClick={handleOpenEnv}
+              disabled={openingEnv}
+              className="self-start rounded-md border border-amber-400 px-3 py-1.5 text-xs text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+            >
+              {openingEnv ? "פותחת..." : "📄 פתחי את קובץ ה-.env"}
+            </button>
+          </div>
+          {openEnvError && <p className="text-xs text-red-600">{openEnvError}</p>}
+        </div>
+      )}
+      {apiKeyConfigured && (
+        <div className="flex flex-col gap-1 self-start">
+          <div className="flex gap-3">
+            <a
+              href="https://www.notion.so/my-integrations"
+              target="_blank"
+              rel="noreferrer"
+              className="self-start text-xs text-brand-red hover:text-brand-red-dark hover:underline"
+            >
+              🔑 עמוד האינטגרציות ב-Notion
+            </a>
+            <button
+              type="button"
+              onClick={handleOpenEnv}
+              disabled={openingEnv}
+              className="self-start text-xs text-brand-red hover:text-brand-red-dark hover:underline disabled:opacity-50"
+            >
+              {openingEnv ? "פותחת..." : "📄 פתחי את קובץ ה-.env"}
+            </button>
+          </div>
+          {openEnvError && <p className="text-xs text-red-600">{openEnvError}</p>}
+        </div>
       )}
 
       <div className="flex flex-col gap-1.5">
