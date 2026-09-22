@@ -25,6 +25,13 @@ function slotIcon(type: string | null): string {
   return "•";
 }
 
+// צבע לפי סוג — כדי שהתגית תיראה בבירור על רקע לבן (לא נבלעת), לא רק אייקון עדין.
+function slotStyle(type: string | null): string {
+  if (type === "instagram_reel") return "bg-fuchsia-100 text-fuchsia-800";
+  if (type === "instagram_carousel") return "bg-sky-100 text-sky-800";
+  return "bg-neutral-100 text-neutral-600";
+}
+
 export default function MonthBoard({ plan }: { plan: MonthPlan }) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
@@ -118,16 +125,25 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-brand-maroon">{Number(day.date.slice(8, 10))}</span>
-                        {day.isStrong && <span title="יום חזק">⚡</span>}
+                        <div className="flex items-center gap-1">
+                          {day.isStrong && <span title="יום חזק">⚡</span>}
+                          {/* נקודה כחולה קטנה במקום תג מלא עם הטקסט — שם החג מוצג רק בהעברת עכבר (title), כדי לא לתפוס מקום. */}
+                          {day.specialDays.map((sd) => (
+                            <span
+                              key={sd.title}
+                              title={sd.title}
+                              className="inline-block h-2 w-2 shrink-0 cursor-help rounded-full bg-blue-500"
+                            />
+                          ))}
+                        </div>
                       </div>
                       {day.blockedDayId && <span className="truncate rounded bg-neutral-200 px-1 text-neutral-700">🚫 חסום</span>}
-                      {day.specialDays.map((sd) => (
-                        <span key={sd.title} className={`truncate rounded px-1 ${sd.isMajor ? "bg-amber-100 text-amber-800" : "bg-blue-50 text-blue-700"}`}>
-                          {sd.isMajor ? "🕎" : "📌"} {sd.title}
-                        </span>
-                      ))}
                       {day.slots.map((slot, si) => (
-                        <span key={si} className="truncate rounded bg-brand-pink/15 px-1 text-brand-maroon" title={slot.tag ?? undefined}>
+                        <span
+                          key={si}
+                          className={`truncate rounded px-1.5 py-0.5 text-xs font-medium ${slotStyle(slot.type)}`}
+                          title={slot.tag ?? undefined}
+                        >
                           {slotIcon(slot.type)} {slot.tag ?? (slot.type === "instagram_reel" ? "צריך ריל" : slot.type === "instagram_carousel" ? "צריך פוסט" : "ריק")}
                         </span>
                       ))}
