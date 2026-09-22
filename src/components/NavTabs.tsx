@@ -13,6 +13,7 @@ function navItemClass(active: boolean): string {
 const MAIN_TABS: { href: string; label: string; isActive: (pathname: string) => boolean }[] = [
   { href: "/", label: "פוסטים קודמים", isActive: (p) => p === "/" || (p.startsWith("/posts") && p !== "/posts/new") },
   { href: "/dashboard", label: "דשבורד", isActive: (p) => p.startsWith("/dashboard") },
+  { href: "/schedule", label: "תכנון חודשי", isActive: (p) => p.startsWith("/schedule") },
 ];
 
 /** הטאבים הראשיים — ליד הלוגו, לא ממורכזים בנפרד (בהתאם לסגנון ניווט רגיל של אתרים/כלים). */

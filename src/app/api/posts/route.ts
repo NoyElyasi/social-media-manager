@@ -17,6 +17,7 @@ const createPostSchema = z.object({
   manualHashtags: z.array(z.string()).optional().nullable(),
   aiTheme: z.string().nullable().optional(),
   aiFormat: z.enum(["regular", "letter", "tip"]).optional(),
+  notionUrl: z.string().nullable().optional(),
   reelNarration: z
     .object({
       audioBase64: z.string(),

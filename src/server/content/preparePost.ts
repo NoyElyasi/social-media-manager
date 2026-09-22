@@ -125,6 +125,8 @@ export interface CreatePostInput {
   aiFormat?: "regular" | "letter" | "tip";
   /** הקלטת הקראה מסונכרנת לריל (ראו ReelNarration) — רק אם instagram_reel נבחר. */
   reelNarration?: ReelNarration | null;
+  /** לינק לעמוד המקור ב-Notion, אם הטקסט יובא משם (ראו NotionImportCard ביצירת פוסט). */
+  notionUrl?: string | null;
   /** מאפשר עצירה מבוקשת (כפתור "עצור") באמצע יצירת ריל. */
   signal?: AbortSignal;
   /** התקדמות רינדור מסגרות הריל, לצורך אינדיקציית זמן משוער בממשק. */
@@ -171,6 +173,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
       aiFormat: input.aiFormat && input.aiFormat !== "regular" ? input.aiFormat : null,
       folderPath: postFolderPath,
       privacyFlags: JSON.stringify(privacyFlags),
+      notionUrl: input.notionUrl ?? null,
     },
   });
 
@@ -434,95 +437,19 @@ export async function updatePostRawText(
 }
 
 /**
- * מעדכנת את התגיות המשותפות של הפוסט (קרוסלה + ריל — אותן תגיות בדיוק),
- * ומרנדרת מחדש כל תוכן קיים שמשתמש בהן. #אחתביום לא נשמרת בקלט — היא
- * מתווספת אוטומטית בכל רינדור (ראו finalizeHashtags).
+ * מעדכנת רק את השדה המשותף של התגיות (בלי רינדור מחדש של קרוסלה/ריל) —
+ * לפי בקשתה, הכפתור היחיד שמתחיל יצירה/רינדור בפועל הוא "שמור טקסט"
+ * (updatePostRawText/EditablePostText). התגיות המוטבעות בתוכן שכבר קיים
+ * (PlatformContent.hashtags/tags, בפועל בתוך התמונה/הסרטון) לא משתנות עד
+ * שהיא בעצמה תלחץ על "שמור טקסט" — הוא קורא את post.hashtags העדכני
+ * ומרנדר לפיו. #אחתביום לא נשמרת בקלט — מתווספת אוטומטית ברינדור.
  */
 export async function updatePostHashtags(postId: string, hashtags: string[]) {
-  const storage = getStorageService();
-  const profile = await getProfileSettings();
-
-  const post = await prisma.post.findUniqueOrThrow({
-    where: { id: postId },
-    include: { platformContents: true },
-  });
-
   const sharedHashtags = normalizeSharedHashtags(hashtags);
   await prisma.post.update({
     where: { id: postId },
     data: { hashtags: JSON.stringify(sharedHashtags) },
   });
-
-  const splitMode = post.splitMode as SplitMode;
-  const revealMode = post.revealMode as RevealMode;
-  const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
-  const songs = suggestSongs(post.aiTheme, parseThemeSongs(profile.themeSongsJson));
-
-  for (const content of post.platformContents) {
-    if (content.type === "instagram_carousel") {
-      // אם יש עמוד שער, התיוג הראשי מוטבע בפועל בתמונה — עדכון תגיות חייב
-      // רינדור מחדש (לא רק שמירה בשדה), אחרת גם בלי עמוד שער.
-      const backgroundImageDataUri = await loadProfileImageDataUri(storage, content.backgroundImagePath);
-      const coverBackgroundImageDataUri = await loadProfileImageDataUri(storage, content.coverImagePath);
-      const result = await prepareInstagramCarousel({
-        rawText: post.rawText,
-        splitMode,
-        hashtags: sharedHashtags,
-        folderPath: content.folderPath,
-        displayName: profile.displayName,
-        profileImageDataUri,
-        backgroundImageDataUri,
-        isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, content.backgroundImagePath),
-        ...getCarouselTextPosition(profile.carouselBackgroundImagePaths, content.backgroundImagePath),
-        coverBackgroundImageDataUri,
-        songs,
-        storage,
-      });
-      await prisma.platformContent.update({
-        where: { id: content.id },
-        data: {
-          text: result.text,
-          files: JSON.stringify(result.files),
-          altText: result.altTexts.join("\n\n"),
-          hashtags: JSON.stringify(result.hashtags),
-          tags: JSON.stringify(result.tags),
-          suggestedSongs: JSON.stringify(result.suggestedSongs),
-        },
-      });
-    }
-
-    if (content.type === "instagram_reel") {
-      // התגיות מוטבעות בפועל בסרטון (שורה נפרדת בראש) — עדכון שלהן חייב
-      // רינדור מחדש, לא רק שמירה בשדה. משתמשים מחדש בהקלטה הקיימת (אם יש) —
-      // עדכון תגיות לא צריך למחוק אותה.
-      const backgroundImageDataUri = await loadProfileImageDataUri(storage, content.backgroundImagePath);
-      const narration = await resolveReelNarration(storage, content.narrationAudioPath, undefined);
-      const result = await prepareInstagramReel({
-        rawText: post.rawText,
-        seed: post.id,
-        folderPath: content.folderPath,
-        storage,
-        splitMode,
-        revealMode,
-        backgroundImageDataUri,
-        hashtags: sharedHashtags,
-        narration,
-      });
-      await prisma.platformContent.update({
-        where: { id: content.id },
-        data: {
-          text: result.altText,
-          files: JSON.stringify([result.file]),
-          altText: result.altText,
-          durationSeconds: result.durationSeconds,
-          hashtags: JSON.stringify(sharedHashtags),
-          narrationAudioPath: result.narrationAudioFileName
-            ? path.join(content.folderPath, result.narrationAudioFileName)
-            : null,
-        },
-      });
-    }
-  }
 
   return prisma.post.findUniqueOrThrow({
     where: { id: postId },

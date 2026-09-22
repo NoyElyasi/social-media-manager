@@ -6,6 +6,8 @@ import { BarComparisonCard, ChartScrollRow, GroupedBarCard, LineTrendCard, PieBr
 import RecommendationCard, { type RecommendationBreakdownRow } from "@/components/dashboard/RecommendationCard";
 import InstagramMediaLabelEditor from "@/components/InstagramMediaLabelEditor";
 import ExcludeFromReelSuggestionsButton from "@/components/ExcludeFromReelSuggestionsButton";
+import { getWeekStart } from "@/lib/weeklySchedule";
+import { getSpecialDays } from "@/lib/holidays";
 
 export const dynamic = "force-dynamic";
 
@@ -302,6 +304,55 @@ export default async function DashboardPage({
       excludedFromReelSuggestions: m.excludedFromReelSuggestions,
     };
   });
+
+  // --- הגעה לפי שבוע (ראו LineTrendCard "מגמת הגעה ממוצעת לפי שבוע" בהמשך) ---
+  // שבוע = יום ראשון עד שבת, כמו בתכנון החודשי (getWeekStart) — כדי שאותו
+  // "שבוע" יזוהה עקבית בין הדשבורד לתכנון. ימים מיוחדים נשלפים חיים מ-Hebcal
+  // (כמו בתכנון) רק לטווח שבו יש בכלל נתונים, כדי לא לבזבז קריאה לשווא.
+  const weekBuckets = new Map<string, Row[]>();
+  for (const r of rows) {
+    const key = getWeekStart(r.timestamp).toISOString().slice(0, 10);
+    if (!weekBuckets.has(key)) weekBuckets.set(key, []);
+    weekBuckets.get(key)!.push(r);
+  }
+  const sortedWeekKeys = [...weekBuckets.keys()].sort();
+
+  const weekSpecialDays =
+    sortedWeekKeys.length > 0
+      ? await getSpecialDays(new Date(`${sortedWeekKeys[0]}T00:00:00.000Z`), rows[rows.length - 1].timestamp)
+      : [];
+
+  // חופש גדול בישראל — הערכה גסה (20 ביוני עד 31 באוגוסט), כי התאריך המדויק
+  // משתנה משנה לשנה ואין לו API; מספיק כדי לתת הקשר, לא מדויק לשבוע-שבוע.
+  function overlapsIsraeliSummerBreak(weekStartIso: string): boolean {
+    const weekStart = new Date(`${weekStartIso}T00:00:00.000Z`);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+    const year = weekStart.getUTCFullYear();
+    const breakStart = new Date(Date.UTC(year, 5, 20));
+    const breakEnd = new Date(Date.UTC(year, 7, 31, 23, 59, 59));
+    return weekStart <= breakEnd && weekEnd >= breakStart;
+  }
+
+  const weeklyReachData: (BarDatum & { holidayTitles: string[]; isSummerBreak: boolean })[] = sortedWeekKeys.map((key) => {
+    const weekRows = weekBuckets.get(key)!;
+    const weekEndIso = (() => {
+      const d = new Date(`${key}T00:00:00.000Z`);
+      d.setUTCDate(d.getUTCDate() + 6);
+      return d.toISOString().slice(0, 10);
+    })();
+    const holidayTitles = weekSpecialDays.filter((sd) => sd.date >= key && sd.date <= weekEndIso).map((sd) => sd.title);
+    const isSummerBreak = overlapsIsraeliSummerBreak(key);
+    const label = new Date(`${key}T00:00:00.000Z`).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" });
+    return {
+      name: `${label}${holidayTitles.length > 0 ? " 🕎" : ""}${isSummerBreak ? " ☀️" : ""}`,
+      value: avg(weekRows.map((r) => r.reachCount)) ?? 0,
+      count: weekRows.length,
+      holidayTitles,
+      isSummerBreak,
+    };
+  });
+  const weeksWithContext = weeklyReachData.filter((w) => w.holidayTitles.length > 0 || w.isSummerBreak);
 
   const reels = rows.filter((r) => r.isReel);
   const carousels = rows.filter((r) => r.mediaType === "CAROUSEL_ALBUM");
@@ -762,6 +813,30 @@ export default async function DashboardPage({
           { dataKey: "reach", label: "הגעה (ייחודי)", color: "#e7a9b8" },
         ]}
       />
+
+      <div className="flex flex-col gap-2">
+        <h2 className="font-semibold text-brand-maroon border-b border-brand-pink/30 pb-2">📅 שבועות חזקים וחלשים</h2>
+        <p className="text-xs text-brand-maroon/50">
+          🕎 = יש חג/מועד באותו שבוע (מ-Hebcal). ☀️ = חופף לחופש הגדול (הערכה גסה, 20.6-31.8). ייתכן שהם מסבירים ירידה/עלייה בהגעה.
+        </p>
+        <ChartScrollRow>
+          <BarComparisonCard
+            title="הגעה ממוצעת לפי שבוע"
+            data={weeklyReachData.length >= 2 ? weeklyReachData : null}
+            note="דרושים לפחות 2 שבועות עם נתונים"
+          />
+        </ChartScrollRow>
+        {weeksWithContext.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {weeksWithContext.map((w) => (
+              <span key={w.name} dir="ltr" className="rounded-full bg-brand-pink/10 px-2 py-0.5 text-[11px] text-brand-maroon/60">
+                {w.name.trim()}
+                {w.holidayTitles.length > 0 ? ` (${w.holidayTitles.join(", ")})` : ""}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
       <details className="rounded-lg border border-brand-pink/30 bg-white">
         <summary className="cursor-pointer font-semibold text-brand-maroon p-3">

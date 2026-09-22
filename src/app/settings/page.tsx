@@ -9,6 +9,7 @@ import AiThemeOptionsForm from "@/components/AiThemeOptionsForm";
 import SongsByThemeForm from "@/components/SongsByThemeForm";
 import SyncCodeButton from "@/components/SyncCodeButton";
 import SettingsTabs from "@/components/SettingsTabs";
+import NotionConnectionForm from "@/components/NotionConnectionForm";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +107,20 @@ export default async function SettingsPage() {
             <SongsByThemeForm themes={aiThemeOptions} initial={themeSongs} />
           </div>
         </>
+      ),
+    },
+    {
+      id: "notion",
+      label: "Notion",
+      content: (
+        <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
+          <h2 className="mb-3 font-bold text-brand-maroon">חיבור לטבלת הקטעים ב-Notion</h2>
+          <NotionConnectionForm
+            apiKeyConfigured={!!process.env.NOTION_API_KEY?.trim()}
+            initialDatabaseUrl={profile.notionDatabaseUrl}
+            initialPropertyMap={profile.notionPropertyMap ? JSON.parse(profile.notionPropertyMap) : null}
+          />
+        </div>
       ),
     },
     {

@@ -39,6 +39,10 @@ model Post {
   aiTone         String? // "realistic" או "absurd"
   aiClassifiedAt DateTime?
 
+  // קישור לדף התכנון/כתיבה של הפוסט הזה ב-Notion, אם יש — נערך ידנית
+  // (ראו PostContentPopup בתכנון השבועי), אין לו שום השפעה על שום פונקציונליות אחרת.
+  notionUrl String?
+
   platformContents PlatformContent[]
 }
 
@@ -109,8 +113,64 @@ model PlatformContent {
   publishedAt   DateTime?
   status        ContentStatus @default(draft)
 
+  // סלוט בתכנון השבועי (ראו ScheduledSlot) שהתוכן הזה שובץ אליו, אם בכלל —
+  // יחיד (לא ניתן לשבץ את אותו תוכן לשני סלוטים במקביל).
+  scheduledSlot ScheduledSlot?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// שיבוץ יום+שעה בתכנון הפרסום השבועי (ראו /schedule) — לא חלק מזרימת
+// יצירת הפוסט הרגילה, לא משפיע עליה בכלל. platformContentId null = "סלוט
+// ריק" (הצעה שאין לה עדיין תוכן מוכן, כדי לדעת "צריך להכין עוד פוסט").
+model ScheduledSlot {
+  id                String   @id @default(cuid())
+  date              DateTime // תאריך קלנדרי (חלק השעה מתעלמים ממנו, ראו hour)
+  hour              Int // 0-23, שעת היום המוצעת/שנבחרה
+  platformContentId String? @unique
+  platformContent   PlatformContent? @relation(fields: [platformContentId], references: [id], onDelete: SetNull)
+  // סומן ידנית ע"י המשתמשת (לא נדרס כשמייצרים הצעה מחדש לשבוע — ראו
+  // generateWeeklySchedule) — לעומת הצעה אוטומטית, שכן נדרסת ברענון.
+  isManual Boolean @default(false)
+  note     String?
+
+  // "ריל"/"קרוסלה" ו"מכתב"/"טיפ" שהומלצו לסלוט הריק הזה בזמן היצירה (ראו
+  // buildMethodologyLines) — תמונת מצב קבועה, לא מחושבת מחדש בכל טעינה, כדי
+  // שאפשר לדעת בדיעבד על מה בדיוק ענתה actualStatus (למשל "דילגתי על מכתב"
+  // צריך לזכור שזה היה מכתב, לא להמציא את זה מחדש כל טעינה).
+  plannedType   String?
+  plannedFormat String?
+  // מה שקרה בפועל עם הסלוט הזה — מסומן ידנית על ידה, לא נגזר אוטומטית
+  // מהסנכרון מאינסטגרם (ראו getSkippedFormatDebt, שמזין את זה בחזרה
+  // להצעה של השבוע הבא אם דילגה על משהו שתוכנן כמכתב/טיפ).
+  actualStatus String    @default("pending") // "pending" | "done" | "skipped"
+  actualAt     DateTime?
+
+  // InstagramMedia.id של הקרוסלה ש"המלצות לרילים הבאים" הציעה לסלוט הריל
+  // הריק הזה, בזמן היצירה — תמונת מצב קבועה, כדי שאפשר "לתפוס" הצעה ולמנוע
+  // מהצעה של שבוע אחר להציע את אותה קרוסלה שוב (ראו getNextReelCandidates).
+  plannedReelCandidateMediaId String?
+
+  // קטע "מוכן" מטבלת ה-Notion (ראו src/server/notion.ts) שהוצע לסלוט הריק
+  // הזה בזמן היצירה — תמונת מצב קבועה (התצוגה לא קוראת מ-Notion בכל טעינה),
+  // ולפי plannedNotionTag נמנעים מלהציע את אותו קטע פעמיים בשבועות שונים.
+  plannedNotionTag     String?
+  plannedNotionPreview String?
+  plannedNotionPageUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// יום שהמשתמשת סימנה ידנית כ"לא יכולה לפרסם בו" (למשל טיול, אירוע אישי) —
+// נלקח בחשבון כאילוץ בהצעה השבועית האוטומטית (ראו generateWeeklySchedule),
+// בנוסף לחגים/מועדים שנשלפים דינמית מ-Hebcal (לא נשמרים ב-DB בכלל).
+model BlockedDay {
+  id        String   @id @default(cuid())
+  date      DateTime
+  note      String?
+  createdAt DateTime @default(now())
 }
 
 // עותק מקומי (cache) של פוסטים אמיתיים מאינסטגרם, נשלף ישירות מ-Graph API —
@@ -204,6 +264,16 @@ model ProfileSettings {
   // (מדד ברמת החשבון בלבד, לא לכל פוסט בנפרד — כך חושפת מטא את הנתון הזה),
   // מופרד לריל לעומת פוסט/קרוסלה. JSON: {reel:{follower,nonFollower},post:{follower,nonFollower}}.
   audienceReachByFollowJson String?
+
+  // חיבור ל-Notion API — לשליפת קטעים מוכנים (status="Ready") מתוך טבלה
+  // שהיא כותבת שם, לפי תגית תואמת (ראו src/server/notion.ts). המפתח הסודי
+  // ("Internal Integration Secret") *לא* נשמר כאן — הוא במשתנה סביבה
+  // NOTION_API_KEY בקובץ .env, לא ב-DB/בממשק, כי הוא סוד ולא הגדרה. רק
+  // הלינק לטבלה (לא סודי) נשמר כהגדרה רגילה.
+  notionDatabaseUrl String?
+  // מיפוי שמות העמודות בטבלה שלה בפועל לתפקידים שהכלי מכיר — JSON:
+  // {tag, status, type, tags} (שמות עמודות ב-Notion, נבחרות ב"בדיקת חיבור" בהגדרות).
+  notionPropertyMap String?
 
   updatedAt                    DateTime @updatedAt
 }

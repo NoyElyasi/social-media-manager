@@ -11,6 +11,29 @@ import type { BackgroundItem } from "./BackgroundGallery";
 import { buildFileUrlFromPath } from "@/lib/files";
 import NarrationInput, { type CapturedNarration } from "./NarrationInput";
 
+function AddTargetButton({
+  target,
+  label,
+  onAdd,
+  disabled,
+}: {
+  target: SelectedTarget;
+  label: string;
+  onAdd: (target: SelectedTarget) => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onAdd(target)}
+      disabled={disabled}
+      className="rounded-md border border-brand-pink/40 px-3 py-1.5 text-sm hover:bg-brand-pink/10 disabled:opacity-50"
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function PostExtras({
   postId,
   hashtags,
@@ -27,10 +50,11 @@ export default function PostExtras({
   const router = useRouter();
   const [hashtagsInput, setHashtagsInput] = useState(hashtags.join(" "));
   const [savingHashtags, setSavingHashtags] = useState(false);
+  const [hashtagsSaved, setHashtagsSaved] = useState(false);
   const [addingTarget, setAddingTarget] = useState<SelectedTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
-  const startedAtRef = useRef<number | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const [showReelBackgroundPicker, setShowReelBackgroundPicker] = useState(false);
@@ -50,6 +74,10 @@ export default function PostExtras({
       });
   }, [showReelBackgroundPicker]);
 
+  // שמירה קלה — רק שדה, בלי רינדור מחדש של קרוסלה/ריל (ראו updatePostHashtags
+  // ב-preparePost.ts). כדי שהתגית החדשה תיכנס גם לתוכן הקיים בפועל (התמונה/
+  // הסרטון) צריך ללחוץ על "שמור טקסט" למעלה — הכפתור היחיד שמריץ יצירה,
+  // עם התקדמות/ביטול, לפי בקשתה.
   async function saveHashtags() {
     setSavingHashtags(true);
     try {
@@ -59,6 +87,7 @@ export default function PostExtras({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hashtags: tags }),
       });
+      setHashtagsSaved(true);
       router.refresh();
     } finally {
       setSavingHashtags(false);
@@ -69,11 +98,12 @@ export default function PostExtras({
     abortControllerRef.current?.abort();
   }
 
-  async function addTarget(target: SelectedTarget) {
+  const addTarget = async (target: SelectedTarget) => {
     setAddingTarget(target);
     setError(null);
     setProgress(null);
-    startedAtRef.current = Date.now();
+    const now = Date.now();
+    setStartedAt(now);
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -117,7 +147,7 @@ export default function PostExtras({
       setProgress(null);
       abortControllerRef.current = null;
     }
-  }
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -130,7 +160,10 @@ export default function PostExtras({
           <input
             type="text"
             value={hashtagsInput}
-            onChange={(e) => setHashtagsInput(e.target.value)}
+            onChange={(e) => {
+              setHashtagsInput(e.target.value);
+              setHashtagsSaved(false);
+            }}
             className="flex-1 rounded-md border border-brand-pink/40 text-sm p-1.5 bg-white"
             placeholder="#תגית2 #תגית3"
           />
@@ -140,9 +173,14 @@ export default function PostExtras({
             disabled={savingHashtags}
             className="shrink-0 rounded-md border border-brand-pink/40 px-3 py-1.5 text-sm hover:bg-brand-pink/10 disabled:opacity-50"
           >
-            {savingHashtags ? "מעדכן..." : "שמור תגיות לכל התוכן"}
+            {savingHashtags ? "שומר..." : "שמור תגיות לכל התוכן"}
           </button>
         </div>
+        {hashtagsSaved && (
+          <p className="text-xs text-brand-maroon/60">
+            נשמר ✓ — זה רק עדכן את השדה. כדי שהתגית תיכנס גם לתמונה/לסרטון בפועל, לחצי על &quot;שמור טקסט&quot; למעלה.
+          </p>
+        )}
       </div>
 
       {missingTargets.length > 0 && (
@@ -165,15 +203,13 @@ export default function PostExtras({
                   {addingTarget === t.value ? "מכין..." : `+ ${t.label}`}
                 </button>
               ) : (
-                <button
+                <AddTargetButton
                   key={t.value}
-                  type="button"
-                  onClick={() => addTarget(t.value)}
+                  target={t.value}
+                  label={addingTarget === t.value ? "מכין..." : `+ ${t.label}`}
+                  onAdd={addTarget}
                   disabled={addingTarget !== null}
-                  className="rounded-md border border-brand-pink/40 px-3 py-1.5 text-sm hover:bg-brand-pink/10 disabled:opacity-50"
-                >
-                  {addingTarget === t.value ? "מכין..." : `+ ${t.label}`}
-                </button>
+                />
               )
             )}
           </div>
@@ -200,11 +236,11 @@ export default function PostExtras({
         </div>
       )}
 
-      {progress && startedAtRef.current && (
+      {progress && startedAt && (
         <ReelProgress
           rendered={progress.rendered}
           total={progress.total}
-          etaSeconds={estimateRemainingSeconds(progress.rendered, progress.total, startedAtRef.current)}
+          etaSeconds={estimateRemainingSeconds(progress.rendered, progress.total, startedAt)}
           onCancel={cancelAddTarget}
         />
       )}

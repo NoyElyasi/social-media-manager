@@ -27,9 +27,10 @@ export default function MetaConnectionForm({
   const [dashboardSinceDate, setDashboardSinceDate] = useState("2026-08-01");
   const [syncingDashboard, setSyncingDashboard] = useState(false);
   const [syncingLatest, setSyncingLatest] = useState(false);
+  const [quickSyncLimit, setQuickSyncLimit] = useState(5);
   const [dashboardSyncNote, setDashboardSyncNote] = useState<string | null>(null);
   const [syncProgress, setSyncProgress] = useState<{ rendered: number; total: number } | null>(null);
-  const syncStartedAtRef = useRef<number | null>(null);
+  const [syncStartedAt, setSyncStartedAt] = useState<number | null>(null);
   const syncAbortRef = useRef<AbortController | null>(null);
 
   // התצוגה של "סונכרן לאחרונה" — מתחילה מה-prop (שנקבע ברינדור השרת),
@@ -101,7 +102,7 @@ export default function MetaConnectionForm({
     setError(null);
     setDashboardSyncNote(null);
     setSyncProgress(null);
-    syncStartedAtRef.current = Date.now();
+    setSyncStartedAt(Date.now());
     const controller = new AbortController();
     syncAbortRef.current = controller;
 
@@ -147,11 +148,13 @@ export default function MetaConnectionForm({
     }
   }
 
-  /** סנכרון זריז — רק 5 הפוסטים העדכניים ביותר, בלי לצאת מהיום שנבחר בשדה התאריך. */
+  /** סנכרון זריז — רק N הפוסטים העדכניים ביותר (quickSyncLimit), בלי לצאת מהיום שנבחר בשדה התאריך. */
   async function handleSyncLatest() {
     setSyncingLatest(true);
     setError(null);
     setDashboardSyncNote(null);
+    setSyncProgress(null);
+    setSyncStartedAt(Date.now());
 
     const controller = new AbortController();
     syncAbortRef.current = controller;
@@ -160,7 +163,7 @@ export default function MetaConnectionForm({
       const res = await fetch("/api/settings/meta/sync-latest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ limit: 5 }),
+        body: JSON.stringify({ limit: quickSyncLimit }),
         signal: controller.signal,
       });
 
@@ -171,7 +174,9 @@ export default function MetaConnectionForm({
 
       let finished = false;
       await readNdjsonStream(res, (event) => {
-        if (event.type === "done") {
+        if (event.type === "progress" && event.total) {
+          setSyncProgress({ rendered: event.rendered ?? 0, total: event.total });
+        } else if (event.type === "done") {
           const result = event.result as { syncedCount: number } | undefined;
           setDashboardSyncNote(`עודכנו ${result?.syncedCount ?? 0} פוסטים אחרונים ✓`);
           setDisplaySyncAt(new Date().toISOString());
@@ -192,6 +197,7 @@ export default function MetaConnectionForm({
       }
     } finally {
       setSyncingLatest(false);
+      setSyncProgress(null);
       syncAbortRef.current = null;
     }
   }
@@ -288,21 +294,34 @@ export default function MetaConnectionForm({
             >
               {syncingDashboard ? "מסנכרנת..." : "סנכרן את הדשבורד"}
             </button>
+            <select
+              value={quickSyncLimit}
+              onChange={(e) => setQuickSyncLimit(Number(e.target.value))}
+              disabled={syncingDashboard || syncingLatest}
+              title="כמה פוסטים עדכניים לעדכן"
+              className="rounded-lg border border-brand-pink/40 p-2 bg-white text-sm disabled:opacity-50"
+            >
+              {[1, 3, 5, 10, 20].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={handleSyncLatest}
               disabled={syncingDashboard || syncingLatest}
-              title="מעדכנת רק את 5 הפוסטים העדכניים ביותר — מהיר יותר מסנכרון מלא"
+              title={`מעדכנת רק את ${quickSyncLimit} הפוסטים העדכניים ביותר — מהיר יותר מסנכרון מלא`}
               className="rounded-lg border border-brand-red px-3 py-2 text-sm text-brand-red hover:bg-brand-red/10 disabled:opacity-50"
             >
-              {syncingLatest ? "מעדכנת..." : "עדכון זריז (5 אחרונים)"}
+              {syncingLatest ? "מעדכנת..." : `עדכון זריז (${quickSyncLimit} אחרונים)`}
             </button>
           </div>
-          {syncProgress && syncStartedAtRef.current && (
+          {syncProgress && syncStartedAt && (
             <ReelProgress
               rendered={syncProgress.rendered}
               total={syncProgress.total}
-              etaSeconds={estimateRemainingSeconds(syncProgress.rendered, syncProgress.total, syncStartedAtRef.current)}
+              etaSeconds={estimateRemainingSeconds(syncProgress.rendered, syncProgress.total, syncStartedAt)}
               onCancel={handleCancelSync}
               label="מסנכרנת..."
               unitLabel="פוסטים"

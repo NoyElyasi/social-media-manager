@@ -73,10 +73,16 @@ export default function NewPostPage() {
   const [coverBackgrounds, setCoverBackgrounds] = useState<BackgroundItem[]>([]);
   const [facebookProfileUrl, setFacebookProfileUrl] = useState<string | null>(null);
   const [facebookSearchQuery, setFacebookSearchQuery] = useState("");
+  // ייבוא מ-Notion — לא נשמר בטיוטה המקומית (notionUrl נשלח בבקשת היצירה עצמה, לא צריך לשרוד רענון עמוד).
+  const [notionLoading, setNotionLoading] = useState(false);
+  const [notionError, setNotionError] = useState<string | null>(null);
+  const [notionSegment, setNotionSegment] = useState<{ pageUrl: string; bodyText: string; typeValues: string[]; tagValues: string[] } | null>(null);
+  const [notionUrl, setNotionUrl] = useState<string | null>(null);
+  const [notionOldFlag, setNotionOldFlag] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
-  const startedAtRef = useRef<number | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // שומר את הטיוטה בכל שינוי — אבל לא דורסים טיוטה קיימת בדיסק במצב ריק
@@ -135,6 +141,36 @@ export default function NewPostPage() {
       .catch(() => {});
   }, []);
 
+  // תמיכה בקישור עומק מלוח השנה (ScheduleSlotEditorPanel, ?notionTag=...) —
+  // מחפש אוטומטית את הקטע המתאים בנושיין בלי להקליד את התגית שוב. לחיצה על
+  // "יצירת פוסט מהקטע הזה" היא בקשה מפורשת לקטע *הזה* — לכן זה תמיד דורס
+  // תגית ישנה שנשארה בטיוטה מקומית (אחרת קטע ב' תמיד יראה את תוצאת קטע א'
+  // הקודם, כי הטיוטה לא מתאפסת בין ביקורים בעמוד בלי שליחה מוצלחת). את
+  // הטקסט עצמו (rawText) עדיין לא נוגעים כאן — importNotionSegment שואל
+  // אישור בנפרד לפני שמחליף אותו.
+  useEffect(() => {
+    const tag = new URLSearchParams(window.location.search).get("notionTag");
+    if (!tag) return;
+    Promise.resolve().then(() => {
+      setManualHashtags(tag.startsWith("#") ? tag : `#${tag}`);
+      setNotionLoading(true);
+    });
+    fetch(`/api/notion/lookup?tag=${encodeURIComponent(tag)}`)
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) {
+          setNotionError(data.error ?? "החיפוש נכשל");
+          return;
+        }
+        if (!data.segment) {
+          setNotionError("לא נמצא קטע מוכן עם התגית הזו ב-Notion");
+          return;
+        }
+        setNotionSegment(data.segment);
+      })
+      .finally(() => setNotionLoading(false));
+  }, []);
+
   function insertMarkerAt(
     textarea: HTMLTextAreaElement,
     marker: string,
@@ -184,7 +220,7 @@ export default function NewPostPage() {
 
     setSubmitting(true);
     setProgress(null);
-    startedAtRef.current = Date.now();
+    setStartedAt(Date.now());
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -204,6 +240,7 @@ export default function NewPostPage() {
           reelBackgroundPath,
           coverBackgroundPath,
           reelNarration: selectedTargets.includes("instagram_reel") ? reelNarration : null,
+          notionUrl,
         }),
         signal: controller.signal,
       });
@@ -239,6 +276,7 @@ export default function NewPostPage() {
     } finally {
       setSubmitting(false);
       setProgress(null);
+      setStartedAt(null);
       abortControllerRef.current = null;
     }
   }
@@ -255,6 +293,77 @@ export default function NewPostPage() {
     if (!query) return;
     const url = `https://www.facebook.com/search/top?q=${encodeURIComponent(query)}`;
     window.open(url, "_blank");
+  }
+
+  function firstManualTag(): string | null {
+    return manualHashtags.trim().split(/\s+/)[0] || null;
+  }
+
+  async function handleNotionLookup() {
+    const tag = firstManualTag();
+    if (!tag) return;
+    setNotionLoading(true);
+    setNotionError(null);
+    setNotionSegment(null);
+    const res = await fetch(`/api/notion/lookup?tag=${encodeURIComponent(tag)}`);
+    const data = await res.json();
+    setNotionLoading(false);
+    if (!res.ok) {
+      setNotionError(data.error ?? "החיפוש נכשל");
+      return;
+    }
+    if (!data.segment) {
+      setNotionError("לא נמצא קטע מוכן עם התגית הזו ב-Notion");
+      return;
+    }
+    setNotionSegment(data.segment);
+  }
+
+  /**
+   * פירוש עמודת "Type" מ-Notion (multi_select — שורה יכולה להכיל כמה מילים
+   * בבת אחת, למשל ["פחד","ישן"]): "טיפ"/"מכתב" הם סוג הפוסט (aiFormat), "ישן"
+   * מסמן קטע ממוחזר (רק הודעה, בלי פעולה נוספת), וכל מילה אחרת היא בעצם
+   * נושא (aiTheme) — ואם היא לא ברשימת הנושאים הקיימת בהגדרות, מוסיפים
+   * אותה לשם, כדי שתהיה זמינה לבחירה גם בעתיד.
+   */
+  async function applyNotionTypeValue(typeValues: string[]) {
+    if (typeValues.includes("טיפ")) setPostFormat("tip");
+    if (typeValues.includes("מכתב")) setPostFormat("letter");
+    if (typeValues.includes("ישן")) setNotionOldFlag(true);
+
+    const theme = typeValues.map((v) => v.trim()).find((v) => v && v !== "טיפ" && v !== "מכתב" && v !== "ישן");
+    if (!theme) return;
+
+    setAiTheme(theme);
+    if (!aiThemeOptions.includes(theme)) {
+      const nextOptions = [...aiThemeOptions, theme];
+      setAiThemeOptions(nextOptions);
+      await fetch("/api/settings/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aiThemeOptions: nextOptions }),
+      });
+    }
+  }
+
+  async function importNotionSegment() {
+    if (!notionSegment) return;
+    if (rawText.trim() && !window.confirm("יש כבר טקסט בתיבה — להחליף אותו בטקסט מ-Notion?")) return;
+
+    setRawText(notionSegment.bodyText);
+    setNotionOldFlag(false);
+
+    const extraTags = notionSegment.tagValues.map((t) => (t.startsWith("#") ? t : `#${t}`));
+    if (extraTags.length > 0) {
+      const existing = manualHashtags.trim().split(/\s+/).filter(Boolean);
+      const merged = [...existing, ...extraTags.filter((t) => !existing.includes(t))];
+      setManualHashtags(merged.join(" "));
+    }
+
+    await applyNotionTypeValue(notionSegment.typeValues);
+
+    setNotionUrl(notionSegment.pageUrl);
+    setNotionSegment(null);
   }
 
   return (
@@ -350,6 +459,35 @@ export default function NewPostPage() {
           className="rounded-lg border border-brand-pink/40 p-2 text-sm bg-white"
           placeholder={`${ALWAYS_FIRST_HASHTAG} #תגית2 #תגית3`}
         />
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3 bg-brand-pink/10">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="text-sm font-medium">ייבוא קטע מוכן מ-Notion (לפי התגית הראשונה שלמעלה)</span>
+          <button
+            type="button"
+            onClick={handleNotionLookup}
+            disabled={notionLoading || !firstManualTag()}
+            className="rounded-md border border-brand-pink/40 px-3 py-1.5 text-xs hover:bg-white disabled:opacity-50"
+          >
+            {notionLoading ? "מחפשת..." : "🔍 חיפוש בנושיין"}
+          </button>
+        </div>
+        {notionError && <p className="text-xs text-red-600">{notionError}</p>}
+        {notionSegment && (
+          <div className="flex items-center justify-between gap-2 rounded-md bg-white p-2 text-xs">
+            <span className="truncate">נמצא קטע: {notionSegment.bodyText.slice(0, 60) || "(ללא טקסט)"}...</span>
+            <button
+              type="button"
+              onClick={importNotionSegment}
+              className="shrink-0 rounded-md bg-brand-red px-2 py-1 text-white hover:bg-brand-red-dark"
+            >
+              ייבוא לטקסט + תגיות
+            </button>
+          </div>
+        )}
+        {notionUrl && <p className="text-xs text-green-700">✓ יובא מ-Notion — קישור לעמוד המקור יישמר עם הפוסט</p>}
+        {notionOldFlag && <p className="text-xs text-amber-700">⚠️ מסומן כ&quot;ישן&quot; ב-Notion — קטע ממוחזר</p>}
       </div>
 
       <div className="flex flex-col gap-2">
@@ -524,11 +662,11 @@ export default function NewPostPage() {
         </div>
       )}
 
-      {progress && startedAtRef.current && (
+      {progress && startedAt && (
         <ReelProgress
           rendered={progress.rendered}
           total={progress.total}
-          etaSeconds={estimateRemainingSeconds(progress.rendered, progress.total, startedAtRef.current)}
+          etaSeconds={estimateRemainingSeconds(progress.rendered, progress.total, startedAt)}
           onCancel={handleCancel}
         />
       )}
