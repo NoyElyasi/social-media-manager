@@ -480,6 +480,10 @@ export default async function DashboardPage({
   const weekdayReachData = bucketBarData(weekdayBuckets, "reachCount", 3);
   const hourLikesData = bucketBarData(hourBuckets, "likesCount", 2);
   const hourReachData = bucketBarData(hourBuckets, "reachCount", 2);
+  // יעילות המרה (לייקים ל-100 חשבונות שנחשפו) לפי יום/שעה — עד כה הושוותה רק
+  // בין ריל לקרוסלה (formatEngagementData למטה), לא לפי יום/שעה בנפרד.
+  const weekdayEngagementData = bucketBarData(weekdayBuckets, "engagementRate", 3);
+  const hourEngagementData = bucketBarData(hourBuckets, "engagementRate", 2);
   const durationWatchData = twoGroupBarData(shortReels, `עד ${REEL_LENGTH_THRESHOLD}s`, longReels, `מעל ${REEL_LENGTH_THRESHOLD}s`, "avgWatchSeconds");
 
   // תיוג AI (אופציונלי — רק לפוסטים שנוצרו בכלי, קושרו, וסווגו)
@@ -507,6 +511,33 @@ export default async function DashboardPage({
   const realisticRows = rows.filter((r) => r.aiTone === "realistic");
   const absurdRows = rows.filter((r) => r.aiTone === "absurd");
   const toneLikesData = twoGroupBarData(realisticRows, "ריאליסטי", absurdRows, "אבסורדי", "likesCount");
+
+  // "טיפ" הוא תיוג ידני נפרד מ"מכתב" — היה חסר השוואה מקבילה (הייתה רק
+  // למכתב), אף שהתיוג עצמו נתמך (ראו InstagramMediaLabelEditor).
+  const tipRows = rows.filter((r) => r.aiFormat === "tip");
+  const nonTipRows = rows.filter((r) => r.aiFormat !== "tip");
+  const formatTipViewsReachData =
+    tipRows.filter((r) => r.reachCount !== null).length >= MIN_PER_GROUP &&
+    nonTipRows.filter((r) => r.reachCount !== null).length >= MIN_PER_GROUP
+      ? [
+          { name: "טיפ", views: avg(tipRows.map((r) => r.viewsCount)) ?? 0, reach: avg(tipRows.map((r) => r.reachCount)) ?? 0 },
+          { name: "שאר הפוסטים", views: avg(nonTipRows.map((r) => r.viewsCount)) ?? 0, reach: avg(nonTipRows.map((r) => r.reachCount)) ?? 0 },
+        ]
+      : null;
+
+  // נושא+פורמט → הגעה, לכל קומבינציה שנבדקה בפועל (לא רק ה-3 המובילות) — כדי
+  // לבדוק אם "יום חלש" הוא באמת חלש או שזה צירוף מקרים של תוכן חלש באותו יום
+  // (בקשה מפורשת). לא מיובא מ-reachInsights.ts (getTopContentAngles) — אותה
+  // קונבנציה כמו שאר הקובץ, לא לשתף קוד עם מנוע התכנון.
+  const angleBuckets: { name: string; rows: Row[] }[] = [];
+  for (const theme of themes) {
+    for (const format of ["letter", "tip", "regular"] as const) {
+      const formatLabel = format === "letter" ? "מכתב" : format === "tip" ? "טיפ" : "רגיל";
+      const matching = rows.filter((r) => r.aiTheme === theme && (r.aiFormat ?? "regular") === format);
+      if (matching.length > 0) angleBuckets.push({ name: `${theme} (${formatLabel})`, rows: matching });
+    }
+  }
+  const angleReachData = bucketBarData(angleBuckets, "reachCount", 2);
 
   const trendData = rows
     .filter((r) => r.likesCount !== null)
@@ -788,6 +819,12 @@ export default async function DashboardPage({
             note="מנרמל את הלייקים לפי כמות החשיפה — כדי לבודד את איכות התוכן מהאלגוריתם"
           />
           <BarComparisonCard
+            title="יום בשבוע → יעילות המרה"
+            data={weekdayEngagementData}
+            note="לייקים ל-100 חשבונות שנחשפו — לא רק כמה הגעה, אלא כמה ממנה 'הומרה'"
+          />
+          <BarComparisonCard title="שעת פרסום → יעילות המרה" data={hourEngagementData} />
+          <BarComparisonCard
             title="אורך ריל → זמן צפייה"
             data={durationWatchData}
             unit="s"
@@ -801,6 +838,15 @@ export default async function DashboardPage({
               { key: "reach", label: "הגעה (ייחודי)", color: "#e7a9b8" },
             ]}
             note="סמני 'פוסט מסוג מכתב' בגלריה למטה — כל פוסט אחר נחשב אוטומטית 'רגיל'"
+          />
+          <GroupedBarCard
+            title="טיפ לעומת שאר הפוסטים — צפיות והגעה"
+            data={formatTipViewsReachData}
+            bars={[
+              { key: "views", label: "צפיות", color: "#c41e3a" },
+              { key: "reach", label: "הגעה (ייחודי)", color: "#e7a9b8" },
+            ]}
+            note="סמני 'פוסט מסוג טיפ' בגלריה למטה"
           />
         </ChartScrollRow>
       </div>
@@ -863,6 +909,11 @@ export default async function DashboardPage({
                 title="נושא → לייקים"
                 data={themeLikesData}
                 note="דרושים לפחות 2 פוסטים מאותו נושא, בשני נושאים שונים — סווגי בגלריה למטה"
+              />
+              <BarComparisonCard
+                title="נושא+פורמט → הגעה (כל הקומבינציה שנבדקה)"
+                data={angleReachData}
+                note="כל הקומבינציות בפועל, לא רק המובילות — כדי לבדוק אם 'יום/נושא חלש' הוא באמת חלש או צירוף מקרים של תוכן חלש שפורסם בו"
               />
               <BarComparisonCard
                 title="מכתב לעומת פוסט רגיל → לייקים"
