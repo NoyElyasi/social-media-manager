@@ -41,7 +41,7 @@ export default function EditablePostText({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
-  const startedAtRef = useRef<number | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const [showBackgroundEditor, setShowBackgroundEditor] = useState(false);
@@ -62,13 +62,13 @@ export default function EditablePostText({
   // (למשל ריל, עם רקע שנבחר בזמן ההוספה) לא תישאר עם ערך ישן מהעלייה
   // הראשונה של הקומפוננטה (שהיה null לפני שהיעד הזה בכלל התווסף לפוסט).
   useEffect(() => {
-    setCarouselBackgroundPath(initialCarouselBackgroundPath);
+    Promise.resolve().then(() => setCarouselBackgroundPath(initialCarouselBackgroundPath));
   }, [initialCarouselBackgroundPath]);
   useEffect(() => {
-    setReelBackgroundPath(initialReelBackgroundPath);
+    Promise.resolve().then(() => setReelBackgroundPath(initialReelBackgroundPath));
   }, [initialReelBackgroundPath]);
   useEffect(() => {
-    setCoverBackgroundPath(initialCoverBackgroundPath);
+    Promise.resolve().then(() => setCoverBackgroundPath(initialCoverBackgroundPath));
   }, [initialCoverBackgroundPath]);
 
   useEffect(() => {
@@ -121,7 +121,7 @@ export default function EditablePostText({
     }
     setSaving(true);
     setProgress(null);
-    startedAtRef.current = Date.now();
+    setStartedAt(Date.now());
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -310,11 +310,11 @@ export default function EditablePostText({
           )}
         </div>
       )}
-      {progress && startedAtRef.current && (
+      {progress && startedAt && (
         <ReelProgress
           rendered={progress.rendered}
           total={progress.total}
-          etaSeconds={estimateRemainingSeconds(progress.rendered, progress.total, startedAtRef.current)}
+          etaSeconds={estimateRemainingSeconds(progress.rendered, progress.total, startedAt)}
           onCancel={handleCancel}
         />
       )}
