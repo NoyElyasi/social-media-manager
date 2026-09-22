@@ -127,13 +127,14 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
                         <span className="font-semibold text-brand-maroon">{Number(day.date.slice(8, 10))}</span>
                         <div className="flex items-center gap-1">
                           {day.isStrong && <span title="יום חזק">⚡</span>}
-                          {/* נקודה כחולה קטנה במקום תג מלא עם הטקסט — שם החג מוצג רק בהעברת עכבר (title), כדי לא לתפוס מקום. */}
+                          {/* נקודה כחולה קטנה במקום תג מלא עם הטקסט — שם החג מוצג רק בהעברת עכבר, כדי לא לתפוס מקום. בועית מותאמת ולא ה-title המובנה של הדפדפן, כי הוא לא היה נראה טוב על אלמנט כה קטן. */}
                           {day.specialDays.map((sd) => (
-                            <span
-                              key={sd.title}
-                              title={sd.title}
-                              className="inline-block h-2 w-2 shrink-0 cursor-help rounded-full bg-blue-500"
-                            />
+                            <span key={sd.title} className="group relative inline-block">
+                              <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                              <span className="pointer-events-none absolute bottom-full right-1/2 z-20 mb-1 hidden translate-x-1/2 whitespace-nowrap rounded-md bg-brand-maroon px-2 py-1 text-[10px] text-white group-hover:block">
+                                {sd.title}
+                              </span>
+                            </span>
                           ))}
                         </div>
                       </div>
