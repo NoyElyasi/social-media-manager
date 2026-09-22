@@ -1,14 +1,7 @@
 /**
- * הצעת שירים (שם בלבד, לא קובץ אודיו) לפי סעיף 4.2/4.4 — מבוססת על נושא
- * (theme) הפוסט, ורשימת השירים לכל נושא ניתנת לעריכה מלאה בהגדרות (ראו
- * SongsByThemeForm) — ההצעה היא תמיד שיר שהמשתמשת עצמה אישרה כמתאים לנושא.
- *
- * הנושא עצמו לא חייב בחירה ידנית: אם לא נבחר נושא בזמן יצירת הפוסט (ראו
- * detectThemeFromText), מזהים אותו אוטומטית ממילות מפתח בטקסט, לפי אותו
- * אוצר מילים של נושאים שגם משמש לתיוג ידני/לרשימות השירים — לא ניחוש גס
- * ומנותק כמו ההיוריסטיקה המקורית (שהחזירה כל הזמן את אותם 1-2 שירים
- * קבועים), אלא זיהוי שמזין בדיוק את אותה מערכת "שיר לפי נושא" שכבר קיימת.
- * בחירה ידנית, כשיש, תמיד גוברת על הזיהוי האוטומטי.
+ * זיהוי נושא (theme) אוטומטי מטקסט הפוסט, ממילות מפתח — לפי בקשה מפורשת,
+ * הצעת שיר קונקרטי (theme -> שיר) בוטלה (ראו preparePost.ts, שכבר לא קורא
+ * ל-suggestSongs); הזיהוי הזה עדיין משמש לקביעת aiTheme של הפוסט.
  */
 
 export interface SongSuggestion {
@@ -58,25 +51,4 @@ export function detectThemeFromText(text: string, availableThemes: string[]): st
   }
 
   return bestTheme;
-}
-
-export type ThemeSongs = Record<string, SongSuggestion[]>;
-
-const FALLBACK_THEME = "אחר";
-const HARD_FALLBACK: SongSuggestion[] = [
-  { title: "כאן ביחד", artist: "שרית חדד" },
-  { title: "יום יבוא", artist: "עידן רייכל" },
-];
-
-/**
- * theme — הנושא שנבחר לפוסט (מתוך aiThemeOptions), או null אם לא נבחר.
- * themeSongs — המפה הנוכחית (מוגדרות/הגדרות), theme → רשימת שירים.
- * אם לנושא הנבחר אין שירים שמורים (רשימה ריקה/לא קיימת), חוזרים לדלי "אחר";
- * ואם גם זה ריק, לרשימת ברירת המחדל הקשיחה כאן (כך שההצעה לא נעלמת לגמרי).
- */
-export function suggestSongs(theme: string | null | undefined, themeSongs: ThemeSongs, max = 3): SongSuggestion[] {
-  const forTheme = theme ? themeSongs[theme] : undefined;
-  const songs = forTheme && forTheme.length > 0 ? forTheme : themeSongs[FALLBACK_THEME];
-  const result = songs && songs.length > 0 ? songs : HARD_FALLBACK;
-  return result.slice(0, max);
 }

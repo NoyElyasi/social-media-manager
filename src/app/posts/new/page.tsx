@@ -18,7 +18,6 @@ const DRAFT_STORAGE_KEY = "newPostDraft";
 interface DraftShape {
   rawText: string;
   selectedTargets: SelectedTarget[];
-  splitMode: "auto" | "manual";
   revealMode: "word" | "letter" | "word-center";
   manualHashtags: string;
   aiTheme: string | null;
@@ -50,7 +49,9 @@ export default function NewPostPage() {
   const [selectedTargets, setSelectedTargets] = useState<SelectedTarget[]>(
     () => loadDraft().selectedTargets ?? ["instagram_carousel"]
   );
-  const [splitMode, setSplitMode] = useState<"auto" | "manual">(() => loadDraft().splitMode ?? "auto");
+  // חילוק אוטומטי בלבד — לפי בקשה מפורשת, בלי אפשרות למצב ידני (יש שליטה
+  // ידנית עדיין באמצעות סימוני /// ו-&& בתוך הטקסט, ראו insertSplitMarker/insertGlueMarker).
+  const splitMode = "auto" as const;
   const [revealMode, setRevealMode] = useState<"word" | "letter" | "word-center">(() => loadDraft().revealMode ?? "word");
   const [manualHashtags, setManualHashtags] = useState(() => loadDraft().manualHashtags ?? "");
   const [aiTheme, setAiTheme] = useState<string | null>(() => loadDraft().aiTheme ?? null);
@@ -95,7 +96,6 @@ export default function NewPostPage() {
     const draft: DraftShape = {
       rawText,
       selectedTargets,
-      splitMode,
       revealMode,
       manualHashtags,
       aiTheme,
@@ -108,7 +108,6 @@ export default function NewPostPage() {
   }, [
     rawText,
     selectedTargets,
-    splitMode,
     revealMode,
     manualHashtags,
     aiTheme,
@@ -492,7 +491,7 @@ export default function NewPostPage() {
 
       <div className="flex flex-col gap-2">
         <label className="font-medium text-sm">
-          נושא הפוסט (אופציונלי — קובע איזה שיר יוצע לקרוסלה. בלי בחירה, מזהים אוטומטית מהטקסט)
+          נושא הפוסט (אופציונלי — לתיוג ולמעקב בדשבורד. בלי בחירה, מזהים אוטומטית מהטקסט)
         </label>
         <select
           value={aiTheme ?? ""}
@@ -555,33 +554,6 @@ export default function NewPostPage() {
         </div>
       </div>
 
-      {/* 3. אפשרויות משותפות לקרוסלה + ריל */}
-      {(showCarouselOptions || showReelOptions) && (
-        <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3 bg-brand-pink/10">
-          <label className="font-medium text-sm">חילוק לעמודים בקרוסלה / למשפטים בריל</label>
-          <div className="flex gap-4 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="splitMode"
-                checked={splitMode === "auto"}
-                onChange={() => setSplitMode("auto")}
-              />
-              אוטומטי (לפי כמות טקסט; אפשר גם להוסיף ‎///‎ לחילוק נוסף בנקודה מסוימת)
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="splitMode"
-                checked={splitMode === "manual"}
-                onChange={() => setSplitMode("manual")}
-              />
-              ידני (רק ‎///‎ קובע איפה מתחיל עמוד/משפט חדש)
-            </label>
-          </div>
-        </div>
-      )}
-
       {/* 4. אפשרויות לקרוסלה בלבד */}
       {showCarouselOptions && (carouselBackgrounds.length > 0 || coverBackgrounds.length > 0) && (
         <div className="flex flex-col gap-4 rounded-lg border border-brand-pink/40 p-3">
@@ -594,6 +566,7 @@ export default function NewPostPage() {
                 selected={carouselBackgroundPath}
                 onSelect={setCarouselBackgroundPath}
                 noneLabel="ללא (רקע לבן)"
+                formatFilter={postFormat}
               />
             </div>
           )}
@@ -605,6 +578,7 @@ export default function NewPostPage() {
                 selected={coverBackgroundPath}
                 onSelect={setCoverBackgroundPath}
                 noneLabel="ללא עמוד שער"
+                formatFilter={postFormat}
               />
             </div>
           )}
@@ -655,6 +629,7 @@ export default function NewPostPage() {
                 selected={reelBackgroundPath}
                 onSelect={setReelBackgroundPath}
                 noneLabel="ללא תבנית (רקע אוטומטי)"
+                formatFilter={postFormat}
               />
             </div>
           )}

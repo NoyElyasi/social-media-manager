@@ -5,7 +5,7 @@ import { getStorageService } from "../storage";
 import { scanForIdentifyingDetails } from "./privacyScanner";
 import { prepareFacebookDraft } from "./facebook";
 import { prepareInstagramCarousel, stripSlideMarkers, type SplitMode } from "./instagramCarousel";
-import { suggestSongs, detectThemeFromText, type ThemeSongs } from "./songSuggestions";
+import { detectThemeFromText } from "./songSuggestions";
 import {
   prepareInstagramReel,
   ReelCancelledError,
@@ -18,14 +18,6 @@ import { ALWAYS_FIRST_HASHTAG, type SelectedTarget } from "@/lib/labels";
 import type { StorageService } from "../storage/types";
 
 export type { SelectedTarget };
-
-function parseThemeSongs(themeSongsJson: string): ThemeSongs {
-  try {
-    return JSON.parse(themeSongsJson || "{}");
-  } catch {
-    return {};
-  }
-}
 
 /** בודקת אם תבנית רקע קרוסלה נבחרת מסומנת "כהה" בהגדרות (ראו setCarouselBackgroundDark). */
 function isDarkCarouselBackground(darkCarouselBackgroundPathsJson: string, backgroundPath: string | null): boolean {
@@ -155,9 +147,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
   const splitMode: SplitMode = input.splitMode ?? "auto";
   const revealMode: RevealMode = input.revealMode ?? "word";
 
-  // בחירה ידנית (אם יש) גוברת; בלעדיה, מזהות נושא אוטומטית מהטקסט (ראו
-  // detectThemeFromText) — כדי שהצעת השיר תמיד תתבסס על נושא אמיתי, ולא
-  // תיפול כל הזמן ל"אחר" רק כי לא נבחר נושא ידנית ביצירה.
+  // בחירה ידנית (אם יש) גוברת; בלעדיה, מזהות נושא אוטומטית מהטקסט (ראו detectThemeFromText).
   const themeOptions: string[] = JSON.parse(profile.aiThemeOptions || "[]");
   const effectiveTheme = input.aiTheme ?? detectThemeFromText(cleanText, themeOptions);
 
@@ -181,7 +171,6 @@ export async function createAndPreparePost(input: CreatePostInput) {
   const carouselBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.carouselBackgroundPath);
   const reelBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.reelBackgroundPath);
   const coverBackgroundImageDataUri = await loadProfileImageDataUri(storage, input.coverBackgroundPath);
-  const songs = suggestSongs(effectiveTheme, parseThemeSongs(profile.themeSongsJson));
 
   try {
     for (const target of input.selectedTargets) {
@@ -222,7 +211,6 @@ export async function createAndPreparePost(input: CreatePostInput) {
           isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, input.carouselBackgroundPath ?? null),
           ...getCarouselTextPosition(profile.carouselBackgroundImagePaths, input.carouselBackgroundPath ?? null),
           coverBackgroundImageDataUri,
-          songs,
           storage,
         });
         await prisma.platformContent.create({
@@ -338,7 +326,6 @@ export async function updatePostRawText(
 
   const profileImageDataUri = await loadProfileImageDataUri(storage, profile.profileImagePath);
   const sharedHashtags: string[] = JSON.parse(post.hashtags || "[]");
-  const songs = suggestSongs(post.aiTheme, parseThemeSongs(profile.themeSongsJson));
 
   for (const content of post.platformContents) {
     if (content.type === "facebook_post") {
@@ -377,7 +364,6 @@ export async function updatePostRawText(
         isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, backgroundPath),
         ...getCarouselTextPosition(profile.carouselBackgroundImagePaths, backgroundPath),
         coverBackgroundImageDataUri,
-        songs,
         storage,
       });
       await prisma.platformContent.update({
@@ -490,7 +476,6 @@ export async function addTargetToPost(
   const subfolder = await storage.createSubfolder(post.folderPath, SUBFOLDER_NAMES[target]);
 
   if (target === "instagram_carousel") {
-    const songs = suggestSongs(post.aiTheme, parseThemeSongs(profile.themeSongsJson));
     const result = await prepareInstagramCarousel({
       rawText: post.rawText,
       splitMode,
@@ -498,7 +483,6 @@ export async function addTargetToPost(
       folderPath: subfolder,
       displayName: profile.displayName,
       profileImageDataUri,
-      songs,
       storage,
     });
     await prisma.platformContent.create({

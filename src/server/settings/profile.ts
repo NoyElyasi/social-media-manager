@@ -1,6 +1,5 @@
 import { prisma } from "../db";
 import type { StorageService } from "../storage/types";
-import type { ThemeSongs } from "../content/songSuggestions";
 
 /** ממפה סיומת קובץ ל-MIME תקין (jpg הוא לא MIME תקני — image/jpeg הוא). */
 function extensionToMime(ext: string): string {
@@ -47,7 +46,6 @@ export async function updateProfileSettings(input: {
   profileImagePath?: string | null;
   facebookProfileUrl?: string | null;
   aiThemeOptions?: string[];
-  themeSongs?: ThemeSongs;
 }) {
   await getProfileSettings(); // מבטיח שהרשומה קיימת
 
@@ -58,7 +56,6 @@ export async function updateProfileSettings(input: {
       ...(input.profileImagePath !== undefined ? { profileImagePath: input.profileImagePath } : {}),
       ...(input.facebookProfileUrl !== undefined ? { facebookProfileUrl: input.facebookProfileUrl } : {}),
       ...(input.aiThemeOptions !== undefined ? { aiThemeOptions: JSON.stringify(input.aiThemeOptions) } : {}),
-      ...(input.themeSongs !== undefined ? { themeSongsJson: JSON.stringify(input.themeSongs) } : {}),
     },
   });
 }
