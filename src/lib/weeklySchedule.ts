@@ -502,6 +502,23 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
       include: { platformContent: { include: { post: true } } },
     });
     createdSlots.push(created);
+
+    // אם התגית/המועמד הזה "נתפס" קודם בסלוט משבוע שכבר עבר ולא נוצל (ראו
+    // getUsedNotionTags/claimedMediaIds — תפיסה משבוע שעבר לא נחשבת "תפוסה"
+    // יותר, כדי לא לחסום תוכן לתמיד) — הסלוט הישן מנוקה עכשיו, כדי שלא
+    // תוצג פעמיים אותה המלצה בדיוק (גם בשבוע שעבר וגם כאן).
+    if (plannedNotionTag) {
+      await prisma.scheduledSlot.updateMany({
+        where: { plannedNotionTag, id: { not: created.id } },
+        data: { plannedNotionTag: null, plannedNotionPreview: null, plannedNotionPageUrl: null },
+      });
+    }
+    if (plannedReelCandidateMediaId) {
+      await prisma.scheduledSlot.updateMany({
+        where: { plannedReelCandidateMediaId, id: { not: created.id } },
+        data: { plannedReelCandidateMediaId: null },
+      });
+    }
   }
 
   // השבוע הזה תפס את מה שהוא צריך (claimedMediaIds/usedNotionTags עדכניים
