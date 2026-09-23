@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useState, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { WeekPlan } from "@/lib/weeklySchedule";
 import ScheduleSlotChip from "./ScheduleSlotChip";
@@ -22,6 +22,28 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
   const [target, setTarget] = useState<EditorTarget | null>(null);
+  const [dragOverCell, setDragOverCell] = useState<string | null>(null);
+
+  /** גרירת שיבוץ קיים לתא (יום+שעה) אחר — מזיזה אותה בדיוק כמו שינוי תאריך/שעה בפאנל (נועלת אותה, ראו PATCH). */
+  async function handleDrop(e: DragEvent<HTMLDivElement>, date: string, hour: number) {
+    e.preventDefault();
+    setDragOverCell(null);
+    const raw = e.dataTransfer.getData("text/plain");
+    if (!raw) return;
+    let payload: { slotId: string; date: string; hour: number };
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (payload.date === date && payload.hour === hour) return;
+    await fetch(`/api/schedule/slots/${payload.slotId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date, hour }),
+    });
+    router.refresh();
+  }
 
   async function handleGenerate() {
     setGenerating(true);
@@ -142,11 +164,30 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
                 </div>
                 {plan.days.map((day) => {
                   const cellSlots = plan.slots.filter((s) => s.date === day.date && s.hour === hour);
+                  const cellKey = `${day.date}-${hour}`;
                   return (
-                    <div key={`${day.date}-${hour}`} className="border-t border-brand-pink/10 p-0.5 flex gap-0.5" style={{ height: ROW_H }}>
+                    <div
+                      key={cellKey}
+                      className={`border-t border-brand-pink/10 p-0.5 flex gap-0.5 ${dragOverCell === cellKey ? "bg-brand-pink/20" : ""}`}
+                      style={{ height: ROW_H }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOverCell(cellKey);
+                      }}
+                      onDragLeave={() => setDragOverCell((k) => (k === cellKey ? null : k))}
+                      onDrop={(e) => handleDrop(e, day.date, hour)}
+                    >
                       {cellSlots.length > 0 ? (
                         cellSlots.map((slot) => (
-                          <div key={slot.slotId ?? `${slot.date}-${slot.hour}`} className="flex-1 min-w-0">
+                          <div
+                            key={slot.slotId ?? `${slot.date}-${slot.hour}`}
+                            className="flex-1 min-w-0 cursor-grab active:cursor-grabbing"
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.effectAllowed = "move";
+                              e.dataTransfer.setData("text/plain", JSON.stringify({ slotId: slot.slotId, date: slot.date, hour: slot.hour }));
+                            }}
+                          >
                             <ScheduleSlotChip slot={slot} onClick={() => setTarget({ mode: "existing", slot })} />
                           </div>
                         ))

@@ -30,6 +30,9 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   const [loadingPicker, setLoadingPicker] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [noteInput, setNoteInput] = useState(target.mode === "existing" ? target.slot.note ?? "" : "");
+  const [notionTags, setNotionTags] = useState<{ tag: string; typeValues: string[] }[] | null>(null);
+  const [notionTagsLoading, setNotionTagsLoading] = useState(false);
+  const [noteDropdownOpen, setNoteDropdownOpen] = useState(false);
 
   const slotId = target.mode === "existing" ? target.slot.slotId : null;
   const date = target.mode === "existing" ? target.slot.date : target.date;
@@ -54,6 +57,16 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
       setReadyItems(data.items ?? []);
       setLoadingPicker(false);
     }
+  }
+
+  /** טוענת פעם אחת (בפוקוס ראשון על שם/הערה) את כל תגיות "מוכן" מנושיין — לדרופ-דאון ולבדיקת קיום. */
+  async function ensureNotionTags() {
+    if (notionTags || notionTagsLoading) return;
+    setNotionTagsLoading(true);
+    const res = await fetch("/api/notion/ready-tags");
+    const data = await res.json();
+    setNotionTags(data.tags ?? []);
+    setNotionTagsLoading(false);
   }
 
   async function refreshAndClose() {
@@ -119,6 +132,12 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
     setNotionEditing(false);
     router.refresh();
   }
+
+  const normalizeTag = (t: string) => t.replace(/^#/, "").trim().toLowerCase();
+  const noteMatches =
+    notionTags && noteInput.trim() ? notionTags.filter((t) => normalizeTag(t.tag).includes(normalizeTag(noteInput))) : [];
+  const noteExistsInNotion =
+    notionTags && noteInput.trim() ? notionTags.some((t) => normalizeTag(t.tag) === normalizeTag(noteInput)) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
@@ -309,14 +328,22 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
               </div>
             )}
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 relative">
               <span className="text-[11px] text-brand-maroon/50">שם/הערה (למשל קטע שעדיין בעבודה במקום אחר, כמו Notion, ולא הוכן עדיין בכלי):</span>
               <div className="flex gap-1">
                 <input
                   type="text"
                   value={noteInput}
                   disabled={busy}
-                  onChange={(e) => setNoteInput(e.target.value)}
+                  onFocus={() => {
+                    void ensureNotionTags();
+                    setNoteDropdownOpen(true);
+                  }}
+                  onBlur={() => setNoteDropdownOpen(false)}
+                  onChange={(e) => {
+                    setNoteInput(e.target.value);
+                    setNoteDropdownOpen(true);
+                  }}
                   placeholder="לדוגמה: קטע געגוע לאמא"
                   className="flex-1 rounded border border-brand-pink/40 bg-white px-2 py-1 text-xs"
                 />
@@ -331,6 +358,31 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
                   </button>
                 )}
               </div>
+              {notionTagsLoading && <span className="text-[11px] text-brand-maroon/40">טוענת רשימת נושיין...</span>}
+              {!notionTagsLoading && notionTags && noteInput.trim() && (
+                <span className={`text-[11px] ${noteExistsInNotion ? "text-green-700" : "text-brand-maroon/40"}`}>
+                  {noteExistsInNotion ? "✓ קיים בנושיין (מוכן)" : "לא נמצא בנושיין קטע 'מוכן' בשם הזה"}
+                </span>
+              )}
+              {noteDropdownOpen && noteMatches.length > 0 && (
+                <div className="absolute top-full right-0 left-0 z-10 mt-1 rounded border border-brand-pink/40 bg-white shadow-md max-h-32 overflow-y-auto">
+                  {noteMatches.map((m) => (
+                    <button
+                      key={m.tag}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setNoteInput(m.tag);
+                        setNoteDropdownOpen(false);
+                      }}
+                      className="w-full text-right px-2 py-1 text-xs hover:bg-brand-pink/10 truncate"
+                    >
+                      {m.tag.startsWith("#") ? m.tag : `#${m.tag}`}
+                      {m.typeValues.length > 0 && <span className="text-brand-maroon/40"> · {m.typeValues.join(", ")}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {recommendedReelCandidate && (
