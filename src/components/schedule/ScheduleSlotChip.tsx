@@ -13,8 +13,11 @@ export default function ScheduleSlotChip({ slot, onClick }: { slot: WeekSlot; on
   const content = slot.content;
   const notionSegment = slot.recommendedNotionSegment;
   const notionTagLabel = notionSegment ? (notionSegment.tag.startsWith("#") ? notionSegment.tag : `#${notionSegment.tag}`) : null;
-  const emptyLabel = notionTagLabel ?? (slot.recommendedType ? RECOMMENDED_TYPE_SHORT_LABELS[slot.recommendedType] ?? "ריק" : "ריק");
   const candidate = slot.recommendedReelCandidate;
+  // המלצת ריל מוצגת בכותרת עם שם/כיתוב הריל עצמו (כמו תגית נושיין) — לא "צריך
+  // ריל" גנרי עם השם למטה, לפי בקשה מפורשת: לראות איזה ריל בלי לפתוח את הפופ-אפ.
+  const reelLabel = candidate ? `🎬 ${candidate.caption ?? "(ללא כיתוב)"}` : null;
+  const emptyLabel = notionTagLabel ?? reelLabel ?? (slot.recommendedType ? RECOMMENDED_TYPE_SHORT_LABELS[slot.recommendedType] ?? "ריק" : "ריק");
 
   return (
     <button
@@ -41,8 +44,6 @@ export default function ScheduleSlotChip({ slot, onClick }: { slot: WeekSlot; on
       </div>
       {content?.text && <div className="truncate opacity-80">{content.text}</div>}
       {!content && notionSegment && <div className="truncate opacity-80">📓 {notionSegment.preview || notionTagLabel}</div>}
-      {/* מועמד ריל ספציפי מוצג תמיד כשיש, גם אם יש הערה גנרית (כמו הערת "יום לבדיקה") — לפי בקשה מפורשת לראות איזה ריל מומלץ בלי ללחוץ. */}
-      {!content && !notionSegment && candidate && <div className="truncate opacity-80">🎬 {candidate.caption ?? "(ללא כיתוב)"}</div>}
       {!content && !notionSegment && !candidate && slot.note && <div className="truncate opacity-80">📝 {slot.note}</div>}
       {!content && !notionSegment && !candidate && !slot.note && <div className="truncate opacity-70">אין מוכן ברשימה</div>}
     </button>
