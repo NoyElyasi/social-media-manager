@@ -335,11 +335,24 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
 
   const blockedDateStrings = new Set(blockedDays.map((b) => formatCalendarDate(b.date)));
   const majorHolidayDateStrings = new Set(specialDays.filter((s) => s.isMajor).map((s) => s.date));
-  // רק סלוט ידני עם תוכן/הערה בפועל "תופס" את היום שלו — סלוט ידני ריק לגמרי
-  // (בלי תוכן ובלי הערה, למשל שיבוץ מקום שנשאר ריק) לא אמור לחסום את היום
-  // מלקבל הצעה אמיתית, אחרת כל השבוע יכול להיראות "ריק" בלי סיבה.
+  // רק סלוט ידני עם תוכן/הערה/הצעה מתוכננת בפועל "תופס" את היום שלו — סלוט
+  // ידני ריק לגמרי (בלי תוכן, בלי הערה, ובלי המלצה מתוכננת, למשל שיבוץ מקום
+  // שנשאר ריק) לא אמור לחסום את היום מלקבל הצעה אמיתית, אחרת כל השבוע יכול
+  // להיראות "ריק" בלי סיבה. סלוט "נעול" (🔒) שכן נושא המלצה (פורמט/ריל/קטע
+  // נושיין) חייב לתפוס את היום, אחרת הרענון יכול ליצור סלוט נוסף בדיוק באותה
+  // שעה — זה מה שקרה בבאג המקורי.
   const manualDateStrings = new Set(
-    manualSlots.filter((s) => s.platformContentId || (s.note && s.note.trim())).map((s) => formatCalendarDate(s.date))
+    manualSlots
+      .filter(
+        (s) =>
+          s.platformContentId ||
+          (s.note && s.note.trim()) ||
+          s.plannedType ||
+          s.plannedFormat ||
+          s.plannedReelCandidateMediaId ||
+          s.plannedNotionTag
+      )
+      .map((s) => formatCalendarDate(s.date))
   );
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));

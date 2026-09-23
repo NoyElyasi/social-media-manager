@@ -24,6 +24,7 @@ export type EditorTarget = { mode: "existing"; slot: WeekSlot } | { mode: "new";
 export default function ScheduleSlotEditorPanel({ target, onClose }: { target: EditorTarget; onClose: () => void }) {
   const router = useRouter();
   const [hour, setHour] = useState(target.mode === "existing" ? target.slot.hour : target.hour);
+  const [dateInput, setDateInput] = useState(target.mode === "existing" ? target.slot.date : target.date);
   const [busy, setBusy] = useState(false);
   const [readyItems, setReadyItems] = useState<ReadyContentItem[] | null>(null);
   const [loadingPicker, setLoadingPicker] = useState(false);
@@ -69,6 +70,18 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
       body: JSON.stringify(data),
     });
     await refreshAndClose();
+  }
+
+  /** מזיזה שיבוץ קיים לתאריך אחר (שבוע אחר לגמרי, כולל) — נועלת אותו (כמו כל עדכון ידני, ראו patchExisting). */
+  async function moveToDate(newDate: string) {
+    setDateInput(newDate);
+    await patchExisting({ date: newDate });
+  }
+
+  function shiftWeek(days: number) {
+    const d = new Date(`${dateInput}T00:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    void moveToDate(d.toISOString().slice(0, 10));
   }
 
   async function deleteExisting() {
@@ -139,6 +152,38 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
           </select>
           {!isManual && <span className="text-[11px] text-brand-maroon/40">🤖 הצעה אוטומטית</span>}
         </div>
+
+        {target.mode === "existing" && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-brand-maroon/60">תאריך:</span>
+            <input
+              type="date"
+              value={dateInput}
+              disabled={busy}
+              onChange={(e) => e.target.value && moveToDate(e.target.value)}
+              className="rounded border border-brand-pink/40 bg-white px-1 py-0.5 text-xs"
+            />
+            <button type="button" onClick={() => shiftWeek(-7)} disabled={busy} className="rounded border border-brand-pink/40 px-1.5 py-0.5 hover:bg-brand-pink/10">
+              שבוע קודם
+            </button>
+            <button type="button" onClick={() => shiftWeek(7)} disabled={busy} className="rounded border border-brand-pink/40 px-1.5 py-0.5 hover:bg-brand-pink/10">
+              שבוע הבא
+            </button>
+          </div>
+        )}
+
+        {target.mode === "existing" && (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => patchExisting({ isManual: !isManual })}
+              disabled={busy}
+              className="text-[11px] text-brand-maroon/60 hover:text-brand-red underline"
+            >
+              {isManual ? "🔓 בטלי נעילה — תיכלל בהצעה הבאה" : "🔒 נעלי — לא תשתנה בהצעה הבאה"}
+            </button>
+          </div>
+        )}
 
         {target.mode === "existing" && (
           <div className="flex items-center gap-1.5 text-xs">
