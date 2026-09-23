@@ -173,6 +173,13 @@ model BlockedDay {
   createdAt DateTime @default(now())
 }
 
+// יום שכבר "נבדק" מול הנתונים האמיתיים שכבר קיימים ב-InstagramMedia (ראו
+// reconcileMonthWithInstagram) — כדי לא להריץ את ההתאמה פעמיים על אותו יום
+// בלחיצות חוזרות על "סנכרון בפועל"/תכנון החודש.
+model ReconciledDay {
+  date DateTime @id
+}
+
 // עותק מקומי (cache) של פוסטים אמיתיים מאינסטגרם, נשלף ישירות מ-Graph API —
 // עצמאי לגמרי מ-Post/PlatformContent. משמש כמקור הנתונים היחיד לדשבורד
 // האנליטיקס (/dashboard), כדי שהדשבורד ישקף את כל הנוכחות שלה באינסטגרם ולא

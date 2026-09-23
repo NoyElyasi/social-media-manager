@@ -273,6 +273,39 @@ export async function listReadySegments(): Promise<NotionReadyRow[]> {
   return rows;
 }
 
+/**
+ * כמו findReadySegmentByTag, אבל בלי סינון לפי סטטוס — לשימוש בסנכרון בפועל
+ * (reconcileMonthWithInstagram ב-weeklySchedule.ts): בזמן שהתוכן פורסם בפועל
+ * הסטטוס בנושיין כבר לא בהכרח "מוכן", אבל עמודת ה-Type שלה (טיפ/מכתב/ישן/
+ * נושא) עדיין נכונה ורלוונטית לסיווג.
+ */
+export async function findSegmentTypeByTag(tag: string): Promise<string[] | null> {
+  const config = await loadNotionConfig();
+  if ("error" in config) return null;
+  const { apiKey, databaseId, map } = config;
+
+  const cleanTag = tag.replace(/^#/, "").trim();
+  const candidates = [tag.trim(), cleanTag].filter((v, i, arr) => v.length > 0 && arr.indexOf(v) === i);
+
+  for (const candidate of candidates) {
+    const filter = buildEqualsFilter(map.tag, candidate);
+    const res = await notionFetch(`/databases/${databaseId}/query`, apiKey, {
+      method: "POST",
+      body: JSON.stringify({ filter, page_size: 1 }),
+    });
+    if (!res.ok) continue;
+
+    const data = (await res.json()) as NotionApiObject;
+    const page = (data.results as NotionApiObject[] | undefined)?.[0];
+    if (page) {
+      const properties = (page.properties ?? {}) as Record<string, NotionApiObject>;
+      return map.type ? extractMultiValue(properties[map.type.name]) : [];
+    }
+  }
+
+  return null;
+}
+
 /** תקציר קצר של טקסט העמוד (לתצוגה בלוח השנה) — נשלף רק לקטע שכבר נבחר, לא לכל הרשימה. */
 export async function getShortPreview(pageId: string): Promise<string> {
   const apiKey = getApiKey();
