@@ -232,29 +232,24 @@ function buildWeekReasonLines(days: { date: string; label: string }[], slots: We
     .sort((a, b) => (a.date === b.date ? a.hour - b.hour : a.date.localeCompare(b.date)))
     .map((s) => {
       const label = dayLabelByDate.get(s.date) ?? s.date;
-      const typeLabel = s.recommendedType === "instagram_reel" ? "ריל" : s.recommendedType === "instagram_carousel" ? "קרוסלה" : "פוסט";
       const head = `${label} (${s.date.slice(5)}, ${String(s.hour).padStart(2, "0")}:00)`;
       const parts: string[] = [];
 
-      if (s.actualStatus === "done") {
-        parts.push(`✅ פורסם בפועל (${typeLabel}) — כבר לא נכלל במכסת ההצעות להמשך השבוע`);
-        return `${head} 🟰 ${parts.join(" · ")}`;
-      }
+      if (s.actualStatus === "done") return `${head} 🟰 ✅`;
 
-      if (s.note?.startsWith("🔍")) parts.push("🔍 יום בדיקה — הכי פחות מפורסם היסטורית, תוסף לשבוע");
-      else parts.push(s.dayIsStrong ? "⚡ יום חזק (הגעה ממוצעת גבוהה)" : "משלים את מכסת השבוע (2 חדש + 1 ישן)");
+      if (s.note?.startsWith("🔍")) parts.push("🔍");
+      else if (s.dayIsStrong) parts.push("⚡");
 
-      if (s.recommendedReelCandidate) parts.push(`🎬 ריל — יש מועמד מוכח מ"הרילים הבאים" (${s.recommendedReelCandidate.caption?.slice(0, 30) ?? "ללא כיתוב"})`);
+      if (s.recommendedReelCandidate) parts.push(`🎬 ${s.recommendedReelCandidate.caption?.slice(0, 30) ?? "ללא כיתוב"}`);
       else if (s.recommendedNotionSegment) {
         const tag = s.recommendedNotionSegment.tag;
-        parts.push(`📓 קרוסלה — קטע מוכן בנושיין (${tag.startsWith("#") ? tag : `#${tag}`})`);
-      }
-      else if (s.content) parts.push(`${typeLabel} — תוכן מוכן שכבר קיים בכלי`);
-      else parts.push(`${typeLabel} — אין עדיין קטע ספציפי, צריך להכין`);
+        parts.push(`📓 ${tag.startsWith("#") ? tag : `#${tag}`}`);
+      } else if (s.content) parts.push("📦");
+      else parts.push(s.recommendedType === "instagram_reel" ? "🎬" : "📄");
 
-      if (s.recommendedFormat) parts.push(`${s.recommendedFormat === "letter" ? "✉️ מכתב" : "💡 טיפ"} — מאחורי הקצב החודשי`);
+      if (s.recommendedFormat) parts.push(s.recommendedFormat === "letter" ? "✉️" : "💡");
 
-      return `${head} 🟰 ${parts.join(" · ")}`;
+      return `${head} 🟰 ${parts.join(" ")}`;
     });
 }
 
