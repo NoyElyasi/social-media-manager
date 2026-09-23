@@ -213,8 +213,49 @@ export interface WeekPlan {
   engagement: EngagementData;
   formatAlerts: FormatGap[];
   methodology: string[];
+  // הסבר קונקרטי לשבוע *הזה* בדיוק — לא הכללים הגלובליים (methodology),
+  // אלא מה בפועל נבחר לכל סלוט ולמה. ראו buildWeekReasonLines.
+  reasonLines: string[];
   topAngles: ContentAngle[];
   summary: { totalPosts: number; reels: number; newNeeded: number; existingReady: number };
+}
+
+/**
+ * הסבר קצר וקונקרטי לכל סלוט בשבוע הזה — למה נבחר היום/השעה/הפורמט הספציפי,
+ * לא רק הכללים הכלליים (ראו buildMethodologyLines). לפי בקשה מפורשת להבין
+ * את השיקולים בכל שבוע, לא רק פעם אחת גלובלית.
+ */
+function buildWeekReasonLines(days: { date: string; label: string }[], slots: WeekSlot[]): string[] {
+  if (slots.length === 0) return ["השבוע הזה אין עדיין אף שיבוץ."];
+  const dayLabelByDate = new Map(days.map((d) => [d.date, d.label]));
+  return [...slots]
+    .sort((a, b) => (a.date === b.date ? a.hour - b.hour : a.date.localeCompare(b.date)))
+    .map((s) => {
+      const label = dayLabelByDate.get(s.date) ?? s.date;
+      const typeLabel = s.recommendedType === "instagram_reel" ? "ריל" : s.recommendedType === "instagram_carousel" ? "קרוסלה" : "פוסט";
+      const head = `${label} (${s.date.slice(5)}, ${String(s.hour).padStart(2, "0")}:00)`;
+      const parts: string[] = [];
+
+      if (s.actualStatus === "done") {
+        parts.push(`✅ פורסם בפועל (${typeLabel}) — כבר לא נכלל במכסת ההצעות להמשך השבוע`);
+        return `${head} 🟰 ${parts.join(" · ")}`;
+      }
+
+      if (s.note?.startsWith("🔍")) parts.push("🔍 יום בדיקה — הכי פחות מפורסם היסטורית, תוסף לשבוע");
+      else parts.push(s.dayIsStrong ? "⚡ יום חזק (הגעה ממוצעת גבוהה)" : "משלים את מכסת השבוע (2 חדש + 1 ישן)");
+
+      if (s.recommendedReelCandidate) parts.push(`🎬 ריל — יש מועמד מוכח מ"הרילים הבאים" (${s.recommendedReelCandidate.caption?.slice(0, 30) ?? "ללא כיתוב"})`);
+      else if (s.recommendedNotionSegment) {
+        const tag = s.recommendedNotionSegment.tag;
+        parts.push(`📓 קרוסלה — קטע מוכן בנושיין (${tag.startsWith("#") ? tag : `#${tag}`})`);
+      }
+      else if (s.content) parts.push(`${typeLabel} — תוכן מוכן שכבר קיים בכלי`);
+      else parts.push(`${typeLabel} — אין עדיין קטע ספציפי, צריך להכין`);
+
+      if (s.recommendedFormat) parts.push(`${s.recommendedFormat === "letter" ? "✉️ מכתב" : "💡 טיפ"} — מאחורי הקצב החודשי`);
+
+      return `${head} 🟰 ${parts.join(" · ")}`;
+    });
 }
 
 async function loadWeekContext(weekStart: Date) {
@@ -942,6 +983,7 @@ function buildPlanResponse(
     engagement,
     formatAlerts,
     methodology: buildMethodologyLines(strength, formatPerf, totalSamples),
+    reasonLines: buildWeekReasonLines(days, slots),
     topAngles,
     summary: {
       totalPosts: slots.length,

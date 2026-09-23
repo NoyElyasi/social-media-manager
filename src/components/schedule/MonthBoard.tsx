@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { MonthPlan } from "@/lib/monthlySchedule";
@@ -36,8 +36,49 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
   const [generating, setGenerating] = useState(false);
   const [reconciling, setReconciling] = useState(false);
   const [reconcileSummary, setReconcileSummary] = useState<string | null>(null);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const monthKey = plan.monthStart.slice(0, 7);
   const today = todayIso();
+
+  async function moveSlot(slotId: string, date: string) {
+    await fetch(`/api/schedule/slots/${slotId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date }),
+    });
+  }
+
+  function readDragPayload(e: DragEvent): { slotId: string; date: string } | null {
+    const raw = e.dataTransfer.getData("text/plain");
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  /** גרירה לתא של יום (לא בדיוק על שיבוץ קיים) — מזיזה את השיבוץ הנגרר ליום הזה, ראו handleDropOnSlot להחלפה בין שני שיבוצים. */
+  async function handleDropOnDay(e: DragEvent<HTMLDivElement>, targetDate: string) {
+    e.preventDefault();
+    setDragOverDate(null);
+    const payload = readDragPayload(e);
+    if (!payload || payload.date === targetDate) return;
+    await moveSlot(payload.slotId, targetDate);
+    router.refresh();
+  }
+
+  /** גרירה ישר על שיבוץ קיים ביום אחר — מחליפה בין התאריכים של שני השיבוצים (לא רק מזיזה אחד). */
+  async function handleDropOnSlot(e: DragEvent<HTMLSpanElement>, targetSlotId: string, targetDate: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverDate(null);
+    const payload = readDragPayload(e);
+    if (!payload || payload.slotId === targetSlotId || payload.date === targetDate) return;
+    await moveSlot(payload.slotId, targetDate);
+    await moveSlot(targetSlotId, payload.date);
+    router.refresh();
+  }
 
   async function handleGenerate() {
     setGenerating(true);
@@ -152,13 +193,21 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
                   return (
                     <div
                       key={day.date}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOverDate(day.date);
+                      }}
+                      onDragLeave={() => setDragOverDate((d) => (d === day.date ? null : d))}
+                      onDrop={(e) => handleDropOnDay(e, day.date)}
                       className={`rounded-lg border p-2 min-h-[104px] flex flex-col gap-1 text-[11px] ${
                         !inMonth
                           ? "border-transparent bg-brand-pink/5 opacity-50"
                           : day.isStrong
                             ? "border-green-200 bg-green-50"
                             : "border-brand-pink/20 bg-white"
-                      } ${isPast ? "opacity-40" : ""} ${isToday ? "ring-2 ring-brand-red" : ""}`}
+                      } ${isPast ? "opacity-40" : ""} ${isToday ? "ring-2 ring-brand-red" : ""} ${
+                        dragOverDate === day.date ? "ring-2 ring-brand-pink bg-brand-pink/10" : ""
+                      }`}
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-brand-maroon">{Number(day.date.slice(8, 10))}</span>
@@ -177,15 +226,32 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
                         </div>
                       </div>
                       {day.blockedDayId && <span className="truncate rounded bg-neutral-200 px-1 text-neutral-700">🚫 חסום</span>}
-                      {day.slots.map((slot, si) => (
-                        <span
-                          key={si}
-                          className={`truncate rounded px-1.5 py-0.5 text-xs font-medium ${slotStyle(slot.type)}`}
-                          title={slot.tag ?? undefined}
-                        >
-                          {slotIcon(slot.type)} {slot.tag ?? (slot.type === "instagram_reel" ? "צריך ריל" : slot.type === "instagram_carousel" ? "צריך פוסט" : "ריק")}
-                        </span>
-                      ))}
+                      {day.slots.map((slot, si) => {
+                        // שיבוץ שכבר פורסם בפועל לא ניתן לגרירה — לא רוצים "לשנות היסטוריה" של מה שבאמת קרה, רק הצעות.
+                        const draggableSlot = !!slot.slotId && slot.actualStatus !== "done";
+                        return (
+                          <span
+                            key={si}
+                            draggable={draggableSlot}
+                            onDragStart={(e) => {
+                              if (!slot.slotId) return;
+                              e.dataTransfer.effectAllowed = "move";
+                              e.dataTransfer.setData("text/plain", JSON.stringify({ slotId: slot.slotId, date: day.date }));
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onDrop={(e) => slot.slotId && handleDropOnSlot(e, slot.slotId, day.date)}
+                            className={`truncate rounded px-1.5 py-0.5 text-xs font-medium ${slotStyle(slot.type)} ${
+                              draggableSlot ? "cursor-grab active:cursor-grabbing" : ""
+                            }`}
+                            title={slot.tag ?? undefined}
+                          >
+                            {slotIcon(slot.type)} {slot.tag ?? (slot.type === "instagram_reel" ? "צריך ריל" : slot.type === "instagram_carousel" ? "צריך פוסט" : "ריק")}
+                          </span>
+                        );
+                      })}
                     </div>
                   );
                 })}
@@ -198,6 +264,16 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
                   פתיחת השבוע ›
                 </Link>
               </div>
+              {week.reasonLines.length > 0 && (
+                <details className="rounded-lg border border-brand-pink/20 bg-brand-pink/5">
+                  <summary className="cursor-pointer text-[11px] font-medium text-brand-maroon px-2 py-1">🧮 למה כך פוזרו הפוסטים השבוע?</summary>
+                  <ul className="flex flex-col gap-1 px-2 pb-2 text-[11px] text-brand-maroon/70 list-disc pr-4">
+                    {week.reasonLines.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </div>
           );
         })}

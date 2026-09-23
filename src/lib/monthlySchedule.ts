@@ -38,11 +38,13 @@ function weekStartsInMonth(monthStart: Date): Date[] {
 }
 
 export interface MonthDaySlotPreview {
+  slotId: string | null;
   hour: number;
   // התגית של התוכן שיפורסם (מפוסט מקושר, או מקטע נושיין שתוכנן), אם ידועה —
   // אחרת null (עדיין רק "צריך ריל/פוסט" גנרי, בלי תוכן ספציפי מאחוריו).
   tag: string | null;
   type: string | null;
+  actualStatus: "pending" | "done" | "skipped";
 }
 
 export interface MonthDaySummary {
@@ -65,6 +67,8 @@ export interface MonthWeekSummary {
   reels: number;
   existingReady: number;
   newNeeded: number;
+  // הסבר קונקרטי לשבוע הזה (למה כל סלוט נבחר) — ראו buildWeekReasonLines ב-weeklySchedule.ts.
+  reasonLines: string[];
 }
 
 export interface MonthPlan {
@@ -89,6 +93,7 @@ export async function getMonthPlan(monthStart: Date): Promise<MonthPlan> {
     reels: plan.summary.reels,
     existingReady: plan.summary.existingReady,
     newNeeded: plan.summary.newNeeded,
+    reasonLines: plan.reasonLines,
     days: plan.days.map((day, di) => {
       const daySlots = plan.slots.filter((s) => s.date === day.date);
       return {
@@ -104,9 +109,11 @@ export async function getMonthPlan(monthStart: Date): Promise<MonthPlan> {
         slots: [...daySlots]
           .sort((a, b) => a.hour - b.hour)
           .map((s) => ({
+            slotId: s.slotId,
             hour: s.hour,
             tag: s.content?.titleTag ?? s.recommendedNotionSegment?.tag ?? s.recommendedReelCandidate?.caption ?? null,
             type: s.content?.type ?? s.recommendedType ?? null,
+            actualStatus: s.actualStatus,
           })),
       };
     }),
