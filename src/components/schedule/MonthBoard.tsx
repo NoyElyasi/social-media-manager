@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { MonthPlan } from "@/lib/monthlySchedule";
+import { postTypeStyle } from "@/lib/labels";
 
 const FORMAT_LABELS: Record<string, string> = { letter: "✉️ מכתב", tip: "💡 טיפ" };
 const WEEKDAY_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -25,11 +26,9 @@ function slotIcon(type: string | null): string {
   return "•";
 }
 
-// צבע לפי סוג — כדי שהתגית תיראה בבירור על רקע לבן (לא נבלעת), לא רק אייקון עדין.
+// צבע לפי סוג — כדי שהתגית תיראה בבירור על רקע לבן (לא נבלעת), לא רק אייקון עדין. ראו postTypeStyle (משותף עם הנראות השבועית).
 function slotStyle(type: string | null): string {
-  if (type === "instagram_reel") return "bg-fuchsia-100 text-fuchsia-800";
-  if (type === "instagram_carousel") return "bg-sky-100 text-sky-800";
-  return "bg-neutral-100 text-neutral-600";
+  return postTypeStyle(type).solid;
 }
 
 export default function MonthBoard({ plan }: { plan: MonthPlan }) {
@@ -127,7 +126,7 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
                         <span className="font-semibold text-brand-maroon">{Number(day.date.slice(8, 10))}</span>
                         <div className="flex items-center gap-1">
                           {day.isStrong && <span title="הרבה חשיפה">⚡</span>}
-                          {day.isEngaging && <span title="הרבה אנגייג'מנט">❤️💬</span>}
+                          {day.isEngaging && <span title="הרבה אנגייג'מנט">❤️</span>}
                           {/* נקודה כחולה קטנה במקום תג מלא עם הטקסט — שם החג מוצג רק בהעברת עכבר, כדי לא לתפוס מקום. בועית מותאמת ולא ה-title המובנה של הדפדפן, כי הוא לא היה נראה טוב על אלמנט כה קטן. */}
                           {day.specialDays.map((sd) => (
                             <span key={sd.title} className="group relative inline-block">

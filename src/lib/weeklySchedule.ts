@@ -110,6 +110,11 @@ async function getSkippedFormatDebt(before: Date): Promise<Set<"letter" | "tip">
  * רק לראות) את ההמלצה, ולשנות אם היא לא מסכימה. מבוסס על *כל* הנתונים
  * שקיימים בכלי בזמן החישוב (לא מפולח לפי חודש — ראו monthlySchedule.ts).
  */
+/**
+ * שורות מקוצרות, "ציוריות" (בסגנון "X 🟰 Y") — לא פסקאות הסבר — לפי בקשה
+ * מפורשת שהחלק הזה יהיה קריא בעין אחת ולא טקסט ארוך. הפירוט המלא נשאר בקוד
+ * (ראו generateWeeklySchedule), זו רק תמצית לתצוגה.
+ */
 export function buildMethodologyLines(
   strength: StrengthData,
   formatPerf: FormatPerformance,
@@ -120,33 +125,29 @@ export function buildMethodologyLines(
   const strongDays = strength.days.filter((d) => d.isStrong);
   lines.push(
     strongDays.length > 0
-      ? `ימים חזקים: ${strongDays.map((d) => `${d.name} (הגעה ממוצעת ${Math.round(d.avgReach ?? 0)}, ${d.count} פוסטים)`).join(", ")} — לפי הגעה ממוצעת גבוהה יותר מבין ${totalSamples} הפוסטים המסונכרנים (דרושים לפחות 2 פוסטים ביום כדי להיחשב).`
-      : `אין עדיין יום עם מספיק פוסטים (2+) כדי לסמן אותו "חזק" — מבין ${totalSamples} פוסטים מסונכרנים.`
+      ? `⚡ יום חזק 🟰 הגעה ממוצעת גבוהה (2+ פוסטים) — ${strongDays.map((d) => d.name).join(", ")}`
+      : `⚡ יום חזק 🟰 עדיין אין מספיק נתונים (מתוך ${totalSamples} פוסטים)`
   );
 
   const strongHours = strength.hourBuckets.filter((h) => h.isStrong);
   lines.push(
     strongHours.length > 0
-      ? `שעות חזקות: ${strongHours.map((h) => `${h.name} (הגעה ממוצעת ${Math.round(h.avgReach ?? 0)}, ${h.count} פוסטים)`).join(", ")} — אותו חישוב, לפי בלוק של 4 שעות. השעה המדויקת שנבחרת בפועל היא זו עם ההגעה הגבוהה ביותר בתוך הבלוק, לא סתם השעה הראשונה בו.`
-      : `אין עדיין בלוק שעות עם מספיק פוסטים כדי לסמן אותו "חזק".`
+      ? `🕐 שעה חזקה 🟰 בלוק 4 שעות + הרגע החזק בתוכו — ${strongHours.map((h) => h.name).join(", ")}`
+      : `🕐 שעה חזקה 🟰 עדיין אין מספיק נתונים`
   );
 
-  lines.push(
-    `יום לבדיקה: בכל שבוע נוסף בכוונה עוד סלוט אחד ביום עם הכי פחות פוסטים היסטוריים מבין המועמדים — לא כי הוא "חלש", אלא כדי לבדוק אם ההיעדרות שלו מההצעה נובעת מביצועים אמיתיים או סתם מזה שלא פורסם בו הרבה, ולתת סיכוי לחשיפה לקהל חדש. אם יש מועמד ריל פנוי הוא מוצע כריל, אחרת כקרוסלה (ראו למטה).`
-  );
+  lines.push(`🔍 יום בדיקה 🟰 הכי פחות היסטוריה + תוסף לשבוע (לא מחליף) — לבדוק פוטנציאל חשיפה לקהל חדש`);
 
   const { reel, carousel } = formatPerf;
-  const reelText = reel.avgReach !== null ? `${Math.round(reel.avgReach)} (${reel.count} פוסטים)` : "אין עדיין נתונים";
-  const carouselText = carousel.avgReach !== null ? `${Math.round(carousel.avgReach)} (${carousel.count} פוסטים)` : "אין עדיין נתונים";
+  const reelAvg = reel.avgReach !== null ? Math.round(reel.avgReach) : null;
+  const carouselAvg = carousel.avgReach !== null ? Math.round(carousel.avgReach) : null;
   lines.push(
-    `פורמט: הגעה ממוצעת בריל ${reelText} לעומת קרוסלה ${carouselText} (מידע כללי בלבד). פוסט "ישן" תמיד מתפרסם כפוסט/קרוסלה, לא כריל. ריל מוצע רק אם יש מועמד אמיתי מ"המלצות לרילים הבאים" בדשבורד (תוכן שכבר הוכיח את עצמו) — לא ריל בלי תוכן ספציפי מאחוריו; בלי מועמד, קרוסלה כברירת מחדל.`
+    `🎬 ריל 🟰 רק עם מועמד מוכח מ"הרילים הבאים"${reelAvg !== null ? ` (הגעה ${reelAvg})` : ""} | 📄 קרוסלה 🟰 ברירת מחדל + כל פוסט "ישן"${carouselAvg !== null ? ` (הגעה ${carouselAvg})` : ""}`
   );
 
-  lines.push(`החישוב מתעדכן אוטומטית לפי כל הנתונים שסונכרנו מאינסטגרם עד כה — ככל שיצטבר עוד מידע, ההמלצה תשתנה ותתדייק.`);
+  lines.push(`📅 הרכב שבועי 🟰 2 חדש + 1 ישן + 1 בדיקה | מקס' 2 רילים בשבוע`);
 
-  lines.push(
-    `הרכב השבוע: שני סלוטים "חדשים" ואחד "ישן" (לפי הטייפ בנושיין) — לכל אחד מנסים למצוא קטע מוכן (סטטוס Ready בנושיין, או תוכן שכבר קיים בכלי), ואם אין, כותבים רק מה סוג הפוסט הדרוש בלי לפרט מה תוכנו. קטע שנבחר לא יוצע שוב בשבוע אחר. לכל היותר שני רילים בשבוע בסך הכל (כולל יום הבדיקה).`
-  );
+  lines.push(`♻️ ההמלצה מתעדכנת אוטומטית לפי כל נתון חדש שמסתנכרן מאינסטגרם`);
 
   return lines;
 }
@@ -173,10 +174,8 @@ export interface WeekSlot {
   isManual: boolean;
   note: string | null;
   dayIsStrong: boolean;
-  hourIsStrong: boolean;
-  // מעורבות (לייקים+תגובות) — נפרד מ-dayIsStrong/hourIsStrong (הגעה), ראו EngagementData.
+  // מעורבות (לייקים+תגובות) — נפרד מ-dayIsStrong (הגעה), ראו EngagementData.
   dayIsEngaging: boolean;
-  hourIsEngaging: boolean;
   // ריל/קרוסלה, מכתב/טיפ, והקרוסלה הספציפית שכדאי להפוך לריל (אם רלוונטי) —
   // כולם תמונת מצב קבועה מזמן היצירה (plannedType/plannedFormat/
   // plannedReelCandidateMediaId ב-DB), לא מחושבים מחדש בכל טעינה. ראו
@@ -272,7 +271,6 @@ function toSlot(row: {
 }, strength: StrengthData, engagement: EngagementData, candidateMap: Map<string, NextReelCandidate>): WeekSlot {
   const dateStr = formatCalendarDate(row.date);
   const dayOfWeek = row.date.getUTCDay();
-  const bucketStart = [0, 4, 8, 12, 16, 20].filter((s) => row.hour >= s).pop() ?? 0;
   return {
     slotId: row.id,
     date: dateStr,
@@ -280,9 +278,7 @@ function toSlot(row: {
     isManual: row.isManual,
     note: row.note,
     dayIsStrong: strength.days[dayOfWeek]?.isStrong ?? false,
-    hourIsStrong: strength.hourBuckets.find((b) => b.startHour === bucketStart)?.isStrong ?? false,
     dayIsEngaging: engagement.days[dayOfWeek]?.isStrong ?? false,
-    hourIsEngaging: engagement.hourBuckets.find((b) => b.startHour === bucketStart)?.isStrong ?? false,
     recommendedType: row.plannedType as "instagram_reel" | "instagram_carousel" | null,
     recommendedFormat: row.plannedFormat as "letter" | "tip" | null,
     recommendedReelCandidate: row.plannedReelCandidateMediaId ? candidateMap.get(row.plannedReelCandidateMediaId) ?? null : null,

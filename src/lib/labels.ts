@@ -34,3 +34,13 @@ export const STATUS_COLORS: Record<string, string> = {
   scheduled: "bg-amber-100 text-amber-700",
   published: "bg-green-100 text-green-700",
 };
+
+/** צבע לפי סוג פוסט (ריל מול קרוסלה) — משותף בין נראות שבועית וחודשית כדי שיהיו תואמים. */
+const POST_TYPE_STYLES: Record<string, { solid: string; border: string }> = {
+  instagram_reel: { solid: "bg-fuchsia-100 text-fuchsia-800", border: "border-fuchsia-300" },
+  instagram_carousel: { solid: "bg-sky-100 text-sky-800", border: "border-sky-300" },
+};
+const DEFAULT_POST_TYPE_STYLE = { solid: "bg-neutral-100 text-neutral-700", border: "border-neutral-300" };
+export function postTypeStyle(type: string | null): { solid: string; border: string } {
+  return (type && POST_TYPE_STYLES[type]) || DEFAULT_POST_TYPE_STYLE;
+}
