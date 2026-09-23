@@ -587,6 +587,7 @@ export interface ReconcileResult {
   matchedSlots: number;
   createdSlots: number;
   formatsClassified: number;
+  deletedPlaceholders: number;
 }
 
 /**
@@ -598,15 +599,18 @@ export interface ReconcileResult {
  * פורמט/נושא (InstagramMedia.aiFormat/aiTheme) לפי עמודת Type בנושיין כשאין
  * להם עדיין סיווג ממקור אחר (פוסט מקומי מקושר) — כדי שמדדי הקצב החודשי
  * (מכתב/טיפ) ו"מוביל כרגע" ישקפו גם תוכן שפורסם ישר מנושיין, בלי שנוצר
- * פוסט בכלי בכלל. רק על ימים שעברו/היום, בתוך החודש הנתון, ורק ימים שלא
- * "נבדקו" עדיין (ReconciledDay) — לא רצה פעמיים על אותו יום.
+ * פוסט בכלי בכלל. ימים שעברו לגמרי נבדקים פעם אחת בלבד (ReconciledDay) —
+ * אבל היום הנוכחי נבדק בכל הרצה, גם אם כבר "סומן", כי עוד יכול להתפרסם בו
+ * משהו בין לחיצה ללחיצה. בסוף מוחקת גם כל "צריך ריל/פוסט" (או הערה) בלי
+ * תוכן אמיתי שנשאר לא ממומש בימים שעברו *לגמרי* (לא היום) — לפי בקשה
+ * מפורשת להשאיר בימים שעברו רק את מה שבאמת פורסם.
  */
 export async function reconcileMonthWithInstagram(monthStart: Date, monthEnd: Date): Promise<ReconcileResult> {
   const today = formatCalendarDate(new Date());
   const lastDayIso = formatCalendarDate(addDays(monthEnd, -1));
   const rangeEndIso = lastDayIso < today ? lastDayIso : today;
   if (formatCalendarDate(monthStart) > rangeEndIso) {
-    return { checkedDays: 0, matchedSlots: 0, createdSlots: 0, formatsClassified: 0 };
+    return { checkedDays: 0, matchedSlots: 0, createdSlots: 0, formatsClassified: 0, deletedPlaceholders: 0 };
   }
 
   const rangeEndDate = parseCalendarDate(rangeEndIso);
@@ -618,42 +622,43 @@ export async function reconcileMonthWithInstagram(monthStart: Date, monthEnd: Da
 
   const candidateDays: Date[] = [];
   for (let d = monthStart; formatCalendarDate(d) <= rangeEndIso; d = addDays(d, 1)) {
-    if (!doneSet.has(formatCalendarDate(d))) candidateDays.push(d);
-  }
-  if (candidateDays.length === 0) {
-    return { checkedDays: 0, matchedSlots: 0, createdSlots: 0, formatsClassified: 0 };
-  }
-
-  const rangeStart = candidateDays[0];
-  const rangeEnd = addDays(candidateDays[candidateDays.length - 1], 1);
-
-  const [media, slots] = await Promise.all([
-    prisma.instagramMedia.findMany({ where: { timestamp: { gte: rangeStart, lt: rangeEnd } }, orderBy: { timestamp: "asc" } }),
-    prisma.scheduledSlot.findMany({ where: { date: { gte: rangeStart, lt: rangeEnd } }, include: { platformContent: true } }),
-  ]);
-
-  const mediaByDay = new Map<string, typeof media>();
-  for (const m of media) {
-    const day = formatCalendarDate(m.timestamp);
-    mediaByDay.set(day, [...(mediaByDay.get(day) ?? []), m]);
-  }
-  const slotsByDay = new Map<string, typeof slots>();
-  for (const s of slots) {
-    const day = formatCalendarDate(s.date);
-    slotsByDay.set(day, [...(slotsByDay.get(day) ?? []), s]);
+    const dIso = formatCalendarDate(d);
+    // "היום" נכנס תמיד, גם אם כבר נבדק קודם באותו יום — ראו הערה למעלה.
+    if (dIso === today || !doneSet.has(dIso)) candidateDays.push(d);
   }
 
   let matchedSlots = 0;
   let createdSlots = 0;
   let formatsClassified = 0;
-  const typeCache = new Map<string, string[] | null>();
-  async function lookupType(tag: string): Promise<string[] | null> {
-    const key = normalizeTagText(tag);
-    if (!typeCache.has(key)) typeCache.set(key, await findSegmentTypeByTag(tag));
-    return typeCache.get(key) ?? null;
-  }
 
-  for (const day of candidateDays) {
+  if (candidateDays.length > 0) {
+    const rangeStart = candidateDays[0];
+    const rangeEnd = addDays(candidateDays[candidateDays.length - 1], 1);
+
+    const [media, slots] = await Promise.all([
+      prisma.instagramMedia.findMany({ where: { timestamp: { gte: rangeStart, lt: rangeEnd } }, orderBy: { timestamp: "asc" } }),
+      prisma.scheduledSlot.findMany({ where: { date: { gte: rangeStart, lt: rangeEnd } }, include: { platformContent: true } }),
+    ]);
+
+    const mediaByDay = new Map<string, typeof media>();
+    for (const m of media) {
+      const day = formatCalendarDate(m.timestamp);
+      mediaByDay.set(day, [...(mediaByDay.get(day) ?? []), m]);
+    }
+    const slotsByDay = new Map<string, typeof slots>();
+    for (const s of slots) {
+      const day = formatCalendarDate(s.date);
+      slotsByDay.set(day, [...(slotsByDay.get(day) ?? []), s]);
+    }
+
+    const typeCache = new Map<string, string[] | null>();
+    async function lookupType(tag: string): Promise<string[] | null> {
+      const key = normalizeTagText(tag);
+      if (!typeCache.has(key)) typeCache.set(key, await findSegmentTypeByTag(tag));
+      return typeCache.get(key) ?? null;
+    }
+
+    for (const day of candidateDays) {
     const dayIso = formatCalendarDate(day);
     const dayMedia = mediaByDay.get(dayIso) ?? [];
     const daySlots = slotsByDay.get(dayIso) ?? [];
@@ -720,10 +725,26 @@ export async function reconcileMonthWithInstagram(monthStart: Date, monthEnd: Da
       }
     }
 
-    await prisma.reconciledDay.upsert({ where: { date: day }, create: { date: day }, update: {} });
+      await prisma.reconciledDay.upsert({ where: { date: day }, create: { date: day }, update: {} });
+    }
   }
 
-  return { checkedDays: candidateDays.length, matchedSlots, createdSlots, formatsClassified };
+  // כל "צריך ריל/פוסט" (או הערה) בלי תוכן אמיתי שנשאר בסטטוס pending בימים
+  // שעברו *לגמרי* (לא כולל היום — עדיין יכול להתפרסם בו משהו) — לא התממש,
+  // אז לפי בקשה מפורשת נשאר בלוח רק מה שבאמת פורסם. תוכן אמיתי
+  // (platformContentId) או סטטוס שסומן ידנית (done/skipped) לא נמחקים.
+  const todayDate = parseCalendarDate(today);
+  const deleteRangeEnd = todayDate < monthEnd ? todayDate : monthEnd;
+  const deletedPlaceholders =
+    deleteRangeEnd > monthStart
+      ? (
+          await prisma.scheduledSlot.deleteMany({
+            where: { date: { gte: monthStart, lt: deleteRangeEnd }, actualStatus: "pending", platformContentId: null },
+          })
+        ).count
+      : 0;
+
+  return { checkedDays: candidateDays.length, matchedSlots, createdSlots, formatsClassified, deletedPlaceholders };
 }
 
 function buildPlanResponse(

@@ -63,9 +63,9 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
     const r = data.result;
     setReconcileSummary(
       r
-        ? r.checkedDays === 0
+        ? r.checkedDays === 0 && r.deletedPlaceholders === 0
           ? "כל הימים שעברו החודש כבר נבדקו — אין חדש"
-          : `נבדקו ${r.checkedDays} ימים — ${r.matchedSlots} שיבוצים עודכנו, ${r.createdSlots} נוספו, ${r.formatsClassified} סווגו לפי נושיין`
+          : `נבדקו ${r.checkedDays} ימים (כולל היום) — ${r.matchedSlots} שיבוצים עודכנו, ${r.createdSlots} נוספו, ${r.formatsClassified} סווגו לפי נושיין, ${r.deletedPlaceholders} הצעות שלא התממשו נמחקו`
         : "שגיאה בסנכרון"
     );
     setReconciling(false);
