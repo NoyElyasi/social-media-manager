@@ -10,6 +10,7 @@ import {
   getReelCandidatesByMediaIds,
   getTopContentAngles,
   WEEKDAY_FULL_LABELS,
+  israelDayAndHour,
   type ContentAngle,
   type DayStrength,
   type EngagementDayStrength,
@@ -65,6 +66,17 @@ export function parseCalendarDate(isoDate: string): Date {
 
 export function formatCalendarDate(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * תאריך לוח (YYYY-MM-DD) לפי השעון בישראל, לא UTC — לשימוש רק כשממירים
+ * timestamp אמיתי של פרסום באינסטגרם ליום לוח (ראו reconcileScheduleWithInstagram):
+ * הפרש 2-3 שעות מ-UTC יכול להזיז פרסום סמוך לחצות ליום אחר לגמרי. שאר
+ * הכלי משתמש ב-formatCalendarDate (UTC) כי הוא סתם תווית לוח, לא נגזר
+ * מזמן אמיתי — כאן זה נגזר מזמן אמיתי, אז חשוב שהיום יהיה נכון בפועל.
+ */
+function israelCalendarDate(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(d);
 }
 
 /** מתחילת השבוע (יום ראשון) של השבוע שמכיל את התאריך הנתון. */
@@ -427,9 +439,11 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
   // הבדיקה תמיד ריל, אז הוא תמיד תופס אחד מהתקציב.
   let reelBudget = REEL_WEEKLY_CAP - (explorationDay ? 1 : 0);
 
-  // שעה נוכחית (UTC, כמו כל שעה אחרת בכלי) — כדי שהיום הנוכחי לא יקבל הצעה
-  // לשעה שכבר עברה (ראו pickHourForDay למטה). לימים אחרים אין לזה השפעה.
-  const currentHour = new Date().getUTCHours();
+  // שעה נוכחית בישראל (לא UTC) — כמו strength.hourly עצמו (מבוסס
+  // israelDayAndHour), אחרת ההשוואה בין "השעה שנבחרה" ל"השעה עכשיו" ב-
+  // pickHourForDay משווה שני קני מידה שונים. כדי שהיום הנוכחי לא יקבל הצעה
+  // לשעה שכבר עברה בפועל (ראו pickHourForDay למטה). לימים אחרים אין לזה השפעה.
+  const currentHour = israelDayAndHour(new Date()).hour;
   function pickHourForDay(iso: string, i: number): number {
     // בחירת שעה: השעה הספציפית עם ההגעה הכי גבוהה בתוך הבלוק החזק (לא סתם
     // "תחילת הבלוק" — ראו bestHourInBucket, נמנע משעות שרירותיות כמו 05:00).
@@ -676,15 +690,20 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
   if (candidateDays.length > 0) {
     const mediaRangeStart = candidateDays[0];
     const mediaRangeEnd = addDays(candidateDays[candidateDays.length - 1], 1);
+    // חצי יום מרווח משני הצדדים בשליפה עצמה — כי הגבולות UTC-חצות, וישראל
+    // קדימה 2-3 שעות: פרסום אמיתי סמוך לחצות (לפי השעון בישראל) יכול להיות
+    // מעבר לגבול ה-UTC. השיבוץ בפועל ליום נכון קורה למטה לפי israelCalendarDate.
+    const mediaQueryStart = new Date(mediaRangeStart.getTime() - 12 * 60 * 60 * 1000);
+    const mediaQueryEnd = new Date(mediaRangeEnd.getTime() + 12 * 60 * 60 * 1000);
 
     const [media, slots] = await Promise.all([
-      prisma.instagramMedia.findMany({ where: { timestamp: { gte: mediaRangeStart, lt: mediaRangeEnd } }, orderBy: { timestamp: "asc" } }),
+      prisma.instagramMedia.findMany({ where: { timestamp: { gte: mediaQueryStart, lt: mediaQueryEnd } }, orderBy: { timestamp: "asc" } }),
       prisma.scheduledSlot.findMany({ where: { date: { gte: mediaRangeStart, lt: mediaRangeEnd } }, include: { platformContent: true } }),
     ]);
 
     const mediaByDay = new Map<string, typeof media>();
     for (const m of media) {
-      const day = formatCalendarDate(m.timestamp);
+      const day = israelCalendarDate(m.timestamp);
       mediaByDay.set(day, [...(mediaByDay.get(day) ?? []), m]);
     }
     const slotsByDay = new Map<string, typeof slots>();
@@ -699,6 +718,13 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
       if (!typeCache.has(key)) typeCache.set(key, await findSegmentTypeByTag(tag));
       return typeCache.get(key) ?? null;
     }
+
+    // תגיות שהתאימו בפועל בהרצה הזו, וה-id-ים של הסלוטים שהם עצמם קיבלו את
+    // ההתאמה (יכולים להיות כמה סלוטים אמיתיים שונים עם *אותה* תגית — למשל
+    // תוכן שהתפרסם בכמה חלקים בימים נפרדים — ראו הניקוי בסוף, שממתין לסיום
+    // כל הימים בדיוק כדי לא לנקות בטעות התאמה אמיתית של יום אחר עם אותה תגית).
+    const usedRealTags = new Set<string>();
+    const realSlotIds = new Set<string>();
 
     for (const day of candidateDays) {
     const dayIso = formatCalendarDate(day);
@@ -721,20 +747,13 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
       const typeValues = tag ? await lookupType(tag) : null;
       const parsed = typeValues ? parseNotionType(typeValues) : null;
       const preview = (parsed?.isOld ? "📜 " : "") + (item.caption?.slice(0, 120) ?? "");
-      const hour = item.timestamp.getUTCHours();
+      const hour = israelDayAndHour(item.timestamp).hour;
 
-      // התגית הזו כבר פורסמה בפועל (עכשיו) — לא משאירים המלצה כפולה עליה
-      // בשיבוץ אחר, גם אם הוא נעול (isManual) — כמו הניקוי המקביל ביצירת
-      // סלוט אוטומטי רגיל (ראו generateWeeklySchedule, אותו באג בדיוק).
-      if (tag) {
-        await prisma.scheduledSlot.updateMany({
-          where: { plannedNotionTag: tag, ...(matchedSlot ? { id: { not: matchedSlot.id } } : {}) },
-          data: { plannedNotionTag: null, plannedNotionPreview: null, plannedNotionPageUrl: null },
-        });
-      }
+      if (tag) usedRealTags.add(tag);
 
       if (matchedSlot) {
         claimedSlotIds.add(matchedSlot.id);
+        realSlotIds.add(matchedSlot.id);
         await prisma.scheduledSlot.update({
           where: { id: matchedSlot.id },
           data: {
@@ -763,6 +782,7 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
           },
         });
         claimedSlotIds.add(created.id);
+        realSlotIds.add(created.id);
         createdSlots++;
       }
 
@@ -778,6 +798,18 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
     }
 
       await prisma.reconciledDay.upsert({ where: { date: day }, create: { date: day }, update: {} });
+    }
+
+    // רק אחרי שכל הימים בהרצה הזו עובדו — תגית שהתאימה בפועל (usedRealTags)
+    // מתנקה מכל שיבוץ אחר שמחזיק אותה, *חוץ* מסלוטים שהם עצמם קיבלו התאמה
+    // אמיתית בהרצה הזו (realSlotIds — יכולה להיות אותה תגית בכמה ימים
+    // שונים, שניהם אמיתיים). ניקוי מוקדם-מדי (תוך כדי הלולאה) ניקה בטעות
+    // התאמה אמיתית של יום מאוחר יותר לפני שהספיק להירשם.
+    for (const tag of usedRealTags) {
+      await prisma.scheduledSlot.updateMany({
+        where: { plannedNotionTag: tag, id: { notIn: [...realSlotIds] } },
+        data: { plannedNotionTag: null, plannedNotionPreview: null, plannedNotionPageUrl: null },
+      });
     }
   }
 
