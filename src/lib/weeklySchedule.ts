@@ -312,6 +312,13 @@ export async function getWeekPlan(weekStart: Date): Promise<WeekPlan> {
  */
 export async function generateWeeklySchedule(weekStart: Date, options: { cascade?: boolean } = {}): Promise<WeekPlan> {
   const cascade = options.cascade ?? true;
+  // מסנכרנת בפועל את השבוע הזה מול מה שכבר פורסם באינסטגרם (ראו
+  // reconcileScheduleWithInstagram) *לפני* כל החלטה אחרת — כדי שהצעה חדשה
+  // (כאן, לא רק ב"סנכרון בפועל" הנפרד בלוח החודשי) לא תציע שוב תגית/תוכן
+  // שכבר פורסם היום, ותסמן את מה שכבר קרה. גם על שבוע שכבר עבר לגמרי (ראו
+  // ההגנה למטה) — כדי שהמידע יהיה נכון גם אם היא לא ביקרה בלוח החודשי.
+  await reconcileScheduleWithInstagram(weekStart, addDays(weekStart, 7));
+
   // "תתחילי מהיום" — לא מציעים ימים שכבר עברו. אם השבוע כולו מאחורי היום
   // הנוכחי, אין שום יום להציע בו משהו — לא מוחקים ולא נוגעים בסלוטים
   // האוטומטיים הקיימים (יכולים לשאת actualStatus היסטורי), רק מחזירים את
@@ -603,25 +610,26 @@ export interface ReconcileResult {
  * אבל היום הנוכחי נבדק בכל הרצה, גם אם כבר "סומן", כי עוד יכול להתפרסם בו
  * משהו בין לחיצה ללחיצה. בסוף מוחקת גם כל "צריך ריל/פוסט" (או הערה) בלי
  * תוכן אמיתי שנשאר לא ממומש בימים שעברו *לגמרי* (לא היום) — לפי בקשה
- * מפורשת להשאיר בימים שעברו רק את מה שבאמת פורסם.
+ * מפורשת להשאיר בימים שעברו רק את מה שבאמת פורסם. rangeStart/rangeEnd הם
+ * כל טווח (לא רק חודש קלנדרי) — נקראת גם עם טווח שבוע, ראו generateWeeklySchedule.
  */
-export async function reconcileMonthWithInstagram(monthStart: Date, monthEnd: Date): Promise<ReconcileResult> {
+export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd: Date): Promise<ReconcileResult> {
   const today = formatCalendarDate(new Date());
-  const lastDayIso = formatCalendarDate(addDays(monthEnd, -1));
-  const rangeEndIso = lastDayIso < today ? lastDayIso : today;
-  if (formatCalendarDate(monthStart) > rangeEndIso) {
+  const lastDayIso = formatCalendarDate(addDays(rangeEnd, -1));
+  const scanEndIso = lastDayIso < today ? lastDayIso : today;
+  if (formatCalendarDate(rangeStart) > scanEndIso) {
     return { checkedDays: 0, matchedSlots: 0, createdSlots: 0, formatsClassified: 0, deletedPlaceholders: 0 };
   }
 
-  const rangeEndDate = parseCalendarDate(rangeEndIso);
+  const scanEndDate = parseCalendarDate(scanEndIso);
   const alreadyDone = await prisma.reconciledDay.findMany({
-    where: { date: { gte: monthStart, lte: rangeEndDate } },
+    where: { date: { gte: rangeStart, lte: scanEndDate } },
     select: { date: true },
   });
   const doneSet = new Set(alreadyDone.map((r) => formatCalendarDate(r.date)));
 
   const candidateDays: Date[] = [];
-  for (let d = monthStart; formatCalendarDate(d) <= rangeEndIso; d = addDays(d, 1)) {
+  for (let d = rangeStart; formatCalendarDate(d) <= scanEndIso; d = addDays(d, 1)) {
     const dIso = formatCalendarDate(d);
     // "היום" נכנס תמיד, גם אם כבר נבדק קודם באותו יום — ראו הערה למעלה.
     if (dIso === today || !doneSet.has(dIso)) candidateDays.push(d);
@@ -632,12 +640,12 @@ export async function reconcileMonthWithInstagram(monthStart: Date, monthEnd: Da
   let formatsClassified = 0;
 
   if (candidateDays.length > 0) {
-    const rangeStart = candidateDays[0];
-    const rangeEnd = addDays(candidateDays[candidateDays.length - 1], 1);
+    const mediaRangeStart = candidateDays[0];
+    const mediaRangeEnd = addDays(candidateDays[candidateDays.length - 1], 1);
 
     const [media, slots] = await Promise.all([
-      prisma.instagramMedia.findMany({ where: { timestamp: { gte: rangeStart, lt: rangeEnd } }, orderBy: { timestamp: "asc" } }),
-      prisma.scheduledSlot.findMany({ where: { date: { gte: rangeStart, lt: rangeEnd } }, include: { platformContent: true } }),
+      prisma.instagramMedia.findMany({ where: { timestamp: { gte: mediaRangeStart, lt: mediaRangeEnd } }, orderBy: { timestamp: "asc" } }),
+      prisma.scheduledSlot.findMany({ where: { date: { gte: mediaRangeStart, lt: mediaRangeEnd } }, include: { platformContent: true } }),
     ]);
 
     const mediaByDay = new Map<string, typeof media>();
@@ -734,12 +742,12 @@ export async function reconcileMonthWithInstagram(monthStart: Date, monthEnd: Da
   // אז לפי בקשה מפורשת נשאר בלוח רק מה שבאמת פורסם. תוכן אמיתי
   // (platformContentId) או סטטוס שסומן ידנית (done/skipped) לא נמחקים.
   const todayDate = parseCalendarDate(today);
-  const deleteRangeEnd = todayDate < monthEnd ? todayDate : monthEnd;
+  const deleteRangeEnd = todayDate < rangeEnd ? todayDate : rangeEnd;
   const deletedPlaceholders =
-    deleteRangeEnd > monthStart
+    deleteRangeEnd > rangeStart
       ? (
           await prisma.scheduledSlot.deleteMany({
-            where: { date: { gte: monthStart, lt: deleteRangeEnd }, actualStatus: "pending", platformContentId: null },
+            where: { date: { gte: rangeStart, lt: deleteRangeEnd }, actualStatus: "pending", platformContentId: null },
           })
         ).count
       : 0;

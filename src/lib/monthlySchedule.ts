@@ -1,4 +1,4 @@
-import { getWeekStart, formatCalendarDate, getWeekPlan, generateWeeklySchedule, reconcileMonthWithInstagram, type ReconcileResult } from "@/lib/weeklySchedule";
+import { getWeekStart, formatCalendarDate, getWeekPlan, generateWeeklySchedule, reconcileScheduleWithInstagram, type ReconcileResult } from "@/lib/weeklySchedule";
 import { getMonthlyFormatPace, type ContentAngle, type FormatGap } from "@/lib/reachInsights";
 import type { SpecialDay } from "@/lib/holidays";
 
@@ -149,12 +149,12 @@ export async function getMonthPlan(monthStart: Date): Promise<MonthPlan> {
  * כדי שמלאי התוכן המוכן (readyContent, ראו generateWeeklySchedule) יתחלק
  * נכון בין השבועות ולא ישובץ פעמיים לאותו תוכן בשני שבועות שונים. לפני זה,
  * מסנכרנת בפועל את הימים שעברו החודש מול מה שכבר פורסם באינסטגרם (ראו
- * reconcileMonthWithInstagram) — כדי שהתכנון להמשך החודש ייקח בחשבון מה
+ * reconcileScheduleWithInstagram) — כדי שהתכנון להמשך החודש ייקח בחשבון מה
  * שבאמת קרה, לא רק המלצות ישנות.
  */
 export async function generateMonthlySchedule(monthStart: Date): Promise<MonthPlan> {
   const monthEnd = addMonths(monthStart, 1);
-  await reconcileMonthWithInstagram(monthStart, monthEnd);
+  await reconcileScheduleWithInstagram(monthStart, monthEnd);
 
   const weekStarts = weekStartsInMonth(monthStart);
   for (const ws of weekStarts) {
@@ -165,8 +165,8 @@ export async function generateMonthlySchedule(monthStart: Date): Promise<MonthPl
   return getMonthPlan(monthStart);
 }
 
-/** מסנכרנת בפועל בלבד (ראו reconcileMonthWithInstagram), בלי ליצור/לרענן הצעות — לכפתור הנפרד "סנכרון בפועל" בלוח החודשי. */
+/** מסנכרנת בפועל בלבד (ראו reconcileScheduleWithInstagram), בלי ליצור/לרענן הצעות — לכפתור הנפרד "סנכרון בפועל" בלוח החודשי. */
 export async function reconcileMonth(monthStart: Date): Promise<ReconcileResult> {
   const monthEnd = addMonths(monthStart, 1);
-  return reconcileMonthWithInstagram(monthStart, monthEnd);
+  return reconcileScheduleWithInstagram(monthStart, monthEnd);
 }
