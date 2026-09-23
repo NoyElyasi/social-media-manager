@@ -384,7 +384,26 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
     return (sb.avgReach ?? -1) - (sa.avgReach ?? -1);
   });
 
-  const chosenDays = rankedDays.slice(0, Math.min(MAX_SUGGESTED_SLOTS, rankedDays.length));
+  // מכסת "חדש/ישן/ריל" לשבוע הזה מפחיתה קודם את מה שכבר פורסם *בפועל*
+  // השבוע (actualStatus="done", ראו reconcileScheduleWithInstagram) — אחרת
+  // ההצעה ממשיכה להציע מכסה מלאה נוספת על גבי מה שכבר קיים, ומציפה בעוד
+  // סלוטים "חדש" שכבר לא נחוצים, לפי בקשה מפורשת לשקלל את זה.
+  const realSlotsThisWeek = existingSlots.filter((s) => s.actualStatus === "done");
+  let realReelCount = 0;
+  let realOldCount = 0;
+  let realNewCount = 0;
+  for (const s of realSlotsThisWeek) {
+    if (s.plannedType === "instagram_reel") realReelCount++;
+    const typeValues = s.plannedNotionTag ? await findSegmentTypeByTag(s.plannedNotionTag) : null;
+    if (typeValues?.includes(NOTION_OLD_TYPE_VALUE)) realOldCount++;
+    else realNewCount++;
+  }
+  const remainingNewSlots = Math.max(0, NEW_ROLE_COUNT - realNewCount);
+  const oldRoleTarget = MAX_SUGGESTED_SLOTS - NEW_ROLE_COUNT;
+  const remainingOldSlots = Math.max(0, oldRoleTarget - realOldCount);
+  const remainingCoreSlots = remainingNewSlots + remainingOldSlots;
+
+  const chosenDays = rankedDays.slice(0, Math.min(remainingCoreSlots, rankedDays.length));
 
   // יום לבדיקה: מבין המועמדים שלא נבחרו למעלה, זה עם הכי פחות פוסטים
   // היסטוריים (לא "חלש" — "לא נבדק") — נוסף כסלוט *נוסף* (לא מחליף אחד מהם),
@@ -435,9 +454,10 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
   );
   const availableCandidates = await getNextReelCandidates(chosenDays.length, claimedMediaIds);
 
-  // תקציב רילים לכל השבוע (ליבה + בדיקה) — לפי בקשתה "ריל גג שניים". סלוט
-  // הבדיקה תמיד ריל, אז הוא תמיד תופס אחד מהתקציב.
-  let reelBudget = REEL_WEEKLY_CAP - (explorationDay ? 1 : 0);
+  // תקציב רילים לכל השבוע (ליבה + בדיקה) — לפי בקשתה "ריל גג שניים", בניכוי
+  // רילים שכבר פורסמו בפועל השבוע (realReelCount). סלוט הבדיקה תמיד ריל, אז
+  // הוא תמיד תופס אחד מהתקציב.
+  let reelBudget = REEL_WEEKLY_CAP - (explorationDay ? 1 : 0) - realReelCount;
 
   // שעה נוכחית בישראל (לא UTC) — כמו strength.hourly עצמו (מבוסס
   // israelDayAndHour), אחרת ההשוואה בין "השעה שנבחרה" ל"השעה עכשיו" ב-
@@ -464,9 +484,15 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
     const iso = formatCalendarDate(date);
     const isExploration = explorationDateStrings.has(iso);
     const hour = pickHourForDay(iso, i);
-    // תפקיד הסלוט: שני הראשונים (בין השלושה של הליבה) "חדש", השלישי "ישן" —
-    // ראו NEW_ROLE_COUNT. לסלוט הבדיקה אין תפקיד (הוא תוסף, לא אחד מהשלושה).
-    const role: "new" | "old" | null = isExploration ? null : i < NEW_ROLE_COUNT ? "new" : "old";
+    // תפקיד הסלוט: לפי remainingNewSlots/remainingOldSlots (כבר מנוכה מה
+    // שפורסם בפועל השבוע, ראו למעלה) — לא NEW_ROLE_COUNT הגולמי. לסלוט
+    // הבדיקה אין תפקיד (הוא תוסף, לא אחד מהשלושה).
+    const role: "new" | "old" | null = isExploration ? null : i < remainingNewSlots ? "new" : "old";
+
+    // ליום בדיקה יש עדיפות לריל (ראו למטה) — תוכן/קטע נושיין נבדק בשבילו רק
+    // אם אין מועמד ריל פנוי, כדי לא להעדיף קרוסלה מוכנה על פני הזדמנות
+    // אמיתית לבדוק ריל ביום הזה (המטרה המקורית של יום הבדיקה).
+    const explorationHasReel = isExploration && reelBudget > 0 && candidateIdx < availableCandidates.length;
 
     let content = null as (typeof readyContent)[number] | null;
     let notionPick: NotionReadyRow | null = null;
@@ -476,6 +502,17 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
     } else if (role === "new" && notionNewQueue.length > 0) {
       notionPick = notionNewQueue.shift() ?? null;
     } else if (role === "old" && notionOldQueue.length > 0) {
+      notionPick = notionOldQueue.shift() ?? null;
+    } else if (isExploration && !explorationHasReel && localIdx < readyContent.length) {
+      // יום לבדיקה בלי מועמד ריל פנוי — עדיין מעדיף תוכן/קטע שממתין על פני
+      // "צריך פוסט" גנרי (ראו בהמשך), בדיוק כמו תפקיד "חדש". מגיע רק אחרי
+      // ששני התפקידים בליבה (חדש/ישן) כבר לקחו את מה שהם צריכים באיטרציה
+      // שלהם (יום הבדיקה נמצא בסוף chosenDays, ראו למעלה) — לא "גונב" מהם.
+      content = readyContent[localIdx];
+      localIdx++;
+    } else if (isExploration && !explorationHasReel && notionNewQueue.length > 0) {
+      notionPick = notionNewQueue.shift() ?? null;
+    } else if (isExploration && !explorationHasReel && notionOldQueue.length > 0) {
       notionPick = notionOldQueue.shift() ?? null;
     }
 
@@ -806,10 +843,25 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
     // שונים, שניהם אמיתיים). ניקוי מוקדם-מדי (תוך כדי הלולאה) ניקה בטעות
     // התאמה אמיתית של יום מאוחר יותר לפני שהספיק להירשם.
     for (const tag of usedRealTags) {
-      await prisma.scheduledSlot.updateMany({
+      const affected = await prisma.scheduledSlot.findMany({
         where: { plannedNotionTag: tag, id: { notIn: [...realSlotIds] } },
+        select: { id: true, note: true, platformContentId: true, plannedReelCandidateMediaId: true, actualStatus: true },
+      });
+      if (affected.length === 0) continue;
+      await prisma.scheduledSlot.updateMany({
+        where: { id: { in: affected.map((a) => a.id) } },
         data: { plannedNotionTag: null, plannedNotionPreview: null, plannedNotionPageUrl: null },
       });
+      // סלוט נעול שהתגית שלו התיישנה, ואחרי הניקוי נשאר ריק לגמרי (בלי
+      // תוכן/הערה/מועמד ריל) — משתחרר מהנעילה, כדי שהרענון הבא יוכל להציע
+      // לו תוכן טרי במקום שיישאר "ריק" לתמיד (נעילה תמיד מגנה רק על המלצה
+      // בפועל, לא על תא ריק שכבר לא רלוונטי).
+      const nowEmptyIds = affected
+        .filter((a) => !a.note && !a.platformContentId && !a.plannedReelCandidateMediaId && a.actualStatus === "pending")
+        .map((a) => a.id);
+      if (nowEmptyIds.length > 0) {
+        await prisma.scheduledSlot.updateMany({ where: { id: { in: nowEmptyIds } }, data: { isManual: false } });
+      }
     }
   }
 
