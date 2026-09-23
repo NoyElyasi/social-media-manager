@@ -23,6 +23,7 @@ import {
 import { getSpecialDays, type SpecialDay } from "@/lib/holidays";
 import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
 import { findSegmentTypeByTag, getShortPreview, listReadySegments, type NotionReadyRow } from "@/server/notion";
+import { syncLatestInstagramMedia } from "@/server/settings/meta";
 
 /** התגית הראשונה שאינה #אחתביום — כמו postTitle בעמוד הבית, ראו src/app/page.tsx. */
 function firstRealHashtag(hashtagsJson: string): string | null {
@@ -426,6 +427,20 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
   // הבדיקה תמיד ריל, אז הוא תמיד תופס אחד מהתקציב.
   let reelBudget = REEL_WEEKLY_CAP - (explorationDay ? 1 : 0);
 
+  // שעה נוכחית (UTC, כמו כל שעה אחרת בכלי) — כדי שהיום הנוכחי לא יקבל הצעה
+  // לשעה שכבר עברה (ראו pickHourForDay למטה). לימים אחרים אין לזה השפעה.
+  const currentHour = new Date().getUTCHours();
+  function pickHourForDay(iso: string, i: number): number {
+    // בחירת שעה: השעה הספציפית עם ההגעה הכי גבוהה בתוך הבלוק החזק (לא סתם
+    // "תחילת הבלוק" — ראו bestHourInBucket, נמנע משעות שרירותיות כמו 05:00).
+    const bucket = hourBucketRotation.length > 0 ? hourBucketRotation[i % hourBucketRotation.length] : null;
+    const base = bucket ? bestHourInBucket(strength.hourly, bucket.startHour) : fallbackHour;
+    if (iso !== today || base > currentHour) return base;
+    // הבלוק החזק/שעת ברירת המחדל כבר עברו היום — קופצים לשעה העגולה הבאה
+    // שעדיין לא עברה, לכל היותר 23:00 (עדיין היום הזה, לא מוצע ליום אחר בגלל זה).
+    return Math.min(23, currentHour + 1);
+  }
+
   let behindIdx = 0;
   let candidateIdx = 0;
   let localIdx = 0;
@@ -434,10 +449,7 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
     const date = chosenDays[i];
     const iso = formatCalendarDate(date);
     const isExploration = explorationDateStrings.has(iso);
-    // בחירת שעה: השעה הספציפית עם ההגעה הכי גבוהה בתוך הבלוק החזק (לא סתם
-    // "תחילת הבלוק" — ראו bestHourInBucket, נמנע משעות שרירותיות כמו 05:00).
-    const bucket = hourBucketRotation.length > 0 ? hourBucketRotation[i % hourBucketRotation.length] : null;
-    const hour = bucket ? bestHourInBucket(strength.hourly, bucket.startHour) : fallbackHour;
+    const hour = pickHourForDay(iso, i);
     // תפקיד הסלוט: שני הראשונים (בין השלושה של הליבה) "חדש", השלישי "ישן" —
     // ראו NEW_ROLE_COUNT. לסלוט הבדיקה אין תפקיד (הוא תוסף, לא אחד מהשלושה).
     const role: "new" | "old" | null = isExploration ? null : i < NEW_ROLE_COUNT ? "new" : "old";
@@ -598,20 +610,39 @@ export interface ReconcileResult {
 }
 
 /**
- * מתאימה בין פוסטים אמיתיים שכבר פורסמו (InstagramMedia — מה שכבר קיים
- * במטמון המקומי מסנכרון קודם בהגדרות/דשבורד, לא מפעילה בעצמה סנכרון API
- * חדש, לפי בקשתה לא למשוך מה שכבר נמשך) לבין שיבוצים בתכנון (ScheduledSlot)
- * של אותו יום, כדי שהלוח ישקף מה שבאמת פורסם: מסמנת actualStatus="done" עם
- * השעה/תגית/סוג האמיתיים, ואם אין שיבוץ תואם כלל יוצרת אחד. גם מסווגת
- * פורמט/נושא (InstagramMedia.aiFormat/aiTheme) לפי עמודת Type בנושיין כשאין
- * להם עדיין סיווג ממקור אחר (פוסט מקומי מקושר) — כדי שמדדי הקצב החודשי
- * (מכתב/טיפ) ו"מוביל כרגע" ישקפו גם תוכן שפורסם ישר מנושיין, בלי שנוצר
- * פוסט בכלי בכלל. ימים שעברו לגמרי נבדקים פעם אחת בלבד (ReconciledDay) —
- * אבל היום הנוכחי נבדק בכל הרצה, גם אם כבר "סומן", כי עוד יכול להתפרסם בו
- * משהו בין לחיצה ללחיצה. בסוף מוחקת גם כל "צריך ריל/פוסט" (או הערה) בלי
- * תוכן אמיתי שנשאר לא ממומש בימים שעברו *לגמרי* (לא היום) — לפי בקשה
- * מפורשת להשאיר בימים שעברו רק את מה שבאמת פורסם. rangeStart/rangeEnd הם
- * כל טווח (לא רק חודש קלנדרי) — נקראת גם עם טווח שבוע, ראו generateWeeklySchedule.
+ * אם עדיין לא היה סנכרון דשבורד היום (ProfileSettings.lastDashboardSyncAt) —
+ * מסנכרנת כמה פוסטים אחרונים (סנכרון "מהיר", לא הסנכרון המלא של הדשבורד),
+ * כדי שסנכרון בפועל/תכנון שבועי יראה גם פרסום שקרה היום בלי שהיא ביקרה
+ * בהגדרות/דשבורד בעצמה קודם. אם כבר סונכרן היום — לא מושכת שוב (לפי בקשתה
+ * לבדוק קודם ולא למשוך מה שכבר נמשך). לא זורקת אם אין חיבור פעיל/כשל ברשת —
+ * ממשיכה עם מה שכבר יש במטמון.
+ */
+async function ensureTodaySynced(): Promise<void> {
+  const profile = await prisma.profileSettings.findUnique({ where: { id: "default" } });
+  const todayStart = parseCalendarDate(formatCalendarDate(new Date()));
+  if (profile?.lastDashboardSyncAt && profile.lastDashboardSyncAt >= todayStart) return;
+  try {
+    await syncLatestInstagramMedia(8);
+  } catch {
+    // אין חיבור פעיל ל-Meta / כשל ברשת — לא עוצרים את הסנכרון בפועל בגלל זה.
+  }
+}
+
+/**
+ * מתאימה בין פוסטים אמיתיים שכבר פורסמו (InstagramMedia — מהמטמון המקומי,
+ * ומרעננת אותו בעצמה ל"היום" אם עוד לא סונכרן, ראו ensureTodaySynced) לבין
+ * שיבוצים בתכנון (ScheduledSlot) של אותו יום, כדי שהלוח ישקף מה שבאמת
+ * פורסם: מסמנת actualStatus="done" עם השעה/תגית/סוג האמיתיים, ואם אין
+ * שיבוץ תואם כלל יוצרת אחד. גם מסווגת פורמט/נושא (InstagramMedia.aiFormat/
+ * aiTheme) לפי עמודת Type בנושיין כשאין להם עדיין סיווג ממקור אחר (פוסט
+ * מקומי מקושר) — כדי שמדדי הקצב החודשי (מכתב/טיפ) ו"מוביל כרגע" ישקפו גם
+ * תוכן שפורסם ישר מנושיין, בלי שנוצר פוסט בכלי בכלל. ימים שעברו לגמרי
+ * נבדקים פעם אחת בלבד (ReconciledDay) — אבל היום הנוכחי נבדק בכל הרצה, גם
+ * אם כבר "סומן", כי עוד יכול להתפרסם בו משהו בין לחיצה ללחיצה. בסוף מוחקת
+ * גם כל "צריך ריל/פוסט" (או הערה) בלי תוכן אמיתי שנשאר לא ממומש בימים
+ * שעברו *לגמרי* (לא היום) — לפי בקשה מפורשת להשאיר בימים שעברו רק את מה
+ * שבאמת פורסם. rangeStart/rangeEnd הם כל טווח (לא רק חודש קלנדרי) — נקראת
+ * גם עם טווח שבוע, ראו generateWeeklySchedule.
  */
 export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd: Date): Promise<ReconcileResult> {
   const today = formatCalendarDate(new Date());
@@ -620,6 +651,9 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
   if (formatCalendarDate(rangeStart) > scanEndIso) {
     return { checkedDays: 0, matchedSlots: 0, createdSlots: 0, formatsClassified: 0, deletedPlaceholders: 0 };
   }
+  // רק אם היום הנוכחי בכלל בטווח המבוקש (scanEndIso===today רק במקרה הזה) —
+  // אין טעם לסנכרן "אחרונים" כשמתאמתים טווח שכולו בעבר.
+  if (scanEndIso === today) await ensureTodaySynced();
 
   const scanEndDate = parseCalendarDate(scanEndIso);
   const alreadyDone = await prisma.reconciledDay.findMany({
@@ -688,6 +722,16 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
       const parsed = typeValues ? parseNotionType(typeValues) : null;
       const preview = (parsed?.isOld ? "📜 " : "") + (item.caption?.slice(0, 120) ?? "");
       const hour = item.timestamp.getUTCHours();
+
+      // התגית הזו כבר פורסמה בפועל (עכשיו) — לא משאירים המלצה כפולה עליה
+      // בשיבוץ אחר, גם אם הוא נעול (isManual) — כמו הניקוי המקביל ביצירת
+      // סלוט אוטומטי רגיל (ראו generateWeeklySchedule, אותו באג בדיוק).
+      if (tag) {
+        await prisma.scheduledSlot.updateMany({
+          where: { plannedNotionTag: tag, ...(matchedSlot ? { id: { not: matchedSlot.id } } : {}) },
+          data: { plannedNotionTag: null, plannedNotionPreview: null, plannedNotionPageUrl: null },
+        });
+      }
 
       if (matchedSlot) {
         claimedSlotIds.add(matchedSlot.id);
