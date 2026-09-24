@@ -784,10 +784,13 @@ export interface ReconcileResult {
  * לבדוק קודם ולא למשוך מה שכבר נמשך). לא זורקת אם אין חיבור פעיל/כשל ברשת —
  * ממשיכה עם מה שכבר יש במטמון.
  */
+// לא "פעם ביום" — היא יכולה לפרסם כמה פעמים באותו יום, כולל אחרי סנכרון
+// קודם מאותו יום. שעה נותנת מרווח סביר בלי למשוך שוב על כל לחיצה, בלי לפספס
+// פרסום חדש מהשעה האחרונה.
+const SYNC_FRESHNESS_MS = 60 * 60 * 1000;
 async function ensureTodaySynced(): Promise<void> {
   const profile = await prisma.profileSettings.findUnique({ where: { id: "default" } });
-  const todayStart = parseCalendarDate(formatCalendarDate(new Date()));
-  if (profile?.lastDashboardSyncAt && profile.lastDashboardSyncAt >= todayStart) return;
+  if (profile?.lastDashboardSyncAt && Date.now() - profile.lastDashboardSyncAt.getTime() < SYNC_FRESHNESS_MS) return;
   try {
     await syncLatestInstagramMedia(8);
   } catch {

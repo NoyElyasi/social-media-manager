@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z, flattenError } from "zod";
 import { prisma } from "@/server/db";
-import { parseCalendarDate } from "@/lib/weeklySchedule";
+import { formatCalendarDate, parseCalendarDate } from "@/lib/weeklySchedule";
 
 const patchSchema = z.object({
   hour: z.number().int().min(0).max(23).optional(),
@@ -30,6 +30,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const { actualStatus, isManual, date, ...rest } = parsed.data;
+
+  // מעבירים ל/מותירים בתאריך שכבר עבר רק אם זה משהו שבאמת פורסם — לא כותבים
+  // "עתיד לפרסם" על יום שכבר חלף בלי שקרה בו כלום, לפי בקשה מפורשת.
+  if (date !== undefined && date < formatCalendarDate(new Date())) {
+    const resultingStatus = actualStatus ?? (await prisma.scheduledSlot.findUnique({ where: { id }, select: { actualStatus: true } }))?.actualStatus;
+    if (resultingStatus !== "done") {
+      return NextResponse.json({ error: "אי אפשר להעביר שיבוץ שעדיין לא פורסם לתאריך שכבר עבר" }, { status: 400 });
+    }
+  }
 
   const updated = await prisma.scheduledSlot.update({
     where: { id },
