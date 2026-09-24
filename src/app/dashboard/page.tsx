@@ -50,7 +50,9 @@ const MEANINGFUL_DIFF = 0.15;
 // תגובות (לבקשת המשתמשת), אבל לא בלעדי, כדי שפוסט עם תגובות/לייקים גבוהים
 // במיוחד עדיין יוכל לעלות בדירוג.
 const NEXT_REEL_WEIGHTS = { views: 0.6, likes: 0.2, comments: 0.2 };
-const MIN_PER_GROUP = 2;
+// 5+ פוסטים לפני שמשווים/מכריזים על מגמה — כמו MIN_PER_GROUP ב-reachInsights.ts
+// (משוכפל בכוונה), לפי בקשה מפורשת לא לבנות על מדגם קטן שיכול להיות מזל.
+const MIN_PER_GROUP = 5;
 const FREQUENT_GAP_DAYS = 2; // פער בין פוסטים עד כמה ימים נחשב "פרסום תדיר"
 const WEEKDAY_LABELS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 const WEEKDAY_FULL_LABELS = ["יום ראשון", "יום שני", "יום שלישי", "יום רביעי", "יום חמישי", "יום שישי", "שבת"];
@@ -362,11 +364,35 @@ export default async function DashboardPage({
   // התוכן נוצר/קושר בכלי הזה), מדורגות לפי שיקלול (ממוצע דירוגי פרצנטיל, כדי
   // שצפיות לא ישתלטו על הניקוד) של צפיות+לייקים+תגובות — "הפוסטים המובילים".
   const reelHashtagSets = reels.map((r) => extractHashtags(r.caption));
+  // גם קרוסלה שהריל שלה עדיין רק טיוטה בכלי (לא פורסמה/סונכרנה עדיין) לא
+  // אמורה להישאר מומלצת — אחרת הדשבורד ממשיך "להציע" תוכן שכבר בעבודה. אותו
+  // תנאי בדיוק כמו getNextReelCandidates ב-reachInsights.ts (ראו שם), שממנו
+  // ההמלצה הזו אמורה להיות זהה — היה חסר כאן, גרם לפער בין הדשבורד לתכנון.
+  const draftReels = await prisma.platformContent.findMany({
+    where: { type: "instagram_reel" },
+    select: { postId: true, hashtags: true },
+  });
+  const draftReelHashtagSets = draftReels.map((r) => {
+    try {
+      return new Set((JSON.parse(r.hashtags || "[]") as string[]).filter((h) => h !== ALWAYS_FIRST_HASHTAG));
+    } catch {
+      return new Set<string>();
+    }
+  });
+  const allReelHashtagSets = [...reelHashtagSets, ...draftReelHashtagSets];
+  const postIdsWithReel = new Set(draftReels.map((r) => r.postId));
+  const carouselLinkedPosts = await prisma.platformContent.findMany({
+    where: { instagramMediaId: { in: carousels.map((c) => c.id) } },
+    select: { instagramMediaId: true, postId: true },
+  });
+  const postIdByMediaId = new Map(carouselLinkedPosts.map((c) => [c.instagramMediaId as string, c.postId]));
   const carouselsWithoutReel = carousels.filter((c) => {
     if (c.excludedFromReelSuggestions) return false; // סומן ידנית "לא רוצה בהמלצות"
+    const linkedPostId = postIdByMediaId.get(c.id);
+    if (linkedPostId && postIdsWithReel.has(linkedPostId)) return false; // ריל טיוטה קיים לפוסט הזה
     const tags = extractHashtags(c.caption);
     if (tags.size === 0) return true; // אין תגיות להשוות — לא ניתן להוכיח שיש ריל תואם
-    return !reelHashtagSets.some((reelTags) => [...tags].some((t) => reelTags.has(t)));
+    return !allReelHashtagSets.some((reelTags) => [...tags].some((t) => reelTags.has(t)));
   });
   const nextReelViewsRanks = percentileRanks(carouselsWithoutReel.map((c) => c.viewsCount));
   const nextReelLikesRanks = percentileRanks(carouselsWithoutReel.map((c) => c.likesCount));
@@ -381,14 +407,6 @@ export default async function DashboardPage({
     }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
-  const nextReelLinkedPosts =
-    nextReelSuggestions.length > 0
-      ? await prisma.platformContent.findMany({
-          where: { instagramMediaId: { in: nextReelSuggestions.map((s) => s.row.id) } },
-          select: { instagramMediaId: true, postId: true },
-        })
-      : [];
-  const postIdByMediaId = new Map(nextReelLinkedPosts.map((c) => [c.instagramMediaId as string, c.postId]));
 
   const oneTag = rows.filter((r) => r.hashtagCount <= 1);
   const manyTags = rows.filter((r) => r.hashtagCount >= 2);
@@ -397,14 +415,24 @@ export default async function DashboardPage({
 
   const weekdayBuckets = WEEKDAY_LABELS.map((label, day) => ({ name: label, rows: rows.filter((r) => r.dayOfWeek === day) }));
   const weekdayBucketsFull = WEEKDAY_FULL_LABELS.map((label, day) => ({ name: label, rows: rows.filter((r) => r.dayOfWeek === day) }));
-  // מקטעי שעות מפורשים (טווח שעות אמיתי בשם, לא "לילה" סתמי) — 4 שעות כל אחד.
-  const HOUR_BUCKET_STARTS = [0, 4, 8, 12, 16, 20];
-  const hourBucketLabel = (start: number) => `${String(start).padStart(2, "0")}-${String((start + 4) % 24).padStart(2, "0")}`;
+  // מקטעי שעות מפורשים (טווח שעות אמיתי בשם, לא "לילה" סתמי) — שעתיים כל אחד
+  // (כמו HOUR_BUCKET_SIZE ב-reachInsights.ts, משוכפל בכוונה).
+  const HOUR_BUCKET_STARTS = Array.from({ length: 12 }, (_, i) => i * 2);
+  const hourBucketLabel = (start: number) => `${String(start).padStart(2, "0")}-${String((start + 2) % 24).padStart(2, "0")}`;
   const hourBucketOf = (h: number) => hourBucketLabel(HOUR_BUCKET_STARTS.filter((s) => h >= s).pop() ?? 0);
   const hourBuckets = HOUR_BUCKET_STARTS.map((start) => {
     const name = hourBucketLabel(start);
     return { name, rows: rows.filter((r) => hourBucketOf(r.hour) === name) };
   });
+
+  // בדיקת שעה בודדת (לא בלוק) — אילו שעות עדיין לא נבדקו כלל, ואילו כבר
+  // נבדקו מספיק (MIN_PER_GROUP+) ומתבררות כחזקות בפועל — לפי בקשה מפורשת.
+  const hourlyRows = Array.from({ length: 24 }, (_, h) => rows.filter((r) => r.hour === h));
+  const untestedHours = hourlyRows.map((rs, h) => ({ h, rs })).filter(({ rs }) => rs.length === 0).map(({ h }) => h);
+  const testedHoursRanked = hourlyRows
+    .map((rs, h) => ({ hour: h, avgReach: avg(rs.map((r) => r.reachCount)), count: rs.filter((r) => r.reachCount !== null).length }))
+    .filter((h): h is { hour: number; avgReach: number; count: number } => h.avgReach !== null && h.count >= MIN_PER_GROUP)
+    .sort((a, b) => b.avgReach - a.avgReach);
 
   // תדירות פרסום: פער בימים בין פוסט לקודמו — משפיע על הגעה?
   const frequentRows: Row[] = [];
@@ -748,6 +776,26 @@ export default async function DashboardPage({
               );
             })}
           </ChartScrollRow>
+        </div>
+      )}
+
+      {(untestedHours.length > 0 || testedHoursRanked.length > 0) && (
+        <div className="flex flex-col gap-2 rounded-xl border border-brand-pink/30 bg-white p-4">
+          <h2 className="font-semibold text-brand-maroon">⏰ בדיקת שעות (שעה בודדת, לא בלוק)</h2>
+          {testedHoursRanked.length > 0 && (
+            <p className="text-sm text-brand-maroon/80">
+              <b>הכי חזקות (5+ פוסטים):</b>{" "}
+              {testedHoursRanked
+                .slice(0, 5)
+                .map((h) => `${String(h.hour).padStart(2, "0")}:00 (${Math.round(h.avgReach)}, ${h.count} פוסטים)`)
+                .join(" · ")}
+            </p>
+          )}
+          {untestedHours.length > 0 && (
+            <p className="text-sm text-brand-maroon/60">
+              <b>עדיין לא נבדקו בכלל, שווה לנסות:</b> {untestedHours.map((h) => `${String(h).padStart(2, "0")}:00`).join(", ")}
+            </p>
+          )}
         </div>
       )}
 

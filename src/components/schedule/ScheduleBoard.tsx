@@ -9,7 +9,8 @@ import BlockedDayToggle from "./BlockedDayToggle";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const ROW_H = 42;
-const HOUR_BUCKET_STARTS = [0, 4, 8, 12, 16, 20];
+// בלוקים של שעתיים — כמו ב-reachInsights.ts (HOUR_BUCKET_SIZE), משוכפל בכוונה.
+const HOUR_BUCKET_STARTS = Array.from({ length: 12 }, (_, i) => i * 2);
 const FORMAT_LABELS: Record<string, string> = { letter: "✉️ מכתב", tip: "💡 טיפ" };
 // כמו formatAngleLabel ב-reachInsights.ts, אבל משוכפל בכוונה — לא ניתן לייבא
 // מ-reachInsights.ts לרכיב לקוח (הוא מייבא את prisma, שלא בונה בדפדפן).
@@ -114,8 +115,8 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
       <details className="rounded-lg border border-brand-pink/30 bg-white">
         <summary className="cursor-pointer text-sm font-medium text-brand-maroon p-3">🧮 על סמך מה נבחרו הימים/השעות/הפורמט?</summary>
         <ul className="flex flex-col gap-1.5 p-3 pt-0 text-xs text-brand-maroon/70 list-disc pr-4">
-          {plan.methodology.map((line) => (
-            <li key={line}>{line}</li>
+          {plan.methodology.map((line, i) => (
+            <li key={i}>{line}</li>
           ))}
         </ul>
       </details>

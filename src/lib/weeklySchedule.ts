@@ -421,14 +421,17 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
   });
 
   // מכסת "חדש/ישן/ריל" לשבוע הזה מפחיתה קודם את מה שכבר פורסם *בפועל*
-  // השבוע (actualStatus="done", ראו reconcileScheduleWithInstagram) — אחרת
-  // ההצעה ממשיכה להציע מכסה מלאה נוספת על גבי מה שכבר קיים, ומציפה בעוד
-  // סלוטים "חדש" שכבר לא נחוצים, לפי בקשה מפורשת לשקלל את זה.
-  const realSlotsThisWeek = existingSlots.filter((s) => s.actualStatus === "done");
+  // השבוע (actualStatus="done", ראו reconcileScheduleWithInstagram) *וגם* כל
+  // שיבוץ נעול (isManual) עם המלצה אמיתית שעדיין pending (למשל אחרי גרירה/
+  // נעילה ידנית) — אחרת ההצעה ממשיכה להציע מכסה מלאה נוספת על גבי מה שכבר
+  // קיים/נעול, ומציפה בעוד סלוטים "חדש" שכבר לא נחוצים.
+  const countedSlotsThisWeek = existingSlots.filter(
+    (s) => s.actualStatus === "done" || (s.isManual && (s.plannedType || s.plannedNotionTag || s.plannedReelCandidateMediaId))
+  );
   let realReelCount = 0;
   let realOldCount = 0;
   let realNewCount = 0;
-  for (const s of realSlotsThisWeek) {
+  for (const s of countedSlotsThisWeek) {
     if (s.plannedType === "instagram_reel") realReelCount++;
     const typeValues = s.plannedNotionTag ? await findSegmentTypeByTag(s.plannedNotionTag) : null;
     if (typeValues?.includes(NOTION_OLD_TYPE_VALUE)) realOldCount++;
@@ -440,6 +443,21 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
   const remainingCoreSlots = remainingNewSlots + remainingOldSlots;
 
   const chosenDays = rankedDays.slice(0, Math.min(remainingCoreSlots, rankedDays.length));
+
+  // אם אף אחד מהימים הנבחרים לא "חזק" (ההגעה לא הכריעה כלום, המיון היה
+  // שרירותי) — מעדיפים לפזר בין שני התאריכים "חדש" ולא לצמצם אותם לימים
+  // רצופים: פוסט "ישן" (שחלק מהעוקבים כבר ראו) מתאים כ"מפריד" ביניהם. חוזק
+  // אמיתי גובר על פיזור — לא נוגעים בסדר אם יש הכרעה לפי הגעה, לפי בקשתה.
+  if (remainingNewSlots === 2 && remainingOldSlots === 1 && chosenDays.length >= 3) {
+    const core = chosenDays.slice(0, 3);
+    const noneStrong = core.every((d) => !strength.days[d.getUTCDay()].isStrong);
+    if (noneStrong) {
+      const sortedByDate = [...core].sort((a, b) => a.getTime() - b.getTime());
+      const middle = sortedByDate[1];
+      const others = sortedByDate.filter((d) => d !== middle);
+      chosenDays.splice(0, 3, ...others, middle);
+    }
+  }
 
   // יום לבדיקה: מבין המועמדים שלא נבחרו למעלה, זה עם הכי פחות פוסטים
   // היסטוריים (לא "חלש" — "לא נבדק") — נוסף כסלוט *נוסף* (לא מחליף אחד מהם),
@@ -454,8 +472,15 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
   if (explorationDay) chosenDays.push(explorationDay);
   const explorationDateStrings = new Set(explorationDay ? [formatCalendarDate(explorationDay)] : []);
 
-  const strongHourBuckets = strength.hourBuckets.filter((b) => b.isStrong);
-  const hourBucketRotation = strongHourBuckets.length > 0 ? strongHourBuckets : strength.hourBuckets.filter((b) => b.count > 0);
+  // מסודר לפי הגעה ממוצעת (לא לפי סדר כרונולוגי של הבלוקים!) — כדי שהסלוט
+  // הראשון (i=0, בדרך כלל גם היום החזק ביותר) יזכה בבלוק השעות החזק ביותר,
+  // לא סתם בבלוק הראשון בזמן. לפי בקשה מפורשת: לא לפזר בין בלוקים חזקים
+  // בסדר שרירותי כשיש דירוג אמיתי ביניהם.
+  const strongHourBuckets = strength.hourBuckets.filter((b) => b.isStrong).sort((a, b) => (b.avgReach ?? 0) - (a.avgReach ?? 0));
+  const hourBucketRotation =
+    strongHourBuckets.length > 0
+      ? strongHourBuckets
+      : [...strength.hourBuckets.filter((b) => b.count > 0)].sort((a, b) => (b.avgReach ?? 0) - (a.avgReach ?? 0));
   const fallbackHour = 18;
 
   const readyContent = await prisma.platformContent.findMany({
@@ -547,9 +572,9 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
       content = readyContent[localIdx];
       localIdx++;
     } else if (isExploration && !explorationHasReel && notionNewQueue.length > 0) {
+      // רק התור ה"חדש", לא ה"ישן" — יום הבדיקה נועד לבדוק חשיפה ל*קהל חדש*,
+      // ותוכן "ישן" (שחלק מהעוקבים כבר ראו) פוגע בדיוק בזה, לפי בקשה מפורשת.
       notionPick = notionNewQueue.shift() ?? null;
-    } else if (isExploration && !explorationHasReel && notionOldQueue.length > 0) {
-      notionPick = notionOldQueue.shift() ?? null;
     }
 
     let plannedType: "instagram_reel" | "instagram_carousel" | null = null;

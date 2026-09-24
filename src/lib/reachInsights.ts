@@ -10,8 +10,13 @@ import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
  */
 
 export const WEEKDAY_FULL_LABELS = ["יום ראשון", "יום שני", "יום שלישי", "יום רביעי", "יום חמישי", "יום שישי", "שבת"];
-const MIN_PER_GROUP = 2;
-const HOUR_BUCKET_STARTS = [0, 4, 8, 12, 16, 20];
+// 5+ פוסטים לפני שמכריזים על יום/שעה/פורמט "חזק"/"מעורבות" — לפי בקשה
+// מפורשת לא לבנות על מדגם קטן שיכול להיות מזל (היה 2, סף נמוך מדי).
+const MIN_PER_GROUP = 5;
+// בלוקים של שעתיים (לא 4) — לפי בקשה מפורשת לחלוקה מדויקת יותר, גם בדאש
+// בורד וגם באיסוף/חישוב הנתונים (ראו HOUR_BUCKET_SIZE).
+const HOUR_BUCKET_SIZE = 2;
+const HOUR_BUCKET_STARTS = Array.from({ length: 24 / HOUR_BUCKET_SIZE }, (_, i) => i * HOUR_BUCKET_SIZE);
 
 export function israelDayAndHour(date: Date): { dayOfWeek: number; hour: number } {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -52,6 +57,8 @@ export interface HourlyStrength {
   hour: number; // 0-23
   avgReach: number | null;
   count: number;
+  /** בין ה-topN המובילות *בפועל* (MIN_PER_GROUP פוסטים לפחות) — לא ניחוש על שעה שכמעט לא נבדקה. */
+  isStrong: boolean;
 }
 
 function markStrong<T extends { count: number; isStrong: boolean }>(buckets: T[], topN: number, valueOf: (b: T) => number | null): void {
@@ -96,7 +103,7 @@ export async function getDayHourStrength(topN = 3): Promise<{ days: DayStrength[
     const values = hourValues.get(startHour) ?? [];
     return {
       startHour,
-      name: `${String(startHour).padStart(2, "0")}-${String((startHour + 4) % 24).padStart(2, "0")}`,
+      name: `${String(startHour).padStart(2, "0")}-${String((startHour + HOUR_BUCKET_SIZE) % 24).padStart(2, "0")}`,
       avgReach: avg(values),
       count: values.filter((v) => v !== null).length,
       isStrong: false,
@@ -107,12 +114,31 @@ export async function getDayHourStrength(topN = 3): Promise<{ days: DayStrength[
     hour,
     avgReach: avg(values),
     count: values.filter((v) => v !== null).length,
+    isStrong: false,
   }));
 
   markStrong(days, topN, (b) => b.avgReach);
   markStrong(hourBuckets, topN, (b) => b.avgReach);
+  markStrong(hourly, topN, (b) => b.avgReach);
 
   return { days, hourBuckets, hourly };
+}
+
+export interface HourTestSummary {
+  /** שעות (0-23) שאין עדיין אף פוסט בהן — שווה לבדוק. */
+  untestedHours: number[];
+  /** שעות עם MIN_PER_GROUP+ פוסטים, מהחזקות לחלשות (הגעה ממוצעת). */
+  testedHoursRanked: { hour: number; avgReach: number; count: number }[];
+}
+
+/** מסכמת אילו שעות ספציפיות (לא בלוקים) עדיין לא נבדקו, ואילו כבר נבדקו מספיק ומתבררות כחזקות — ראו hourly. */
+export function summarizeHourTesting(hourly: HourlyStrength[]): HourTestSummary {
+  const untestedHours = hourly.filter((h) => h.count === 0).map((h) => h.hour);
+  const testedHoursRanked = hourly
+    .filter((h): h is HourlyStrength & { avgReach: number } => h.avgReach !== null && h.count >= MIN_PER_GROUP)
+    .sort((a, b) => b.avgReach - a.avgReach)
+    .map((h) => ({ hour: h.hour, avgReach: h.avgReach, count: h.count }));
+  return { untestedHours, testedHoursRanked };
 }
 
 export interface EngagementBucketStrength {
@@ -166,7 +192,7 @@ export async function getDayHourEngagement(topN = 3): Promise<{ days: Engagement
     const values = hourValues.get(startHour) ?? [];
     return {
       startHour,
-      name: `${String(startHour).padStart(2, "0")}-${String((startHour + 4) % 24).padStart(2, "0")}`,
+      name: `${String(startHour).padStart(2, "0")}-${String((startHour + HOUR_BUCKET_SIZE) % 24).padStart(2, "0")}`,
       avgEngagement: avg(values),
       count: values.filter((v) => v !== null).length,
       isStrong: false,
@@ -180,14 +206,14 @@ export async function getDayHourEngagement(topN = 3): Promise<{ days: Engagement
 }
 
 /**
- * השעה הספציפית (0-23) עם ההגעה הממוצעת הגבוהה ביותר בתוך בלוק 4 השעות
- * שמתחיל ב-bucketStart, מבין שעות עם מספיק נתונים (MIN_PER_GROUP) — ואם אין
- * כזו, אמצע הבלוק (bucketStart+2) כברירת מחדל "נורמלית" יותר מקצה הבלוק.
+ * השעה הספציפית (0-23) עם ההגעה הממוצעת הגבוהה ביותר בתוך הבלוק (2 שעות,
+ * ראו HOUR_BUCKET_SIZE) שמתחיל ב-bucketStart, מבין שעות עם מספיק נתונים
+ * (MIN_PER_GROUP) — ואם אין כזו, תחילת הבלוק כברירת מחדל.
  */
 export function bestHourInBucket(hourly: HourlyStrength[], bucketStart: number): number {
-  let best = bucketStart + 2;
+  let best = bucketStart;
   let bestAvg = -Infinity;
-  for (let h = bucketStart; h < bucketStart + 4; h++) {
+  for (let h = bucketStart; h < bucketStart + HOUR_BUCKET_SIZE; h++) {
     const entry = hourly[h % 24];
     if (entry && entry.avgReach !== null && entry.count >= MIN_PER_GROUP && entry.avgReach > bestAvg) {
       bestAvg = entry.avgReach;

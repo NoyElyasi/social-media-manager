@@ -163,8 +163,8 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
       <details className="rounded-lg border border-brand-pink/30 bg-white">
         <summary className="cursor-pointer text-sm font-medium text-brand-maroon p-3">🧮 על סמך מה נבחרו הימים/השעות/הפורמט?</summary>
         <ul className="flex flex-col gap-1.5 p-3 pt-0 text-xs text-brand-maroon/70 list-disc pr-4">
-          {plan.methodology.map((line) => (
-            <li key={line}>{line}</li>
+          {plan.methodology.map((line, i) => (
+            <li key={i}>{line}</li>
           ))}
         </ul>
       </details>
@@ -245,9 +245,10 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
                             onDrop={(e) => slot.slotId && handleDropOnSlot(e, slot.slotId, day.date)}
                             className={`truncate rounded px-1.5 py-0.5 text-xs font-medium ${slotStyle(slot.type)} ${
                               draggableSlot ? "cursor-grab active:cursor-grabbing" : ""
-                            }`}
+                            } ${slot.actualStatus === "done" ? "ring-2 ring-green-400" : ""}`}
                             title={slot.tag ?? undefined}
                           >
+                            {slot.actualStatus === "done" && "✅ "}
                             {slotIcon(slot.type)} {slot.tag ?? (slot.type === "instagram_reel" ? "צריך ריל" : slot.type === "instagram_carousel" ? "צריך פוסט" : "ריק")}
                           </span>
                         );
@@ -268,8 +269,8 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
                 <details className="rounded-lg border border-brand-pink/20 bg-brand-pink/5">
                   <summary className="cursor-pointer text-[11px] font-medium text-brand-maroon px-2 py-1">🧮 למה כך פוזרו הפוסטים השבוע?</summary>
                   <ul className="flex flex-col gap-1 px-2 pb-2 text-[11px] text-brand-maroon/70 list-disc pr-4">
-                    {week.reasonLines.map((line) => (
-                      <li key={line}>{line}</li>
+                    {week.reasonLines.map((line, i) => (
+                      <li key={i}>{line}</li>
                     ))}
                   </ul>
                 </details>
