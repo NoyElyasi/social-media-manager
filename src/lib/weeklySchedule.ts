@@ -239,6 +239,7 @@ function buildWeekReasonLines(days: { date: string; label: string }[], slots: We
       if (s.actualStatus === "done") return `${head} 🟰 ✅`;
 
       if (s.note?.startsWith("🔍")) parts.push("🔍");
+      else if (s.note?.startsWith("🎁")) parts.push("🎁");
       else if (s.dayIsStrong) parts.push("⚡");
       if (s.note?.includes("🕐")) parts.push("🕐");
 
@@ -564,9 +565,11 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
   const availableCandidates = await getNextReelCandidates(chosenDays.length, claimedMediaIds);
 
   // תקציב רילים לכל השבוע (ליבה + בדיקה) — לפי בקשתה "ריל גג שניים", בניכוי
-  // רילים שכבר פורסמו בפועל השבוע (realReelCount). סלוט הבדיקה תמיד ריל, אז
-  // הוא תמיד תופס אחד מהתקציב.
-  let reelBudget = REEL_WEEKLY_CAP - (explorationDay ? 1 : 0) - realReelCount;
+  // רילים שכבר פורסמו בפועל השבוע (realReelCount). סלוט הבדיקה, אם הופך
+  // בפועל לריל, מנכה מהתקציב הזה בעצמו בהמשך (ראו reelEligible/reelBudget--
+  // למטה, על אותו ענף בדיוק כמו כל סלוט אחר) — לא מנכים כאן מראש בנוסף,
+  // אחרת ריל אחד נחשב פעמיים ומגביל בפועל לריל אחד בשבוע גם כשהתקציב שניים.
+  let reelBudget = REEL_WEEKLY_CAP - realReelCount;
 
   // שעה נוכחית בישראל (לא UTC) — כמו strength.hourly עצמו (מבוסס
   // israelDayAndHour), אחרת ההשוואה בין "השעה שנבחרה" ל"השעה עכשיו" ב-
@@ -718,6 +721,52 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
     if (plannedReelCandidateMediaId) {
       await prisma.scheduledSlot.updateMany({
         where: { plannedReelCandidateMediaId, id: { not: created.id } },
+        data: { plannedReelCandidateMediaId: null },
+      });
+    }
+  }
+
+  // יום חזק שנשאר בלי שום שיבוץ השבוע (המכסה הבסיסית לא הגיעה אליו, למשל
+  // בגלל שיבוצים ידניים ישנים שתפסו כבר את המכסה) — אם עדיין יש תקציב ריל
+  // פנוי שלא נוצל עד כאן, מוסיפה לו ריל בפני עצמו, כתוסף. לא משנה שום כלל
+  // קיים (מכסת חדש/ישן, בחירת יום הבדיקה) — רק ממלאת תקציב שכבר קיים ולא
+  // נוצל, כדי שיום חזק לא יישאר ריק סתם. לפי בקשה מפורשת.
+  const usedDateStrings = new Set(chosenDays.map((d) => formatCalendarDate(d)));
+  const leftoverStrongDays = candidateDays
+    .filter((d) => !usedDateStrings.has(formatCalendarDate(d)) && strength.days[d.getUTCDay()].isStrong)
+    .sort((a, b) => (strength.days[b.getUTCDay()].avgReach ?? -1) - (strength.days[a.getUTCDay()].avgReach ?? -1));
+
+  for (const date of leftoverStrongDays) {
+    if (reelBudget <= 0) break;
+    const iso = formatCalendarDate(date);
+    const hour = pickHourForDay(iso, chosenDays.length);
+    reelBudget--;
+    let bonusReelCandidateMediaId: string | null = null;
+    if (candidateIdx < availableCandidates.length) {
+      bonusReelCandidateMediaId = availableCandidates[candidateIdx].mediaId;
+      candidateIdx++;
+    }
+    const bonusSlot = await prisma.scheduledSlot.create({
+      data: {
+        date,
+        hour,
+        isManual: false,
+        platformContentId: null,
+        note: "🎁 יום חזק שנשאר בלי שיבוץ במכסה הרגילה — נוסף כאן ריל כדי לא להחמיץ אותו",
+        plannedType: "instagram_reel",
+        plannedFormat: null,
+        plannedReelCandidateMediaId: bonusReelCandidateMediaId,
+        plannedNotionTag: null,
+        plannedNotionPreview: null,
+        plannedNotionPageUrl: null,
+      },
+      include: { platformContent: { include: { post: true } } },
+    });
+    createdSlots.push(bonusSlot);
+    chosenDays.push(date);
+    if (bonusReelCandidateMediaId) {
+      await prisma.scheduledSlot.updateMany({
+        where: { plannedReelCandidateMediaId: bonusReelCandidateMediaId, id: { not: bonusSlot.id } },
         data: { plannedReelCandidateMediaId: null },
       });
     }
