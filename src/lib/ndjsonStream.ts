@@ -8,8 +8,12 @@ export interface StreamEvent {
   line?: string; // ל-type "log" — שורת פלט גולמית (ראו /api/settings/sync-code)
 }
 
-/** קורא תשובת זרם NDJSON (שורת JSON אחת לאירוע) וקוראת ל-onEvent לכל אירוע. */
-export async function readNdjsonStream(res: Response, onEvent: (event: StreamEvent) => void): Promise<void> {
+/**
+ * קורא תשובת זרם NDJSON (שורת JSON אחת לאירוע) וקוראת ל-onEvent לכל אירוע.
+ * גנרי ב-T (ברירת מחדל StreamEvent) — כדי שאפשר לשתף את לוגיקת הפענוח גם עם
+ * זרמים שצורת האירוע שלהם שונה (למשל התקדמות פריט-פריט על פני כמה פוסטים).
+ */
+export async function readNdjsonStream<T = StreamEvent>(res: Response, onEvent: (event: T) => void): Promise<void> {
   if (!res.body) throw new Error("שגיאה בקבלת תשובה מהשרת");
 
   const reader = res.body.getReader();
@@ -23,10 +27,10 @@ export async function readNdjsonStream(res: Response, onEvent: (event: StreamEve
     const lines = buffer.split("\n");
     buffer = lines.pop() ?? "";
     for (const line of lines) {
-      if (line.trim()) onEvent(JSON.parse(line) as StreamEvent);
+      if (line.trim()) onEvent(JSON.parse(line) as T);
     }
   }
-  if (buffer.trim()) onEvent(JSON.parse(buffer) as StreamEvent);
+  if (buffer.trim()) onEvent(JSON.parse(buffer) as T);
 }
 
 /** אומדן שניות שנותרו, לפי קצב ההתקדמות עד כה (שניות שחלפו חלקי מסגרות שנעשו). */

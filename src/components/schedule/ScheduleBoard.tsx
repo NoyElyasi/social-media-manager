@@ -6,6 +6,20 @@ import type { WeekPlan } from "@/lib/weeklySchedule";
 import ScheduleSlotChip from "./ScheduleSlotChip";
 import ScheduleSlotEditorPanel, { type EditorTarget } from "./ScheduleSlotEditorPanel";
 import BlockedDayToggle from "./BlockedDayToggle";
+import { readNdjsonStream } from "@/lib/ndjsonStream";
+
+type GenerateContentEvent =
+  | { type: "progress"; index: number; total: number; date: string; hour: number }
+  | { type: "item"; date: string; hour: number; status: "created" | "skipped" | "error"; message: string }
+  | { type: "done"; created: number; skipped: number; errors: number }
+  | { type: "cancelled" };
+
+interface ContentResultItem {
+  date: string;
+  hour: number;
+  status: "created" | "skipped" | "error";
+  message: string;
+}
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const ROW_H = 42;
@@ -24,6 +38,9 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
   const [generating, setGenerating] = useState(false);
   const [target, setTarget] = useState<EditorTarget | null>(null);
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
+  const [generatingContent, setGeneratingContent] = useState(false);
+  const [contentProgress, setContentProgress] = useState<{ index: number; total: number } | null>(null);
+  const [contentResults, setContentResults] = useState<ContentResultItem[] | null>(null);
 
   /** גרירת שיבוץ קיים לתא (יום+שעה) אחר — מזיזה אותה בדיוק כמו שינוי תאריך/שעה בפאנל (נועלת אותה, ראו PATCH). */
   async function handleDrop(e: DragEvent<HTMLDivElement>, date: string, hour: number) {
@@ -55,6 +72,38 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
     });
     setGenerating(false);
     router.refresh();
+  }
+
+  /**
+   * שולפת מנושיין ומכינה בפועל (createAndPreparePost/addTargetToPost) את כל
+   * התוכן שעדיין חסר בשבוע הזה, לפי ההמלצות הקיימות — פוסט חדש מקטע נושיין
+   * מוכן, או ריל חדש לקרוסלה שכבר בכלי. בלי המלצה קונקרטית — מדלגת על הסלוט
+   * (לא ממציאה תוכן). זרם NDJSON כי כל פריט איטי (רינדור אמיתי), כמו יצירת
+   * פוסט בודד — כאן על פני כמה פוסטים ברצף, עם התקדמות פריט-פריט.
+   */
+  async function handleGenerateContent() {
+    setGeneratingContent(true);
+    setContentProgress(null);
+    const results: ContentResultItem[] = [];
+    try {
+      const res = await fetch("/api/schedule/generate-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weekStart: plan.weekStart }),
+      });
+      await readNdjsonStream<GenerateContentEvent>(res, (event) => {
+        if (event.type === "progress") {
+          setContentProgress({ index: event.index, total: event.total });
+        } else if (event.type === "item") {
+          results.push({ date: event.date, hour: event.hour, status: event.status, message: event.message });
+        }
+      });
+    } finally {
+      setGeneratingContent(false);
+      setContentProgress(null);
+      setContentResults(results);
+      router.refresh();
+    }
   }
 
   const strongHourLabels = plan.strength.hourBuckets.filter((b) => b.isStrong).map((b) => b.name);
@@ -103,6 +152,15 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
           )}
           <button
             type="button"
+            onClick={handleGenerateContent}
+            disabled={generatingContent}
+            title="שולפת מהנושיין ומכינה בפועל כל תוכן שעדיין חסר לשבוע הזה — פוסטים חדשים מקטעים מוכנים, ורילים לקרוסלות שכבר בכלי. בלי המלצה קונקרטית — מדלגת, לא ממציאה תוכן."
+            className="rounded-lg border border-brand-red/50 bg-white px-4 py-2 text-brand-red text-sm font-medium hover:bg-brand-red/10 disabled:opacity-50"
+          >
+            {generatingContent ? (contentProgress ? `מכינה ${contentProgress.index}/${contentProgress.total}...` : "מתחילה...") : "🚀 הכיני תוכן לכל השבוע"}
+          </button>
+          <button
+            type="button"
             onClick={handleGenerate}
             disabled={generating}
             className="rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium hover:bg-brand-red-dark disabled:opacity-50"
@@ -111,6 +169,23 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
           </button>
         </div>
       </div>
+
+      {contentResults && (
+        <details open className="rounded-lg border border-brand-pink/30 bg-white">
+          <summary className="cursor-pointer text-sm font-medium text-brand-maroon p-3">
+            🚀 תוצאת ההכנה האוטומטית — {contentResults.filter((r) => r.status === "created").length} נוצרו,{" "}
+            {contentResults.filter((r) => r.status === "skipped").length} דילוגים,{" "}
+            {contentResults.filter((r) => r.status === "error").length} שגיאות
+          </summary>
+          <ul className="flex flex-col gap-1 p-3 pt-0 text-xs text-brand-maroon/70 list-disc pr-4">
+            {contentResults.map((r, i) => (
+              <li key={i}>
+                {r.date.slice(5)} {String(r.hour).padStart(2, "0")}:00 — {r.status === "created" ? "✅" : r.status === "skipped" ? "⏭️" : "⚠️"} {r.message}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <details className="rounded-lg border border-brand-pink/30 bg-white">
         <summary className="cursor-pointer text-sm font-medium text-brand-maroon p-3">🧮 על סמך מה נבחרו הימים/השעות/הפורמט?</summary>
