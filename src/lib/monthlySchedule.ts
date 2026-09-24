@@ -111,7 +111,13 @@ export async function getMonthPlan(monthStart: Date): Promise<MonthPlan> {
           .map((s) => ({
             slotId: s.slotId,
             hour: s.hour,
-            tag: s.content?.titleTag ?? s.recommendedNotionSegment?.tag ?? s.recommendedReelCandidate?.caption ?? null,
+            // recommendedReelCandidate יכול להיות מועמד אמיתי בלי כיתוב (פוסטים
+            // ישנים, מלפני שהיה כיתוב עקבי) — "?? null" רגיל היה קורס למקום ריק
+            // ומראה "צריך ריל" גנרי, כאילו אין בכלל מועמד. יש מועמד, רק בלי כיתוב.
+            tag:
+              s.content?.titleTag ??
+              s.recommendedNotionSegment?.tag ??
+              (s.recommendedReelCandidate ? s.recommendedReelCandidate.caption ?? "(ללא כיתוב)" : null),
             type: s.content?.type ?? s.recommendedType ?? null,
             actualStatus: s.actualStatus,
           })),
