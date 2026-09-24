@@ -632,16 +632,20 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
       const pickedTheme = parseNotionType(notionPick.typeValues).theme;
       if (pickedTheme) dateToTheme.set(iso, pickedTheme);
     } else {
-      // אין תוכן מוכן וגם אין קטע טרי מנושיין — חוזרים למתכונת הקודמת: רק
-      // כותבים מה *סוג* הפוסט הדרוש, לא מה תוכנו. פוסט "ישן" תמיד מתפרסם
-      // כפוסט (קרוסלה) ולא כריל; ריל בכלל רק אם יש מועמד אמיתי מ"הרילים
-      // הבאים" בדשבורד (תוכן שכבר הוכיח את עצמו) — לא ריל "סתם", לפי בקשתה.
-      const canOfferReel = role !== "old" && reelBudget > 0 && candidateIdx < availableCandidates.length;
-      plannedType = canOfferReel ? "instagram_reel" : "instagram_carousel";
+      // אין תוכן מוכן וגם אין קטע טרי מנושיין. פוסט "ישן" תמיד מתפרסם כפוסט
+      // (קרוסלה) ולא כריל, ואם תקציב הריל השבועי כבר נוצל — גם כקרוסלה. אבל
+      // אם התקציב עדיין פנוי (role!=old, reelBudget>0) והפער הוא רק שאין
+      // *כרגע* מועמד קונקרטי מ"הרילים הבאים" — נשאר "צריך ריל" (placeholder,
+      // בלי מועמד) ולא קרוסלה: התקציב השבועי ל-2 רילים הוא התחייבות, לא
+      // הצעה שמתכווצת רק כי הדשבורד ריק כרגע (לפי בקשה מפורשת). התקציב עדיין
+      // נחשב "תפוס" כאן בכל מקרה, כדי שלא ננסה יותר מ-2 סלוטי-ריל בפועל בשבוע.
+      const reelEligible = role !== "old" && reelBudget > 0;
+      const canOfferReel = reelEligible && candidateIdx < availableCandidates.length;
+      plannedType = reelEligible ? "instagram_reel" : "instagram_carousel";
+      if (reelEligible) reelBudget--;
       if (canOfferReel) {
         plannedReelCandidateMediaId = availableCandidates[candidateIdx].mediaId;
         candidateIdx++;
-        reelBudget--;
       }
       if (behindIdx < behindAlerts.length) {
         plannedFormat = behindAlerts[behindIdx].format;
@@ -650,9 +654,11 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
     }
 
     const note = isExploration
-      ? plannedType === "instagram_reel"
+      ? plannedReelCandidateMediaId
         ? "🔍 יום לבדיקה — פחות מפורסם היסטורית; ריל כאן יכול להרחיב חשיפה לקהל חדש"
-        : "🔍 יום לבדיקה — פחות מפורסם היסטורית; אין כרגע מועמד ריל מומלץ, אז קרוסלה"
+        : plannedType === "instagram_reel"
+          ? "🔍 יום לבדיקה — פחות מפורסם היסטורית; עדיין אין מועמד ריל מומלץ — צריך למצוא/להכין אחד"
+          : "🔍 יום לבדיקה — פחות מפורסם היסטורית; אין כרגע מועמד ריל מומלץ, אז קרוסלה"
       : role === "old" && !content && !notionPick
         ? "📜 פוסט ישן — אין קטע מוכן (סטטוס Ready, טייפ 'ישן') בנושיין כרגע"
         : null;
