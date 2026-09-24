@@ -231,6 +231,39 @@ export async function findReadySegmentByTag(
   return { ok: true, segment: null };
 }
 
+/**
+ * מושכת קטע ישירות לפי מזהה העמוד (מתוך pageUrl, ראו Post.notionUrl) — לא
+ * לפי תגית. חשוב ל-refresh-from-notion: אם שינתה את התגית של השורה בנושיין
+ * מאז שהפוסט נוצר (ראו Post.notionTag, שקבוע מזמן היצירה), חיפוש לפי התגית
+ * הישנה כבר לא ימצא כלום — מזהה העמוד עצמו לא משתנה בשינוי שם/תגית.
+ */
+export async function findSegmentByPageUrl(pageUrl: string): Promise<{ ok: true; segment: NotionSegment | null } | { ok: false; error: string }> {
+  const config = await loadNotionConfig();
+  if ("error" in config) return { ok: false, error: config.error };
+  const { apiKey, map } = config;
+
+  // extractDatabaseId מזהה מזהה Notion גנרי מתוך קישור (32 הקס, עם/בלי מקפים) — עובד גם לעמוד בודד, לא רק לטבלה.
+  const pageId = extractDatabaseId(pageUrl);
+  if (!pageId) return { ok: false, error: "לא ניתן לזהות את מזהה העמוד מהקישור" };
+
+  const res = await notionFetch(`/pages/${pageId}`, apiKey);
+  if (res.status === 404) return { ok: true, segment: null };
+  if (!res.ok) return { ok: false, error: await notionErrorMessage(res) };
+
+  const page = (await res.json()) as NotionApiObject;
+  const properties = (page.properties ?? {}) as Record<string, NotionApiObject>;
+  const bodyText = await fetchPageBodyText(pageId, apiKey);
+  return {
+    ok: true,
+    segment: {
+      pageUrl: String(page.url ?? pageUrl),
+      bodyText,
+      typeValues: map.type ? extractMultiValue(properties[map.type.name]) : [],
+      tagValues: map.tags ? extractMultiValue(properties[map.tags.name]) : [],
+    },
+  };
+}
+
 export interface NotionReadyRow {
   tag: string;
   pageId: string;

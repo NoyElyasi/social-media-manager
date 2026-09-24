@@ -24,6 +24,7 @@ export default function EditablePostText({
   initialCoverBackgroundPath,
   existingNarrationUrl,
   notionTag,
+  notionUrl,
 }: {
   postId: string;
   initialRawText: string;
@@ -35,8 +36,9 @@ export default function EditablePostText({
   initialReelBackgroundPath: string | null;
   initialCoverBackgroundPath: string | null;
   existingNarrationUrl: string | null;
-  /** התגית שממנה יובא הטקסט מנושיין, אם ככה — מציגה כפתור "עדכני מהנושיין" (ראו refresh-from-notion). */
+  /** התגית/קישור שממנו יובא הטקסט מנושיין, אם ככה — מציגה כפתור "עדכני מהנושיין" (ראו refresh-from-notion). */
   notionTag: string | null;
+  notionUrl: string | null;
 }) {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -378,12 +380,16 @@ export default function EditablePostText({
         >
           {saving ? "מעדכן ומייצר תמונות..." : "שמור טקסט"}
         </button>
-        {notionTag && (
+        {(notionTag || notionUrl) && (
           <button
             type="button"
             onClick={handleRefreshFromNotion}
             disabled={saving || refreshing}
-            title={`שולפת את הטקסט העדכני מנושיין (תגית ${notionTag.startsWith("#") ? notionTag : `#${notionTag}`}) ומרנדרת מחדש`}
+            title={
+              notionTag
+                ? `שולפת את הטקסט העדכני מנושיין (תגית ${notionTag.startsWith("#") ? notionTag : `#${notionTag}`}) ומרנדרת מחדש — לפי קישור העמוד, גם אם התגית שונתה בנושיין`
+                : "שולפת את הטקסט העדכני מנושיין ומרנדרת מחדש"
+            }
             className="self-start rounded-lg border border-brand-pink/40 bg-white px-4 py-2 text-brand-maroon text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
           >
             {refreshing ? "מעדכנת מהנושיין..." : "🔄 עדכני טקסט מהנושיין"}
