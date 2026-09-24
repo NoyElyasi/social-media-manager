@@ -8,7 +8,7 @@ import {
   setCarouselBackgroundDark,
   setBackgroundCategory,
   setBackgroundTextPosition,
-  setDefaultBackgroundPath,
+  setDefaultBackgroundPathForFormat,
   type BackgroundKind,
 } from "@/server/settings/profile";
 import { getStorageService } from "@/server/storage";
@@ -68,10 +68,12 @@ const patchSchema = z.object({
   category: z.string().optional(),
   textTopOffset: z.number().nullable().optional(),
   textRightInset: z.number().nullable().optional(),
+  // הפורמט (רגיל/טיפ/מכתב) שמסמנים/מבטלים לתבנית הזו — עם isDefault, ראו setDefaultBackgroundPathForFormat.
+  defaultFormat: z.enum(["regular", "tip", "letter"]).optional(),
   isDefault: z.boolean().optional(),
 });
 
-/** מעדכנת תבנית רקע קיימת — סימון "כהה" (קרוסלה בלבד), קטגוריה, מיקום טקסט מותאם, ו/או סימון כברירת מחדל. */
+/** מעדכנת תבנית רקע קיימת — סימון "כהה" (קרוסלה בלבד), קטגוריה, מיקום טקסט מותאם, ו/או סימון כברירת מחדל לפורמט. */
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
   const parsed = patchSchema.safeParse(body);
@@ -81,7 +83,7 @@ export async function PATCH(req: NextRequest) {
 
   let darkPaths: string[] | undefined;
   let entries: Awaited<ReturnType<typeof setBackgroundCategory>> | undefined;
-  let defaultPath: string | null | undefined;
+  let defaultPaths: Partial<Record<"regular" | "tip" | "letter", string>> | undefined;
 
   if (parsed.data.isDark !== undefined) {
     darkPaths = await setCarouselBackgroundDark(parsed.data.path, parsed.data.isDark);
@@ -95,9 +97,9 @@ export async function PATCH(req: NextRequest) {
       rightInset: parsed.data.textRightInset ?? null,
     });
   }
-  if (parsed.data.isDefault !== undefined) {
-    defaultPath = await setDefaultBackgroundPath(parsed.data.kind, parsed.data.isDefault ? parsed.data.path : null);
+  if (parsed.data.defaultFormat !== undefined && parsed.data.isDefault !== undefined) {
+    defaultPaths = await setDefaultBackgroundPathForFormat(parsed.data.kind, parsed.data.defaultFormat, parsed.data.isDefault ? parsed.data.path : null);
   }
 
-  return NextResponse.json({ darkPaths, entries, defaultPath });
+  return NextResponse.json({ darkPaths, entries, defaultPaths });
 }

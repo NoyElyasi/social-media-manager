@@ -71,14 +71,27 @@ const BACKGROUND_FIELD: Record<
   cover: "coverBackgroundImagePaths",
 };
 
-const DEFAULT_BACKGROUND_FIELD: Record<
+const DEFAULT_BACKGROUNDS_FIELD: Record<
   BackgroundKind,
-  "defaultReelBackgroundPath" | "defaultCarouselBackgroundPath" | "defaultCoverBackgroundPath"
+  "defaultReelBackgroundPathsJson" | "defaultCarouselBackgroundPathsJson" | "defaultCoverBackgroundPathsJson"
 > = {
-  reel: "defaultReelBackgroundPath",
-  carousel: "defaultCarouselBackgroundPath",
-  cover: "defaultCoverBackgroundPath",
+  reel: "defaultReelBackgroundPathsJson",
+  carousel: "defaultCarouselBackgroundPathsJson",
+  cover: "defaultCoverBackgroundPathsJson",
 };
+
+/** פורמט הפוסט (aiFormat, "regular"/"tip"/"letter") — כל אחד יכול לקבל רקע ברירת מחדל נפרד לכל סוג (ריל/קרוסלה/שער). */
+export type PostFormatKey = "regular" | "tip" | "letter";
+export const POST_FORMAT_ORDER: PostFormatKey[] = ["regular", "tip", "letter"];
+
+/** מפרשת את מפת ברירות המחדל השמורה — {format: path}, בלי ערך = אין ברירת מחדל לפורמט הזה. */
+export function parseDefaultBackgroundPaths(json: string): Partial<Record<PostFormatKey, string>> {
+  try {
+    return JSON.parse(json || "{}");
+  } catch {
+    return {};
+  }
+}
 
 /**
  * קטגוריה/"סקין" חופשי לתבנית רקע (למשל "אחת ביום", "מכתב ביום", "טיפ
@@ -135,19 +148,42 @@ export async function removeBackgroundImagePath(kind: BackgroundKind, filePath: 
     data.darkCarouselBackgroundPaths = JSON.stringify(darkPaths);
   }
 
-  // ואם הנתיב הזה היה מסומן כברירת מחדל — מנקים גם את זה, כדי שלא יישאר מפנה לתבנית שלא קיימת יותר.
-  const defaultField = DEFAULT_BACKGROUND_FIELD[kind];
-  if (profile[defaultField] === filePath) data[defaultField] = null;
+  // ואם הנתיב הזה היה מסומן כברירת מחדל לאיזשהו פורמט — מנקים גם את זה, כדי שלא יישאר מפנה לתבנית שלא קיימת יותר.
+  const defaultsField = DEFAULT_BACKGROUNDS_FIELD[kind];
+  const defaults = parseDefaultBackgroundPaths(profile[defaultsField]);
+  const nextDefaults = Object.fromEntries(Object.entries(defaults).filter(([, p]) => p !== filePath));
+  if (Object.keys(nextDefaults).length !== Object.keys(defaults).length) {
+    data[defaultsField] = JSON.stringify(nextDefaults);
+  }
 
   await prisma.profileSettings.update({ where: { id: "default" }, data });
   return entries;
 }
 
-/** מסמנת/מבטלת סימון תבנית רקע כ"ברירת מחדל" לסוג הזה (ריל/קרוסלה/שער) — יחיד לכל סוג, ראו CreatePostInput ב-preparePost.ts. */
-export async function setDefaultBackgroundPath(kind: BackgroundKind, filePath: string | null): Promise<string | null> {
-  const field = DEFAULT_BACKGROUND_FIELD[kind];
-  await prisma.profileSettings.update({ where: { id: "default" }, data: { [field]: filePath } });
-  return filePath;
+/**
+ * מסמנת/מבטלת תבנית רקע כ"ברירת מחדל" לצירוף סוג (ריל/קרוסלה/שער) ופורמט
+ * פוסט (רגיל/טיפ/מכתב) — יחידה לכל צירוף, אז סימון תבנית חדשה לפורמט מסוים
+ * דורס אוטומטית את התבנית שהייתה ברירת מחדל לפניה לאותו פורמט. filePath=null
+ * מבטלת. ראו pickDefaultBackgroundPath לצריכה.
+ */
+export async function setDefaultBackgroundPathForFormat(
+  kind: BackgroundKind,
+  format: PostFormatKey,
+  filePath: string | null
+): Promise<Partial<Record<PostFormatKey, string>>> {
+  const profile = await getProfileSettings();
+  const field = DEFAULT_BACKGROUNDS_FIELD[kind];
+  const current = parseDefaultBackgroundPaths(profile[field]);
+  const next = { ...current };
+  if (filePath === null) delete next[format];
+  else next[format] = filePath;
+  await prisma.profileSettings.update({ where: { id: "default" }, data: { [field]: JSON.stringify(next) } });
+  return next;
+}
+
+/** ברירת המחדל לפורמט נתון (מהJSON שכבר נקרא, ראו ProfileSettings) — null/undefined format מתייחס כ"regular". */
+export function pickDefaultBackgroundPath(json: string, format: PostFormatKey | null | undefined): string | null {
+  return parseDefaultBackgroundPaths(json)[format ?? "regular"] ?? null;
 }
 
 /** משנה את הקטגוריה של תבנית רקע קיימת (למשל אם טעו בהקלדה בהעלאה, או רוצים לשייך מחדש). */

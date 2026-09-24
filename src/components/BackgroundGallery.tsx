@@ -30,13 +30,19 @@ const UNCATEGORIZED_LABEL = "כללי";
  * קטגוריה ("סקין") היא תג חופשי שנוצר תוך כדי העלאה — לא רשימה סגורה
  * שמנוהלת בנפרד, לפי בקשה מפורשת "ליצור קטגוריות כל פעם שיש קטגוריה חדשה".
  */
+type PostFormatKey = "regular" | "tip" | "letter";
+// לפי בקשה מפורשת: מחזור לחיצות בסדר הזה (בלי מחדל→רגיל→טיפ→מכתב→בלי מחדל).
+const FORMAT_CYCLE: PostFormatKey[] = ["regular", "tip", "letter"];
+const FORMAT_LABELS: Record<PostFormatKey, string> = { regular: "רגיל", tip: "טיפ", letter: "מכתב" };
+const FORMAT_ABBR: Record<PostFormatKey, string> = { regular: "ר", tip: "ט", letter: "מ" };
+
 export default function BackgroundGallery({
   kind,
   title,
   hint,
   initial,
   initialDarkPaths,
-  initialDefaultPath,
+  initialDefaultPaths,
 }: {
   kind: "reel" | "carousel" | "cover";
   title: string;
@@ -44,13 +50,13 @@ export default function BackgroundGallery({
   initial: BackgroundItem[];
   /** רלוונטי רק ל-kind="carousel" — אילו נתיבים מסומנים כתבנית כהה (ראו setCarouselBackgroundDark). */
   initialDarkPaths?: string[];
-  /** התבנית המסומנת כברירת מחדל לסוג הזה (ראו setDefaultBackgroundPath) — יחידה, לא סט. */
-  initialDefaultPath?: string | null;
+  /** מפת ברירת המחדל לכל פורמט (רגיל/טיפ/מכתב) לסוג הזה — ראו setDefaultBackgroundPathForFormat. */
+  initialDefaultPaths?: Partial<Record<PostFormatKey, string>>;
 }) {
   const router = useRouter();
   const [items, setItems] = useState(initial);
   const [darkPaths, setDarkPaths] = useState(new Set(initialDarkPaths ?? []));
-  const [defaultPath, setDefaultPath] = useState(initialDefaultPath ?? null);
+  const [defaultPaths, setDefaultPaths] = useState(initialDefaultPaths ?? {});
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [uploadCategory, setUploadCategory] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -85,20 +91,55 @@ export default function BackgroundGallery({
     router.refresh();
   }
 
-  /** מסמנת/מבטלת סימון תבנית כברירת מחדל לסוג הזה — יחידה, אז לסמן תבנית אחרת כברירת מחדל דורס אוטומטית את הקודמת. */
-  async function toggleDefault(item: BackgroundItem) {
+  /** הפורמט שהתבנית הזו מסומנת כברירת מחדל שלו כרגע, אם יש. */
+  function currentDefaultFormat(item: BackgroundItem): PostFormatKey | null {
+    return FORMAT_CYCLE.find((f) => defaultPaths[f] === item.path) ?? null;
+  }
+
+  /**
+   * מסמנת/מבטלת סימון תבנית כברירת מחדל — מחזור לחיצות: בלי ברירת מחדל →
+   * רגיל → טיפ → מכתב → בלי ברירת מחדל. אחת לכל פורמט לסוג הזה (ריל/קרוסלה/
+   * שער), אז לסמן תבנית חדשה לפורמט מסוים דורס אוטומטית את הקודמת עבורו.
+   */
+  async function cycleDefault(item: BackgroundItem) {
     setError(null);
-    const isDefault = defaultPath !== item.path;
-    const res = await fetch("/api/settings/backgrounds", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind, path: item.path, isDefault }),
-    });
-    if (!res.ok) {
-      setError("שגיאה בסימון ברירת המחדל — נסו שוב");
-      return;
+    const current = currentDefaultFormat(item);
+    const currentIdx = current ? FORMAT_CYCLE.indexOf(current) : -1;
+    const nextFormat = currentIdx + 1 < FORMAT_CYCLE.length ? FORMAT_CYCLE[currentIdx + 1] : null;
+
+    // מבטלים את הפורמט הנוכחי (אם יש) לפני שמסמנים את הבא — אחרת לרגע קצר
+    // התבנית "שייכת" לשני פורמטים בבת אחת בצד השרת (לא עקבי, גם אם חולף).
+    if (current) {
+      const clearRes = await fetch("/api/settings/backgrounds", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, path: item.path, defaultFormat: current, isDefault: false }),
+      });
+      if (!clearRes.ok) {
+        setError("שגיאה בסימון ברירת המחדל — נסו שוב");
+        return;
+      }
     }
-    setDefaultPath(isDefault ? item.path : null);
+    if (nextFormat) {
+      const setRes = await fetch("/api/settings/backgrounds", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, path: item.path, defaultFormat: nextFormat, isDefault: true }),
+      });
+      if (!setRes.ok) {
+        setError("שגיאה בסימון ברירת המחדל — נסו שוב");
+        return;
+      }
+      const data = await setRes.json();
+      setDefaultPaths(data.defaultPaths ?? {});
+    } else {
+      setDefaultPaths((prev) => {
+        if (!current) return prev;
+        const next = { ...prev };
+        delete next[current];
+        return next;
+      });
+    }
     router.refresh();
   }
 
@@ -196,6 +237,7 @@ export default function BackgroundGallery({
       return;
     }
     setItems((prev) => prev.filter((i) => i.path !== item.path));
+    setDefaultPaths((prev) => Object.fromEntries(Object.entries(prev).filter(([, p]) => p !== item.path)));
     router.refresh();
   }
 
@@ -243,6 +285,22 @@ export default function BackgroundGallery({
             >
               ✕
             </button>
+            <button
+              type="button"
+              onClick={() => cycleDefault(item)}
+              title={
+                currentDefaultFormat(item)
+                  ? `ברירת מחדל ל: ${FORMAT_LABELS[currentDefaultFormat(item)!]} — לחצי לשנות/לבטל`
+                  : "לחצי לסמן כברירת מחדל (רגיל ← טיפ ← מכתב)"
+              }
+              className={`absolute -top-2 -right-2 h-6 w-6 rounded-full border text-[10px] font-bold flex items-center justify-center ${
+                currentDefaultFormat(item)
+                  ? "border-amber-500 bg-amber-100 text-amber-800"
+                  : "bg-white border-brand-pink/40 text-brand-maroon/50 hover:bg-brand-pink/10"
+              }`}
+            >
+              {currentDefaultFormat(item) ? `⭐${FORMAT_ABBR[currentDefaultFormat(item)!]}` : "☆"}
+            </button>
             {editingPath === item.path ? (
               <input
                 type="text"
@@ -266,18 +324,6 @@ export default function BackgroundGallery({
                 {item.category?.trim() || UNCATEGORIZED_LABEL}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => toggleDefault(item)}
-              title="ברירת מחדל — תשמש אוטומטית ליצירת תוכן בלי בחירה ידנית, למשל הכפתור 'הכיני תוכן לכל השבוע'"
-              className={`rounded-full px-2 py-0.5 text-[11px] border ${
-                defaultPath === item.path
-                  ? "border-amber-500 bg-amber-100 text-amber-800"
-                  : "border-brand-pink/40 bg-white text-brand-maroon/60 hover:bg-brand-pink/10"
-              }`}
-            >
-              {defaultPath === item.path ? "⭐ ברירת מחדל" : "☆ הפכי לברירת מחדל"}
-            </button>
             {kind === "carousel" && (
               <button
                 type="button"

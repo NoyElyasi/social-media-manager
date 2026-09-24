@@ -5,7 +5,7 @@ import { getWeekPlan, getWeekStart, parseCalendarDate, type WeekSlot } from "@/l
 import { findReadySegmentByTag } from "@/server/notion";
 import { createAndPreparePost, addTargetToPost } from "@/server/content/preparePost";
 import { ReelCancelledError } from "@/server/content/instagramReel";
-import { getProfileSettings, updateProfileSettings } from "@/server/settings/profile";
+import { getProfileSettings, updateProfileSettings, pickDefaultBackgroundPath } from "@/server/settings/profile";
 import type { SelectedTarget } from "@/lib/labels";
 
 const bodySchema = z.object({ weekStart: z.string() });
@@ -47,9 +47,9 @@ export async function POST(req: NextRequest) {
   const pending: WeekSlot[] = [...plan.slots]
     .filter((s) => s.slotId && !s.content && s.actualStatus === "pending")
     .sort((a, b) => (a.date === b.date ? a.hour - b.hour : a.date.localeCompare(b.date)));
-  // רקעי ברירת מחדל (ראו setDefaultBackgroundPath) — כאן, בניגוד ליצירה
-  // ידנית, אין מי שיבחר רקע בזמן אמת, אז משתמשים במה שסומן כברירת מחדל
-  // בהגדרות (או בלי רקע, אם לא סומן כלום).
+  // רקעי ברירת מחדל, אחד לכל פורמט (ראו setDefaultBackgroundPathForFormat) —
+  // כאן, בניגוד ליצירה ידנית, אין מי שיבחר רקע בזמן אמת, אז משתמשים במה
+  // שסומן כברירת מחדל להגדרות לפי הפורמט של הפוסט (או בלי רקע, אם לא סומן כלום).
   const profile = await getProfileSettings();
 
   const encoder = new TextEncoder();
@@ -84,12 +84,13 @@ export async function POST(req: NextRequest) {
               send({ type: "item", date: slot.date, hour: slot.hour, status: "skipped", message: "הריל המומלץ לא מקושר לפוסט בכלי — לא הוכן ריל" });
               continue;
             }
+            const existingPost = await prisma.post.findUniqueOrThrow({ where: { id: postId }, select: { aiFormat: true } });
             let updatedPost;
             let reelAlreadyExisted = false;
             try {
               updatedPost = await addTargetToPost(postId, "instagram_reel", {
                 signal: req.signal,
-                reelBackgroundPath: profile.defaultReelBackgroundPath,
+                reelBackgroundPath: pickDefaultBackgroundPath(profile.defaultReelBackgroundPathsJson, existingPost.aiFormat as "tip" | "letter" | null),
               });
             } catch (targetErr) {
               // לא כשל אמיתי: יש כאן עדיין תוכן שלא קושר לשיבוץ הזה — אם כבר
@@ -135,8 +136,8 @@ export async function POST(req: NextRequest) {
               aiFormat: format ?? undefined,
               notionUrl: segment.pageUrl,
               notionTag: slot.recommendedNotionSegment.tag,
-              carouselBackgroundPath: profile.defaultCarouselBackgroundPath,
-              coverBackgroundPath: profile.defaultCoverBackgroundPath,
+              carouselBackgroundPath: pickDefaultBackgroundPath(profile.defaultCarouselBackgroundPathsJson, format),
+              coverBackgroundPath: pickDefaultBackgroundPath(profile.defaultCoverBackgroundPathsJson, format),
               signal: req.signal,
             });
             const newContent = post.platformContents.find((pc) => selectedTargets.includes(pc.type as SelectedTarget));

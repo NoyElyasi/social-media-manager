@@ -241,13 +241,15 @@ model ProfileSettings {
   carouselBackgroundImagePaths String   @default("[]")
   // תבניות רקע לעמוד השער (הראשון, עם התיוג הראשי במרכז) — ראו PlatformContent.coverImagePath.
   coverBackgroundImagePaths String   @default("[]")
-  // נתיב תבנית רקע (מבין אלה שברשימות מעלה) שמסומן כ"ברירת מחדל" לכל סוג —
-  // נבחר ידנית בהגדרות (ראו setDefaultBackgroundPath). לא משפיע על יצירת פוסט
-  // ידנית (שם היא בוחרת בעצמה כל פעם) — רק על יצירה אוטומטית בלי בחירה
-  // ידנית, כמו הכפתור "הכיני תוכן לכל השבוע".
-  defaultCarouselBackgroundPath String?
-  defaultReelBackgroundPath     String?
-  defaultCoverBackgroundPath    String?
+  // ברירת מחדל לתבנית רקע (מבין אלה שברשימות מעלה) — אחת לכל צירוף סוג
+  // (ריל/קרוסלה/שער) ופורמט פוסט (רגיל/טיפ/מכתב), נבחר ידנית בהגדרות (ראו
+  // setDefaultBackgroundPathForFormat). JSON: {"regular": path|null, "tip":
+  // path|null, "letter": path|null}. לא משפיע על יצירת פוסט ידנית (שם היא
+  // בוחרת בעצמה כל פעם) — רק על יצירה אוטומטית בלי בחירה ידנית, כמו הכפתור
+  // "הכיני תוכן לכל השבוע", שבוחר לפי aiFormat של הפוסט שנוצר.
+  defaultCarouselBackgroundPathsJson String @default("{}")
+  defaultReelBackgroundPathsJson     String @default("{}")
+  defaultCoverBackgroundPathsJson    String @default("{}")
   // אילו מהנתיבים שב-carouselBackgroundImagePaths מסומנים כתבנית כהה — קובע
   // אם פס ההתקדמות/מספור העמודים בתחתית העמוד מצייר בגוונים בהירים (לא
   // נבלע ברקע) או בגוונים הרגילים של המותג. מסומן ידנית בהגדרות, לא מזוהה
