@@ -248,9 +248,17 @@ export async function listReadySegments(): Promise<NotionReadyRow[]> {
 
   do {
     const filter = buildEqualsFilter({ name: map.status.name, type: map.status.type }, map.status.readyValue);
+    // בלי sorts, Notion מחזירה סדר לא-מוגדר (לא בהכרח סדר השורות בטבלה) —
+    // מיון לפי זמן יצירה כדי שהתור (במיוחד "ישן") יתאים לסדר שהיא כתבה בו,
+    // לפי בקשה מפורשת.
     const res = await notionFetch(`/databases/${databaseId}/query`, apiKey, {
       method: "POST",
-      body: JSON.stringify({ filter, page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) }),
+      body: JSON.stringify({
+        filter,
+        sorts: [{ timestamp: "created_time", direction: "ascending" }],
+        page_size: 100,
+        ...(cursor ? { start_cursor: cursor } : {}),
+      }),
     });
     if (!res.ok) break;
 

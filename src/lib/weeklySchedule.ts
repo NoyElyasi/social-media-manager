@@ -498,6 +498,17 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
   const notionNewQueue = notionReady.filter((r) => !r.typeValues.includes(NOTION_OLD_TYPE_VALUE));
   const notionOldQueue = notionReady.filter((r) => r.typeValues.includes(NOTION_OLD_TYPE_VALUE));
 
+  // נושא (aiTheme, מעמודת Type בנושיין) לכל יום שכבר יש לו שיבוץ אמיתי/נעול
+  // השבוע — כדי לא לשבץ אותו נושא בימים רצופים (ראו pickAvoidingAdjacentTheme
+  // למטה), לפי בקשה מפורשת. גיוון הוא שיקול רך — לא גובר על סדר הנושיין/חוזק.
+  const dateToTheme = new Map<string, string>();
+  for (const s of existingSlots) {
+    if (!s.plannedNotionTag) continue;
+    const typeValues = await findSegmentTypeByTag(s.plannedNotionTag);
+    const theme = typeValues ? parseNotionType(typeValues).theme : null;
+    if (theme) dateToTheme.set(formatCalendarDate(s.date), theme);
+  }
+
   // הכל מתוכנן ונעול *לפני* היצירה (לא מחושב מחדש בכל טעינה בהמשך, ראו
   // WeekSlot.recommendedType/Format/ReelCandidate/NotionSegment) — כדי שיישאר
   // תמונת מצב יציבה, ואפשר "לתפוס" הצעה כדי שהצעה של שבוע אחר לא תציע אותה
@@ -561,9 +572,9 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
       content = readyContent[localIdx];
       localIdx++;
     } else if (role === "new" && notionNewQueue.length > 0) {
-      notionPick = notionNewQueue.shift() ?? null;
+      notionPick = pickAvoidingAdjacentTheme(notionNewQueue, iso, dateToTheme);
     } else if (role === "old" && notionOldQueue.length > 0) {
-      notionPick = notionOldQueue.shift() ?? null;
+      notionPick = pickAvoidingAdjacentTheme(notionOldQueue, iso, dateToTheme);
     } else if (isExploration && !explorationHasReel && localIdx < readyContent.length) {
       // יום לבדיקה בלי מועמד ריל פנוי — עדיין מעדיף תוכן/קטע שממתין על פני
       // "צריך פוסט" גנרי (ראו בהמשך), בדיוק כמו תפקיד "חדש". מגיע רק אחרי
@@ -574,7 +585,7 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
     } else if (isExploration && !explorationHasReel && notionNewQueue.length > 0) {
       // רק התור ה"חדש", לא ה"ישן" — יום הבדיקה נועד לבדוק חשיפה ל*קהל חדש*,
       // ותוכן "ישן" (שחלק מהעוקבים כבר ראו) פוגע בדיוק בזה, לפי בקשה מפורשת.
-      notionPick = notionNewQueue.shift() ?? null;
+      notionPick = pickAvoidingAdjacentTheme(notionNewQueue, iso, dateToTheme);
     }
 
     let plannedType: "instagram_reel" | "instagram_carousel" | null = null;
@@ -590,15 +601,18 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
     } else if (notionPick) {
       // קטע טקסט טרי מנושיין — עדיין לא הוכיח את עצמו כתוכן מוביל, אז לא
       // הופך לריל (ריל רק מהרשימה המומלצת, ראו למטה) — קרוסלה כברירת מחדל.
-      // הבחירה מהתור (new/old) היא "shift" — כלומר תמיד לפי הסדר שחזר מנושיין
-      // (ראו listReadySegments), בלי לחפש קדימה קטע "נוח" יותר — גם בין
-      // הישנים וגם בין החדשים. אם לקטע שנבחר יש גם "מכתב"/"טיפ" בעמודת
-      // Type (למשל קטע ישן שהוא גם מכתב) — זה עדיין משתקף בפורמט המומלץ.
+      // הבחירה מהתור (new/old) היא לפי הסדר שחזר מנושיין (ראו listReadySegments),
+      // עם חריגה יחידה: מדלגת קדימה בתור אם הראשון מתנגש בנושא עם יום סמוך
+      // (ראו pickAvoidingAdjacentTheme) — לא "נוחות" כללית, רק גיוון נושאי.
+      // אם לקטע שנבחר יש גם "מכתב"/"טיפ" בעמודת Type (למשל קטע ישן שהוא גם
+      // מכתב) — זה עדיין משתקף בפורמט המומלץ.
       plannedType = "instagram_carousel";
       plannedNotionTag = notionPick.tag;
       plannedNotionPageUrl = notionPick.pageUrl;
       plannedNotionPreview = await getShortPreview(notionPick.pageId);
       plannedFormat = notionPick.typeValues.includes("מכתב") ? "letter" : notionPick.typeValues.includes("טיפ") ? "tip" : null;
+      const pickedTheme = parseNotionType(notionPick.typeValues).theme;
+      if (pickedTheme) dateToTheme.set(iso, pickedTheme);
     } else {
       // אין תוכן מוכן וגם אין קטע טרי מנושיין — חוזרים למתכונת הקודמת: רק
       // כותבים מה *סוג* הפוסט הדרוש, לא מה תוכנו. פוסט "ישן" תמיד מתפרסם
@@ -711,6 +725,29 @@ function parseNotionType(typeValues: string[]): { format: "letter" | "tip" | nul
   const isOld = typeValues.includes(NOTION_OLD_TYPE_VALUE);
   const theme = typeValues.map((v) => v.trim()).find((v) => v && v !== "טיפ" && v !== "מכתב" && v !== NOTION_OLD_TYPE_VALUE) ?? null;
   return { format, theme, isOld };
+}
+
+/**
+ * בוחרת מתוך התור (new/old) קטע שלא חופף בנושא (aiTheme) עם היום שלפני/אחרי
+ * בשבוע — כדי לא לשבץ שני תכנים באותו נושא בימים רצופים, לפי בקשה מפורשת.
+ * גיוון הוא שיקול *רך*: אם כל התור חופף (או אין העדפה), נכנעת וחוזרת לראש
+ * התור, כמו התנהגות ה-shift המקורית — לא מוותרת על סדר הנושיין בשביל גיוון.
+ * משנה את queue במקום (splice), בדיוק כמו .shift().
+ */
+function pickAvoidingAdjacentTheme(queue: NotionReadyRow[], iso: string, dateToTheme: Map<string, string>): NotionReadyRow | null {
+  if (queue.length === 0) return null;
+  const prevIso = formatCalendarDate(addDays(parseCalendarDate(iso), -1));
+  const nextIso = formatCalendarDate(addDays(parseCalendarDate(iso), 1));
+  const neighborThemes = new Set([dateToTheme.get(prevIso), dateToTheme.get(nextIso)].filter((t): t is string => !!t));
+  const idx =
+    neighborThemes.size === 0
+      ? 0
+      : queue.findIndex((r) => {
+          const theme = parseNotionType(r.typeValues).theme;
+          return !theme || !neighborThemes.has(theme);
+        });
+  const pickIdx = idx === -1 ? 0 : idx;
+  return queue.splice(pickIdx, 1)[0] ?? null;
 }
 
 export interface ReconcileResult {
