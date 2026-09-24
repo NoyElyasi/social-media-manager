@@ -9,6 +9,7 @@ import {
   getNextReelCandidates,
   getReelCandidatesByMediaIds,
   getTopContentAngles,
+  summarizeHourTesting,
   WEEKDAY_FULL_LABELS,
   israelDayAndHour,
   type ContentAngle,
@@ -239,6 +240,7 @@ function buildWeekReasonLines(days: { date: string; label: string }[], slots: We
 
       if (s.note?.startsWith("🔍")) parts.push("🔍");
       else if (s.dayIsStrong) parts.push("⚡");
+      if (s.note?.includes("🕐")) parts.push("🕐");
 
       if (s.recommendedReelCandidate) parts.push(`🎬 ${s.recommendedReelCandidate.caption?.slice(0, 30) ?? "ללא כיתוב"}`);
       else if (s.recommendedNotionSegment) {
@@ -469,8 +471,25 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
     explorationCandidates.length > 0
       ? [...explorationCandidates].sort((a, b) => strength.days[a.getUTCDay()].count - strength.days[b.getUTCDay()].count)[0]
       : null;
+  const coreLen = chosenDays.length;
   if (explorationDay) chosenDays.push(explorationDay);
   const explorationDateStrings = new Set(explorationDay ? [formatCalendarDate(explorationDay)] : []);
+
+  // בדיקת שעה: לפחות שעה אחת שעדיין אין לה שום פוסט היסטורי (untestedHours)
+  // נבדקת השבוע בפועל, לא רק שעות שכבר הוכחו כחזקות (hourBucketRotation) —
+  // לפי בקשה מפורשת שלא נמשיך "להמר" רק על מה שכבר נבדק. מעדיפים לתלות את
+  // הבדיקה בסלוט ה"ישן" האחרון אם יש (תוכן שחלק מהעוקבים כבר ראו — הימור
+  // פחות יקר על שעה לא ידועה מאשר תוכן חדש), ואם אין יום "ישן" השבוע —
+  // בסלוט האחרון שנבחר (יכול להיות גם יום הבדיקה עצמו).
+  const untestedHour = summarizeHourTesting(strength.hourly).untestedHours[0] ?? null;
+  const hourTestIndex =
+    untestedHour === null
+      ? null
+      : coreLen > remainingNewSlots
+        ? coreLen - 1
+        : chosenDays.length > 0
+          ? chosenDays.length - 1
+          : null;
 
   // מסודר לפי הגעה ממוצעת (לא לפי סדר כרונולוגי של הבלוקים!) — כדי שהסלוט
   // הראשון (i=0, בדרך כלל גם היום החזק ביותר) יזכה בבלוק השעות החזק ביותר,
@@ -573,7 +592,10 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
     const date = chosenDays[i];
     const iso = formatCalendarDate(date);
     const isExploration = explorationDateStrings.has(iso);
-    const hour = pickHourForDay(iso, i);
+    // אם השעה הלא-נבדקת עדיין לא עברה היום (אם זה היום הנוכחי) — משתמשים
+    // בה במקום בבלוק החזק הרגיל; אחרת חוזרים להתנהגות הרגילה (ראו pickHourForDay).
+    const isHourTest = i === hourTestIndex && untestedHour !== null && !(iso === today && untestedHour <= currentHour);
+    const hour = isHourTest ? untestedHour! : pickHourForDay(iso, i);
     // תפקיד הסלוט: לפי remainingNewSlots/remainingOldSlots (כבר מנוכה מה
     // שפורסם בפועל השבוע, ראו למעלה) — לא NEW_ROLE_COUNT הגולמי. לסלוט
     // הבדיקה אין תפקיד (הוא תוסף, לא אחד מהשלושה).
@@ -653,7 +675,7 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
       }
     }
 
-    const note = isExploration
+    const baseNote = isExploration
       ? plannedReelCandidateMediaId
         ? "🔍 יום לבדיקה — פחות מפורסם היסטורית; ריל כאן יכול להרחיב חשיפה לקהל חדש"
         : plannedType === "instagram_reel"
@@ -662,6 +684,8 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
       : role === "old" && !content && !notionPick
         ? "📜 פוסט ישן — אין קטע מוכן (סטטוס Ready, טייפ 'ישן') בנושיין כרגע"
         : null;
+    const hourTestNote = isHourTest ? `🕐 גם בדיקת שעה שעדיין לא נבדקה בכלל (${String(hour).padStart(2, "0")}:00)` : null;
+    const note = [baseNote, hourTestNote].filter((v): v is string => !!v).join(" · ") || null;
 
     const created = await prisma.scheduledSlot.create({
       data: {
