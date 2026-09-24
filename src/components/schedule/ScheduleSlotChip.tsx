@@ -33,7 +33,7 @@ export default function ScheduleSlotChip({ slot, onClick }: { slot: WeekSlot; on
       } ${slot.actualStatus === "done" ? "ring-2 ring-green-400" : slot.actualStatus === "skipped" ? "ring-2 ring-red-300 opacity-70" : ""}`}
     >
       <div className="flex items-center justify-between gap-0.5">
-        <span className="truncate">{content ? PLATFORM_LABELS[content.type] ?? content.type : emptyLabel}</span>
+        <span className="truncate">{content ? content.titleTag ?? PLATFORM_LABELS[content.type] ?? content.type : emptyLabel}</span>
         <span className="shrink-0 flex items-center gap-0.5">
           {slot.actualStatus === "done" && <span title="עלה בפועל">✅</span>}
           {slot.actualStatus === "skipped" && <span title="לא עלה בפועל">❌</span>}
