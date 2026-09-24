@@ -70,6 +70,7 @@ export default async function SettingsPage() {
                 textRightInset: e.textRightInset,
               }))}
               initialDarkPaths={darkCarouselBackgroundPaths}
+              initialDefaultPath={profile.defaultCarouselBackgroundPath}
             />
           </div>
           <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
@@ -78,6 +79,7 @@ export default async function SettingsPage() {
               title="תבניות רקע לריל"
               hint="אפשר להעלות כמה תבניות ולבחור מבינהן בזמן יצירת פוסט. בלי בחירה — נבחר צבע רקע אוטומטי."
               initial={reelBackgroundEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path), category: e.category }))}
+              initialDefaultPath={profile.defaultReelBackgroundPath}
             />
           </div>
           <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
@@ -86,6 +88,7 @@ export default async function SettingsPage() {
               title="תבניות רקע לעמוד שער (בקרוסלה)"
               hint="אם בוחרים תבנית כזו ביצירת פוסט, מתווסף עמוד ראשון נוסף עם הרקע הזה והתיוג הראשי של הפוסט מוצג עליו גדול, במרכז."
               initial={coverBackgroundEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path), category: e.category }))}
+              initialDefaultPath={profile.defaultCoverBackgroundPath}
             />
           </div>
         </>

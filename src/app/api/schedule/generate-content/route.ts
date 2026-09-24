@@ -47,6 +47,10 @@ export async function POST(req: NextRequest) {
   const pending: WeekSlot[] = [...plan.slots]
     .filter((s) => s.slotId && !s.content && s.actualStatus === "pending")
     .sort((a, b) => (a.date === b.date ? a.hour - b.hour : a.date.localeCompare(b.date)));
+  // רקעי ברירת מחדל (ראו setDefaultBackgroundPath) — כאן, בניגוד ליצירה
+  // ידנית, אין מי שיבחר רקע בזמן אמת, אז משתמשים במה שסומן כברירת מחדל
+  // בהגדרות (או בלי רקע, אם לא סומן כלום).
+  const profile = await getProfileSettings();
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -83,7 +87,10 @@ export async function POST(req: NextRequest) {
             let updatedPost;
             let reelAlreadyExisted = false;
             try {
-              updatedPost = await addTargetToPost(postId, "instagram_reel", { signal: req.signal });
+              updatedPost = await addTargetToPost(postId, "instagram_reel", {
+                signal: req.signal,
+                reelBackgroundPath: profile.defaultReelBackgroundPath,
+              });
             } catch (targetErr) {
               // לא כשל אמיתי: יש כאן עדיין תוכן שלא קושר לשיבוץ הזה — אם כבר
               // נוסף ריל לפוסט הזה מאז שההמלצה נשמרה (למשל ידנית, או בהרצה
@@ -127,6 +134,9 @@ export async function POST(req: NextRequest) {
               aiTheme: theme,
               aiFormat: format ?? undefined,
               notionUrl: segment.pageUrl,
+              notionTag: slot.recommendedNotionSegment.tag,
+              carouselBackgroundPath: profile.defaultCarouselBackgroundPath,
+              coverBackgroundPath: profile.defaultCoverBackgroundPath,
               signal: req.signal,
             });
             const newContent = post.platformContents.find((pc) => selectedTargets.includes(pc.type as SelectedTarget));

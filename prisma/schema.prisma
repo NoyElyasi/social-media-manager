@@ -42,6 +42,11 @@ model Post {
   // קישור לדף התכנון/כתיבה של הפוסט הזה ב-Notion, אם יש — נערך ידנית
   // (ראו PostContentPopup בתכנון השבועי), אין לו שום השפעה על שום פונקציונליות אחרת.
   notionUrl String?
+  // התגית שממנה יובא הטקסט מנושיין, אם הפוסט נוצר מקטע נושיין (ייבוא ידני
+  // ב-posts/new, או הכפתור "הכיני תוכן לכל השבוע") — מאפשרת למשוך מחדש את
+  // הטקסט העדכני מנושיין בלחיצה (ראו refresh-from-notion), בלי תלות בסטטוס
+  // הנוכחי של השורה בנושיין (יכול להשתנות אחרי שהקטע נלקח/פורסם).
+  notionTag String?
 
   platformContents PlatformContent[]
 }
@@ -236,6 +241,13 @@ model ProfileSettings {
   carouselBackgroundImagePaths String   @default("[]")
   // תבניות רקע לעמוד השער (הראשון, עם התיוג הראשי במרכז) — ראו PlatformContent.coverImagePath.
   coverBackgroundImagePaths String   @default("[]")
+  // נתיב תבנית רקע (מבין אלה שברשימות מעלה) שמסומן כ"ברירת מחדל" לכל סוג —
+  // נבחר ידנית בהגדרות (ראו setDefaultBackgroundPath). לא משפיע על יצירת פוסט
+  // ידנית (שם היא בוחרת בעצמה כל פעם) — רק על יצירה אוטומטית בלי בחירה
+  // ידנית, כמו הכפתור "הכיני תוכן לכל השבוע".
+  defaultCarouselBackgroundPath String?
+  defaultReelBackgroundPath     String?
+  defaultCoverBackgroundPath    String?
   // אילו מהנתיבים שב-carouselBackgroundImagePaths מסומנים כתבנית כהה — קובע
   // אם פס ההתקדמות/מספור העמודים בתחתית העמוד מצייר בגוונים בהירים (לא
   // נבלע ברקע) או בגוונים הרגילים של המותג. מסומן ידנית בהגדרות, לא מזוהה

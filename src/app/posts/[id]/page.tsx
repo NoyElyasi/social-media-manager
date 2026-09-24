@@ -82,6 +82,7 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
             initialCoverBackgroundPath={
               visiblePlatformContents.find((pc) => pc.type === "instagram_carousel")?.coverImagePath ?? null
             }
+            notionTag={post.notionTag}
           />
           <PostExtras
             postId={post.id}

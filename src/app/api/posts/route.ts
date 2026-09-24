@@ -18,6 +18,7 @@ const createPostSchema = z.object({
   aiTheme: z.string().nullable().optional(),
   aiFormat: z.enum(["regular", "letter", "tip"]).optional(),
   notionUrl: z.string().nullable().optional(),
+  notionTag: z.string().nullable().optional(),
   reelNarration: z
     .object({
       audioBase64: z.string(),

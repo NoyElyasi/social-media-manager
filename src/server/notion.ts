@@ -181,10 +181,17 @@ async function loadNotionConfig(): Promise<{ apiKey: string; databaseId: string;
 }
 
 /**
- * מחפשת קטע "מוכן" (status = הערך שנבחר בהגדרות) בטבלת ה-Notion, לפי תגית
- * תואמת. מנסה גם עם וגם בלי # מוביל (לא ידוע איך היא כותבת את התגית בטבלה).
+ * מחפשת קטע בטבלת ה-Notion לפי תגית תואמת. מנסה גם עם וגם בלי # מוביל (לא
+ * ידוע איך היא כותבת את התגית בטבלה). כברירת מחדל מסננת גם לפי סטטוס
+ * "מוכן" (requireReadyStatus, ברירת מחדל true) — אבל למשיכת טקסט מעודכן
+ * לקטע שכבר נלקח/פורסם (ראו refresh-from-notion) הסטטוס בנושיין כבר לא
+ * בהכרח "מוכן" (ראו findSegmentTypeByTag), אז שם קוראים עם false.
  */
-export async function findReadySegmentByTag(tag: string): Promise<{ ok: true; segment: NotionSegment | null } | { ok: false; error: string }> {
+export async function findReadySegmentByTag(
+  tag: string,
+  options: { requireReadyStatus?: boolean } = {}
+): Promise<{ ok: true; segment: NotionSegment | null } | { ok: false; error: string }> {
+  const requireReadyStatus = options.requireReadyStatus ?? true;
   const config = await loadNotionConfig();
   if ("error" in config) return { ok: false, error: config.error };
   const { apiKey, databaseId, map } = config;
@@ -193,9 +200,9 @@ export async function findReadySegmentByTag(tag: string): Promise<{ ok: true; se
   const candidates = [tag.trim(), cleanTag].filter((v, i, arr) => v.length > 0 && arr.indexOf(v) === i);
 
   for (const candidate of candidates) {
-    const filter = {
-      and: [buildEqualsFilter(map.tag, candidate), buildEqualsFilter({ name: map.status.name, type: map.status.type }, map.status.readyValue)],
-    };
+    const filter = requireReadyStatus
+      ? { and: [buildEqualsFilter(map.tag, candidate), buildEqualsFilter({ name: map.status.name, type: map.status.type }, map.status.readyValue)] }
+      : buildEqualsFilter(map.tag, candidate);
     const res = await notionFetch(`/databases/${databaseId}/query`, apiKey, {
       method: "POST",
       body: JSON.stringify({ filter, page_size: 1 }),

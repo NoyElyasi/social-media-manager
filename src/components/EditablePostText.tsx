@@ -23,6 +23,7 @@ export default function EditablePostText({
   initialReelBackgroundPath,
   initialCoverBackgroundPath,
   existingNarrationUrl,
+  notionTag,
 }: {
   postId: string;
   initialRawText: string;
@@ -34,11 +35,14 @@ export default function EditablePostText({
   initialReelBackgroundPath: string | null;
   initialCoverBackgroundPath: string | null;
   existingNarrationUrl: string | null;
+  /** התגית שממנה יובא הטקסט מנושיין, אם ככה — מציגה כפתור "עדכני מהנושיין" (ראו refresh-from-notion). */
+  notionTag: string | null;
 }) {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [rawText, setRawText] = useState(initialRawText);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -175,6 +179,52 @@ export default function EditablePostText({
       }
     } finally {
       setSaving(false);
+      setProgress(null);
+      abortControllerRef.current = null;
+    }
+  }
+
+  /** שולפת מחדש את הטקסט העדכני מנושיין (לפי notionTag) ומרנדרת מחדש, בלחיצה אחת — כמו לחיצה על "שמור טקסט" עם טקסט שנשלף אוטומטית. */
+  async function handleRefreshFromNotion() {
+    setError(null);
+    setRefreshing(true);
+    setProgress(null);
+    setStartedAt(Date.now());
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      const res = await fetch(`/api/posts/${postId}/refresh-from-notion`, { method: "POST", signal: controller.signal });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data?.error ?? "שגיאה בעדכון מהנושיין");
+      }
+
+      let updatedText: string | null = null;
+      await readNdjsonStream(res, (event) => {
+        if (event.type === "progress" && event.total) {
+          setProgress({ rendered: event.rendered ?? 0, total: event.total });
+        } else if (event.type === "done") {
+          updatedText = (event.post as { rawText: string }).rawText;
+        } else if (event.type === "cancelled") {
+          setError("העדכון בוטל");
+        } else if (event.type === "error") {
+          setError(event.message ?? "שגיאה בעדכון מהנושיין");
+        }
+      });
+
+      if (updatedText !== null) {
+        setRawText(updatedText);
+        router.refresh();
+      }
+    } catch (err) {
+      if (controller.signal.aborted) {
+        setError("העדכון בוטל");
+      } else {
+        setError(err instanceof Error ? err.message : "שגיאה לא צפויה");
+      }
+    } finally {
+      setRefreshing(false);
       setProgress(null);
       abortControllerRef.current = null;
     }
@@ -319,14 +369,27 @@ export default function EditablePostText({
         />
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <button
-        type="button"
-        onClick={handleUpdate}
-        disabled={saving}
-        className="self-start rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium hover:bg-brand-red-dark disabled:opacity-50"
-      >
-        {saving ? "מעדכן ומייצר תמונות..." : "שמור טקסט"}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleUpdate}
+          disabled={saving || refreshing}
+          className="self-start rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium hover:bg-brand-red-dark disabled:opacity-50"
+        >
+          {saving ? "מעדכן ומייצר תמונות..." : "שמור טקסט"}
+        </button>
+        {notionTag && (
+          <button
+            type="button"
+            onClick={handleRefreshFromNotion}
+            disabled={saving || refreshing}
+            title={`שולפת את הטקסט העדכני מנושיין (תגית ${notionTag.startsWith("#") ? notionTag : `#${notionTag}`}) ומרנדרת מחדש`}
+            className="self-start rounded-lg border border-brand-pink/40 bg-white px-4 py-2 text-brand-maroon text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
+          >
+            {refreshing ? "מעדכנת מהנושיין..." : "🔄 עדכני טקסט מהנושיין"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

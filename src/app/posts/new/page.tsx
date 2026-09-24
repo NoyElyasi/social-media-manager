@@ -79,6 +79,10 @@ export default function NewPostPage() {
   const [notionError, setNotionError] = useState<string | null>(null);
   const [notionSegment, setNotionSegment] = useState<{ pageUrl: string; bodyText: string; typeValues: string[]; tagValues: string[] } | null>(null);
   const [notionUrl, setNotionUrl] = useState<string | null>(null);
+  // התגית שממנה חיפשנו את notionSegment — נשמרת גם אחרי שהקטע יובא (לא
+  // מתאפסת עם notionSegment) כדי שתישלח עם הפוסט וישאר אפשר למשוך טקסט
+  // מעודכן מהנושיין בעריכה מאוחר יותר (ראו refresh-from-notion).
+  const [notionTag, setNotionTag] = useState<string | null>(null);
   const [notionOldFlag, setNotionOldFlag] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -166,6 +170,7 @@ export default function NewPostPage() {
           return;
         }
         setNotionSegment(data.segment);
+        setNotionTag(tag);
       })
       .finally(() => setNotionLoading(false));
   }, []);
@@ -240,6 +245,7 @@ export default function NewPostPage() {
           coverBackgroundPath,
           reelNarration: selectedTargets.includes("instagram_reel") ? reelNarration : null,
           notionUrl,
+          notionTag,
         }),
         signal: controller.signal,
       });
@@ -316,6 +322,7 @@ export default function NewPostPage() {
       return;
     }
     setNotionSegment(data.segment);
+    setNotionTag(tag);
   }
 
   /**

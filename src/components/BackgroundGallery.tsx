@@ -36,6 +36,7 @@ export default function BackgroundGallery({
   hint,
   initial,
   initialDarkPaths,
+  initialDefaultPath,
 }: {
   kind: "reel" | "carousel" | "cover";
   title: string;
@@ -43,10 +44,13 @@ export default function BackgroundGallery({
   initial: BackgroundItem[];
   /** רלוונטי רק ל-kind="carousel" — אילו נתיבים מסומנים כתבנית כהה (ראו setCarouselBackgroundDark). */
   initialDarkPaths?: string[];
+  /** התבנית המסומנת כברירת מחדל לסוג הזה (ראו setDefaultBackgroundPath) — יחידה, לא סט. */
+  initialDefaultPath?: string | null;
 }) {
   const router = useRouter();
   const [items, setItems] = useState(initial);
   const [darkPaths, setDarkPaths] = useState(new Set(initialDarkPaths ?? []));
+  const [defaultPath, setDefaultPath] = useState(initialDefaultPath ?? null);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [uploadCategory, setUploadCategory] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -78,6 +82,23 @@ export default function BackgroundGallery({
       else next.delete(item.path);
       return next;
     });
+    router.refresh();
+  }
+
+  /** מסמנת/מבטלת סימון תבנית כברירת מחדל לסוג הזה — יחידה, אז לסמן תבנית אחרת כברירת מחדל דורס אוטומטית את הקודמת. */
+  async function toggleDefault(item: BackgroundItem) {
+    setError(null);
+    const isDefault = defaultPath !== item.path;
+    const res = await fetch("/api/settings/backgrounds", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, path: item.path, isDefault }),
+    });
+    if (!res.ok) {
+      setError("שגיאה בסימון ברירת המחדל — נסו שוב");
+      return;
+    }
+    setDefaultPath(isDefault ? item.path : null);
     router.refresh();
   }
 
@@ -245,6 +266,18 @@ export default function BackgroundGallery({
                 {item.category?.trim() || UNCATEGORIZED_LABEL}
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => toggleDefault(item)}
+              title="ברירת מחדל — תשמש אוטומטית ליצירת תוכן בלי בחירה ידנית, למשל הכפתור 'הכיני תוכן לכל השבוע'"
+              className={`rounded-full px-2 py-0.5 text-[11px] border ${
+                defaultPath === item.path
+                  ? "border-amber-500 bg-amber-100 text-amber-800"
+                  : "border-brand-pink/40 bg-white text-brand-maroon/60 hover:bg-brand-pink/10"
+              }`}
+            >
+              {defaultPath === item.path ? "⭐ ברירת מחדל" : "☆ הפכי לברירת מחדל"}
+            </button>
             {kind === "carousel" && (
               <button
                 type="button"

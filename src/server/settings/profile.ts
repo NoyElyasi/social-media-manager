@@ -71,6 +71,15 @@ const BACKGROUND_FIELD: Record<
   cover: "coverBackgroundImagePaths",
 };
 
+const DEFAULT_BACKGROUND_FIELD: Record<
+  BackgroundKind,
+  "defaultReelBackgroundPath" | "defaultCarouselBackgroundPath" | "defaultCoverBackgroundPath"
+> = {
+  reel: "defaultReelBackgroundPath",
+  carousel: "defaultCarouselBackgroundPath",
+  cover: "defaultCoverBackgroundPath",
+};
+
 /**
  * קטגוריה/"סקין" חופשי לתבנית רקע (למשל "אחת ביום", "מכתב ביום", "טיפ
  * ביום") — מוקלד חופשי בזמן ההעלאה, לא רשימה סגורה שמנוהלת בנפרד. "" = בלי
@@ -116,7 +125,7 @@ export async function removeBackgroundImagePath(kind: BackgroundKind, filePath: 
   const profile = await getProfileSettings();
   const field = BACKGROUND_FIELD[kind];
   const entries = parseBackgroundEntries(profile[field]).filter((e) => e.path !== filePath);
-  const data: Record<string, string> = { [field]: JSON.stringify(entries) };
+  const data: Record<string, string | null> = { [field]: JSON.stringify(entries) };
 
   // גם מנקים סימון "כהה" ישן אם היה — כדי שלא יישאר נתיב-רפאים ברשימה הזו.
   if (kind === "carousel") {
@@ -126,8 +135,19 @@ export async function removeBackgroundImagePath(kind: BackgroundKind, filePath: 
     data.darkCarouselBackgroundPaths = JSON.stringify(darkPaths);
   }
 
+  // ואם הנתיב הזה היה מסומן כברירת מחדל — מנקים גם את זה, כדי שלא יישאר מפנה לתבנית שלא קיימת יותר.
+  const defaultField = DEFAULT_BACKGROUND_FIELD[kind];
+  if (profile[defaultField] === filePath) data[defaultField] = null;
+
   await prisma.profileSettings.update({ where: { id: "default" }, data });
   return entries;
+}
+
+/** מסמנת/מבטלת סימון תבנית רקע כ"ברירת מחדל" לסוג הזה (ריל/קרוסלה/שער) — יחיד לכל סוג, ראו CreatePostInput ב-preparePost.ts. */
+export async function setDefaultBackgroundPath(kind: BackgroundKind, filePath: string | null): Promise<string | null> {
+  const field = DEFAULT_BACKGROUND_FIELD[kind];
+  await prisma.profileSettings.update({ where: { id: "default" }, data: { [field]: filePath } });
+  return filePath;
 }
 
 /** משנה את הקטגוריה של תבנית רקע קיימת (למשל אם טעו בהקלדה בהעלאה, או רוצים לשייך מחדש). */

@@ -8,6 +8,7 @@ import {
   setCarouselBackgroundDark,
   setBackgroundCategory,
   setBackgroundTextPosition,
+  setDefaultBackgroundPath,
   type BackgroundKind,
 } from "@/server/settings/profile";
 import { getStorageService } from "@/server/storage";
@@ -67,9 +68,10 @@ const patchSchema = z.object({
   category: z.string().optional(),
   textTopOffset: z.number().nullable().optional(),
   textRightInset: z.number().nullable().optional(),
+  isDefault: z.boolean().optional(),
 });
 
-/** מעדכנת תבנית רקע קיימת — סימון "כהה" (קרוסלה בלבד), קטגוריה, ו/או מיקום טקסט מותאם. */
+/** מעדכנת תבנית רקע קיימת — סימון "כהה" (קרוסלה בלבד), קטגוריה, מיקום טקסט מותאם, ו/או סימון כברירת מחדל. */
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
   const parsed = patchSchema.safeParse(body);
@@ -79,6 +81,7 @@ export async function PATCH(req: NextRequest) {
 
   let darkPaths: string[] | undefined;
   let entries: Awaited<ReturnType<typeof setBackgroundCategory>> | undefined;
+  let defaultPath: string | null | undefined;
 
   if (parsed.data.isDark !== undefined) {
     darkPaths = await setCarouselBackgroundDark(parsed.data.path, parsed.data.isDark);
@@ -92,6 +95,9 @@ export async function PATCH(req: NextRequest) {
       rightInset: parsed.data.textRightInset ?? null,
     });
   }
+  if (parsed.data.isDefault !== undefined) {
+    defaultPath = await setDefaultBackgroundPath(parsed.data.kind, parsed.data.isDefault ? parsed.data.path : null);
+  }
 
-  return NextResponse.json({ darkPaths, entries });
+  return NextResponse.json({ darkPaths, entries, defaultPath });
 }

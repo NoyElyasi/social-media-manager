@@ -119,6 +119,8 @@ export interface CreatePostInput {
   reelNarration?: ReelNarration | null;
   /** לינק לעמוד המקור ב-Notion, אם הטקסט יובא משם (ראו NotionImportCard ביצירת פוסט). */
   notionUrl?: string | null;
+  /** התגית שממנה יובא הטקסט מנושיין, אם ככה — מאפשרת למשוך מחדש טקסט מעודכן בלחיצה (ראו refresh-from-notion). */
+  notionTag?: string | null;
   /** מאפשר עצירה מבוקשת (כפתור "עצור") באמצע יצירת ריל. */
   signal?: AbortSignal;
   /** התקדמות רינדור מסגרות הריל, לצורך אינדיקציית זמן משוער בממשק. */
@@ -164,6 +166,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
       folderPath: postFolderPath,
       privacyFlags: JSON.stringify(privacyFlags),
       notionUrl: input.notionUrl ?? null,
+      notionTag: input.notionTag ?? null,
     },
   });
 
