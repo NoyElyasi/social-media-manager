@@ -68,15 +68,22 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
     router.refresh();
   }
 
-  /** גרירה ישר על שיבוץ קיים ביום אחר — מחליפה בין התאריכים של שני השיבוצים (לא רק מזיזה אחד). */
-  async function handleDropOnSlot(e: DragEvent<HTMLSpanElement>, targetSlotId: string, targetDate: string) {
+  /**
+   * גרירה ישר על שיבוץ קיים — מחליפה בין *התוכן* של שני השיבוצים, לא בין
+   * התאריכים/שעות שלהם. היום והשעה של כל שיבוץ נבחרו במיוחד בשבילו (לפי
+   * חוזק אותו יום/שעה) — לפי בקשה מפורשת, זה לא אמור "לנדוד" עם התוכן.
+   */
+  async function handleDropOnSlot(e: DragEvent<HTMLSpanElement>, targetSlotId: string) {
     e.preventDefault();
     e.stopPropagation();
     setDragOverDate(null);
     const payload = readDragPayload(e);
-    if (!payload || payload.slotId === targetSlotId || payload.date === targetDate) return;
-    await moveSlot(payload.slotId, targetDate);
-    await moveSlot(targetSlotId, payload.date);
+    if (!payload || payload.slotId === targetSlotId) return;
+    await fetch("/api/schedule/slots/swap", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotIdA: payload.slotId, slotIdB: targetSlotId }),
+    });
     router.refresh();
   }
 
@@ -242,7 +249,7 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
                               e.preventDefault();
                               e.stopPropagation();
                             }}
-                            onDrop={(e) => slot.slotId && handleDropOnSlot(e, slot.slotId, day.date)}
+                            onDrop={(e) => slot.slotId && handleDropOnSlot(e, slot.slotId)}
                             className={`truncate rounded px-1.5 py-0.5 text-xs font-medium ${slotStyle(slot.type)} ${
                               draggableSlot ? "cursor-grab active:cursor-grabbing" : ""
                             } ${slot.actualStatus === "done" ? "ring-2 ring-green-400" : ""}`}
