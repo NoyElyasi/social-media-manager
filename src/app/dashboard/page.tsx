@@ -364,35 +364,20 @@ export default async function DashboardPage({
   // התוכן נוצר/קושר בכלי הזה), מדורגות לפי שיקלול (ממוצע דירוגי פרצנטיל, כדי
   // שצפיות לא ישתלטו על הניקוד) של צפיות+לייקים+תגובות — "הפוסטים המובילים".
   const reelHashtagSets = reels.map((r) => extractHashtags(r.caption));
-  // גם קרוסלה שהריל שלה עדיין רק טיוטה בכלי (לא פורסמה/סונכרנה עדיין) לא
-  // אמורה להישאר מומלצת — אחרת הדשבורד ממשיך "להציע" תוכן שכבר בעבודה. אותו
-  // תנאי בדיוק כמו getNextReelCandidates ב-reachInsights.ts (ראו שם), שממנו
-  // ההמלצה הזו אמורה להיות זהה — היה חסר כאן, גרם לפער בין הדשבורד לתכנון.
-  const draftReels = await prisma.platformContent.findMany({
-    where: { type: "instagram_reel" },
-    select: { postId: true, hashtags: true },
-  });
-  const draftReelHashtagSets = draftReels.map((r) => {
-    try {
-      return new Set((JSON.parse(r.hashtags || "[]") as string[]).filter((h) => h !== ALWAYS_FIRST_HASHTAG));
-    } catch {
-      return new Set<string>();
-    }
-  });
-  const allReelHashtagSets = [...reelHashtagSets, ...draftReelHashtagSets];
-  const postIdsWithReel = new Set(draftReels.map((r) => r.postId));
   const carouselLinkedPosts = await prisma.platformContent.findMany({
     where: { instagramMediaId: { in: carousels.map((c) => c.id) } },
     select: { instagramMediaId: true, postId: true },
   });
   const postIdByMediaId = new Map(carouselLinkedPosts.map((c) => [c.instagramMediaId as string, c.postId]));
+  // מוציאה רק לפי ריל שכבר *פורסם* בפועל (תגית חופפת) — לא לפי טיוטה בכלי,
+  // אפילו אם קיימת: היא מכינה הרבה תוכן מראש, וזה לא אמור להעלים המלצה —
+  // רק פרסום בפועל, לפי בקשה מפורשת (אותו תנאי כמו getNextReelCandidates
+  // ב-reachInsights.ts, שממנו ההמלצה הזו אמורה להיות זהה).
   const carouselsWithoutReel = carousels.filter((c) => {
     if (c.excludedFromReelSuggestions) return false; // סומן ידנית "לא רוצה בהמלצות"
-    const linkedPostId = postIdByMediaId.get(c.id);
-    if (linkedPostId && postIdsWithReel.has(linkedPostId)) return false; // ריל טיוטה קיים לפוסט הזה
     const tags = extractHashtags(c.caption);
     if (tags.size === 0) return true; // אין תגיות להשוות — לא ניתן להוכיח שיש ריל תואם
-    return !allReelHashtagSets.some((reelTags) => [...tags].some((t) => reelTags.has(t)));
+    return !reelHashtagSets.some((reelTags) => [...tags].some((t) => reelTags.has(t)));
   });
   const nextReelViewsRanks = percentileRanks(carouselsWithoutReel.map((c) => c.viewsCount));
   const nextReelLikesRanks = percentileRanks(carouselsWithoutReel.map((c) => c.likesCount));

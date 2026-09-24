@@ -495,8 +495,26 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
   // נושיין לא מוגדר, אז זה נופל אוטומטית למתכונת הקודמת (ראו למטה).
   const usedNotionTags = await getUsedNotionTags(parseCalendarDate(today));
   const notionReady = (await listReadySegments()).filter((r) => !usedNotionTags.has(r.tag));
-  const notionNewQueue = notionReady.filter((r) => !r.typeValues.includes(NOTION_OLD_TYPE_VALUE));
-  const notionOldQueue = notionReady.filter((r) => r.typeValues.includes(NOTION_OLD_TYPE_VALUE));
+  // "ישן": לפי סדר הכתיבה בטבלה (זמן יצירה) — חשוב לה שם. "חדש": לא לפי זמן
+  // כתיבה בכלל (לא קריטי לה) — לפי שיקלול: מכתב/טיפ שמאחורי הקצב החודשי, וגם
+  // נושא שכרגע "מוביל" (topAngles) מקבלים עדיפות. שני הכללים לפי בקשה מפורשת.
+  const notionOldQueue = notionReady
+    .filter((r) => r.typeValues.includes(NOTION_OLD_TYPE_VALUE))
+    .sort((a, b) => a.createdTime.localeCompare(b.createdTime));
+  const letterBehind = formatAlerts.some((a) => a.format === "letter" && a.isBehind);
+  const tipBehind = formatAlerts.some((a) => a.format === "tip" && a.isBehind);
+  const leadingThemes = new Set(topAngles.map((a) => a.theme));
+  function scoreNewCandidate(row: NotionReadyRow): number {
+    const { format, theme } = parseNotionType(row.typeValues);
+    let score = 0;
+    if (format === "letter" && letterBehind) score += 2;
+    if (format === "tip" && tipBehind) score += 2;
+    if (theme && leadingThemes.has(theme)) score += 1;
+    return score;
+  }
+  const notionNewQueue = notionReady
+    .filter((r) => !r.typeValues.includes(NOTION_OLD_TYPE_VALUE))
+    .sort((a, b) => scoreNewCandidate(b) - scoreNewCandidate(a));
 
   // נושא (aiTheme, מעמודת Type בנושיין) לכל יום שכבר יש לו שיבוץ אמיתי/נעול
   // השבוע — כדי לא לשבץ אותו נושא בימים רצופים (ראו pickAvoidingAdjacentTheme

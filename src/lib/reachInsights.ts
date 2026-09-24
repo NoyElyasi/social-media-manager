@@ -313,40 +313,22 @@ export async function getNextReelCandidates(topN = 5, excludeMediaIds: Set<strin
   const carousels = media.filter((m) => m.mediaType === "CAROUSEL_ALBUM");
   const reelHashtagSets = reels.map((r) => extractHashtags(r.caption));
 
-  // שני סימנים ל"כבר מטופל" מעבר לרילים שכבר *פורסמו* לאינסטגרם — כדי שההצעה
-  // לא תמשיך להציע את אותה קרוסלה שוב בשבוע הבא בפרק הזמן שבין שיבוץ הריל
-  // בכלי לבין פרסומו בפועל וסנכרון InstagramMedia:
-  // 1) ריל שהוכן בכלי עם תגית תואמת (גם אם עוד לא פורסם).
-  // 2) ריל כלשהו שהוכן בכלי לאותו פוסט בדיוק כמו הקרוסלה (גם בלי תגית תואמת —
-  //    זה קורה כשמוסיפים ריל לפוסט קיים ולא ממלאים לו תגיות בנפרד).
-  const draftReels = await prisma.platformContent.findMany({
-    where: { type: "instagram_reel" },
-    select: { postId: true, hashtags: true },
-  });
-  const draftReelHashtagSets = draftReels.map((r) => {
-    try {
-      return new Set((JSON.parse(r.hashtags || "[]") as string[]).filter((h) => h !== ALWAYS_FIRST_HASHTAG));
-    } catch {
-      return new Set<string>();
-    }
-  });
-  const allReelHashtagSets = [...reelHashtagSets, ...draftReelHashtagSets];
-  const postIdsWithReel = new Set(draftReels.map((r) => r.postId));
-
   const linkedPosts = await prisma.platformContent.findMany({
     where: { instagramMediaId: { in: carousels.map((c) => c.id) } },
     select: { instagramMediaId: true, postId: true },
   });
   const postIdByMediaId = new Map(linkedPosts.map((c) => [c.instagramMediaId as string, c.postId]));
 
+  // מוציאה רק לפי ריל שכבר *פורסם* בפועל לאינסטגרם (תגית חופפת) — לא לפי
+  // טיוטה בכלי (גם אם קיימת), לפי בקשה מפורשת: היא מכינה הרבה תוכן מראש,
+  // והלוח הזה הוא לוח פרסום מומלץ, לא מד-קיום-הכנה. טיוטה בעבודה לא צריכה
+  // להעלים את ההמלצה — רק פרסום בפועל (מזוהה בסנכרון בפועל, ראו weeklySchedule.ts).
   const carouselsWithoutReel = carousels.filter((c) => {
     if (c.excludedFromReelSuggestions) return false;
     if (excludeMediaIds.has(c.id)) return false; // כבר "נתפס" בסלוט מתוכנן בשבוע אחר, ראו weeklySchedule.ts
-    const linkedPostId = postIdByMediaId.get(c.id);
-    if (linkedPostId && postIdsWithReel.has(linkedPostId)) return false;
     const tags = extractHashtags(c.caption);
     if (tags.size === 0) return true;
-    return !allReelHashtagSets.some((reelTags) => [...tags].some((t) => reelTags.has(t)));
+    return !reelHashtagSets.some((reelTags) => [...tags].some((t) => reelTags.has(t)));
   });
 
   const viewsRanks = percentileRanks(carouselsWithoutReel.map((c) => c.viewsCount));

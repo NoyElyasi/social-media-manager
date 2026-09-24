@@ -230,6 +230,9 @@ export interface NotionReadyRow {
   pageUrl: string;
   // ראו NotionSegment.typeValues — multi_select, יכול להכיל גם נושא וגם מילת-בקרה יחד.
   typeValues: string[];
+  // זמן יצירת השורה בנושיין — לשימוש בתור ה"ישן" (מיון לפי סדר כתיבה בטבלה),
+  // ראו weeklySchedule.ts. לא רלוונטי לתור ה"חדש", ששם ממיינים לפי שיקלול אחר.
+  createdTime: string;
 }
 
 /**
@@ -248,17 +251,9 @@ export async function listReadySegments(): Promise<NotionReadyRow[]> {
 
   do {
     const filter = buildEqualsFilter({ name: map.status.name, type: map.status.type }, map.status.readyValue);
-    // בלי sorts, Notion מחזירה סדר לא-מוגדר (לא בהכרח סדר השורות בטבלה) —
-    // מיון לפי זמן יצירה כדי שהתור (במיוחד "ישן") יתאים לסדר שהיא כתבה בו,
-    // לפי בקשה מפורשת.
     const res = await notionFetch(`/databases/${databaseId}/query`, apiKey, {
       method: "POST",
-      body: JSON.stringify({
-        filter,
-        sorts: [{ timestamp: "created_time", direction: "ascending" }],
-        page_size: 100,
-        ...(cursor ? { start_cursor: cursor } : {}),
-      }),
+      body: JSON.stringify({ filter, page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) }),
     });
     if (!res.ok) break;
 
@@ -273,6 +268,7 @@ export async function listReadySegments(): Promise<NotionReadyRow[]> {
         pageId: String(page.id),
         pageUrl: String(page.url),
         typeValues: map.type ? extractMultiValue(properties[map.type.name]) : [],
+        createdTime: String(page.created_time ?? ""),
       });
     }
     cursor = data.has_more ? (data.next_cursor as string | undefined) : undefined;
