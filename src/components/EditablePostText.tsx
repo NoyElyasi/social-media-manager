@@ -242,35 +242,25 @@ export default function EditablePostText({
         className="rounded-lg border border-brand-pink/40 p-3 text-base bg-white"
       />
       {hasSplitTarget && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <p className="text-xs text-neutral-500">
-              סימון חילוק לעמוד (קרוסלה) / משפט (ריל) חדש:{" "}
-              <code className="bg-neutral-200 px-1 rounded">{MANUAL_SLIDE_BREAK}</code>
-            </p>
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insertMarker(MANUAL_SLIDE_BREAK)}
-              className="shrink-0 rounded-md border border-brand-pink/40 px-2 py-1 text-xs hover:bg-brand-pink/10"
-            >
-              + סימון חילוק
-            </button>
-          </div>
-          <div className="flex items-center gap-3">
-            <p className="text-xs text-neutral-500">
-              במצב אוטומטי: שני משפטים שחייבים להישאר יחד (לא להיפרד) —{" "}
-              <code className="bg-neutral-200 px-1 rounded">{GLUE_MARKER}</code> ביניהם
-            </p>
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insertMarker(GLUE_MARKER)}
-              className="shrink-0 rounded-md border border-brand-pink/40 px-2 py-1 text-xs hover:bg-brand-pink/10"
-            >
-              + סימון הדבקה
-            </button>
-          </div>
+        <div className="flex gap-2 text-xs">
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => insertMarker(MANUAL_SLIDE_BREAK)}
+            title="הציבו את הסמן בטקסט במקום לפצל לעמוד/משפט חדש, ואז לחצו כאן"
+            className="rounded-md border px-2 py-1 hover:bg-neutral-100"
+          >
+            + סימון חילוק ({MANUAL_SLIDE_BREAK})
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => insertMarker(GLUE_MARKER)}
+            title="שני משפטים שחייבים להישאר יחד באותו עמוד/כתובית — הציבו סמן ביניהם ולחצו כאן"
+            className="rounded-md border px-2 py-1 hover:bg-neutral-100"
+          >
+            + סימון הדבקה ({GLUE_MARKER})
+          </button>
         </div>
       )}
       {hasCarousel && hasReel && (
