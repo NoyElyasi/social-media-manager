@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getMonthPlan, getMonthStart, addMonths } from "@/lib/monthlySchedule";
 import MonthBoard from "@/components/schedule/MonthBoard";
 import WideScheduleLayout from "@/components/schedule/WideScheduleLayout";
+import ScheduleNavArrows from "@/components/schedule/ScheduleNavArrows";
 
 export const dynamic = "force-dynamic";
 
@@ -17,20 +18,18 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
 
   return (
     <WideScheduleLayout>
+      <ScheduleNavArrows
+        prevHref={`/schedule?month=${prevMonth}`}
+        nextHref={`/schedule?month=${nextMonth}`}
+        prevLabel="חודש קודם"
+        nextLabel="חודש הבא"
+      />
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h1 className="text-2xl font-bold text-brand-maroon">{plan.monthLabel}</h1>
-          <div className="flex items-center gap-2 text-sm">
-            <Link href={`/schedule?month=${prevMonth}`} className="rounded-lg border border-brand-pink/40 px-3 py-1.5 hover:bg-brand-pink/10">
-              ‹ חודש קודם
-            </Link>
-            <Link href={`/schedule?month=${thisMonth}`} className="rounded-lg border border-brand-pink/40 px-3 py-1.5 hover:bg-brand-pink/10">
-              החודש
-            </Link>
-            <Link href={`/schedule?month=${nextMonth}`} className="rounded-lg border border-brand-pink/40 px-3 py-1.5 hover:bg-brand-pink/10">
-              חודש הבא ›
-            </Link>
-          </div>
+          <Link href={`/schedule?month=${thisMonth}`} className="rounded-lg border border-brand-pink/40 px-3 py-1.5 text-sm hover:bg-brand-pink/10">
+            החודש
+          </Link>
         </div>
 
         <MonthBoard key={plan.monthStart} plan={plan} />

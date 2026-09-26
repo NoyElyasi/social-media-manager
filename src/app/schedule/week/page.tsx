@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getWeekPlan, getWeekStart, formatCalendarDate, parseCalendarDate } from "@/lib/weeklySchedule";
 import ScheduleBoard from "@/components/schedule/ScheduleBoard";
 import WideScheduleLayout from "@/components/schedule/WideScheduleLayout";
+import ScheduleNavArrows from "@/components/schedule/ScheduleNavArrows";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,12 @@ export default async function ScheduleWeekPage({ searchParams }: { searchParams:
 
   return (
     <WideScheduleLayout>
+      <ScheduleNavArrows
+        prevHref={`/schedule/week?week=${prevWeek}`}
+        nextHref={`/schedule/week?week=${nextWeek}`}
+        prevLabel="שבוע קודם"
+        nextLabel="שבוע הבא"
+      />
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -36,35 +43,12 @@ export default async function ScheduleWeekPage({ searchParams }: { searchParams:
               {plan.weekStart} – {weekEndLabel}
             </p>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <Link href={`/schedule/week?week=${prevWeek}`} className="rounded-lg border border-brand-pink/40 px-3 py-1.5 hover:bg-brand-pink/10">
-              ‹ שבוע קודם
-            </Link>
-            <Link href={`/schedule/week?week=${thisWeek}`} className="rounded-lg border border-brand-pink/40 px-3 py-1.5 hover:bg-brand-pink/10">
-              השבוע
-            </Link>
-            <Link href={`/schedule/week?week=${nextWeek}`} className="rounded-lg border border-brand-pink/40 px-3 py-1.5 hover:bg-brand-pink/10">
-              שבוע הבא ›
-            </Link>
-          </div>
+          <Link href={`/schedule/week?week=${thisWeek}`} className="rounded-lg border border-brand-pink/40 px-3 py-1.5 text-sm hover:bg-brand-pink/10">
+            השבוע
+          </Link>
         </div>
 
         <ScheduleBoard key={plan.weekStart} plan={plan} />
-
-        <div className="flex justify-between">
-          <Link
-            href={`/schedule/week?week=${prevWeek}`}
-            className="rounded-lg border border-brand-pink/40 bg-white px-4 py-2 text-brand-maroon text-sm font-medium hover:bg-brand-pink/10"
-          >
-            ‹ שבוע קודם
-          </Link>
-          <Link
-            href={`/schedule/week?week=${nextWeek}`}
-            className="rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium hover:bg-brand-red-dark"
-          >
-            שבוע הבא ›
-          </Link>
-        </div>
       </div>
     </WideScheduleLayout>
   );
