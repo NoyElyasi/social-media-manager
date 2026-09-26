@@ -36,6 +36,11 @@ const LETTER_REVEAL_SECONDS = 0.045;
 // שהצמצום הקודם התברר כמהיר מידי.
 const READ_SECONDS_PER_WORD = 0.37;
 const MIN_CAPTION_SECONDS = 0.6;
+// קצב בין מילה למילה במצב "מילה במרכז" בלבד (בלי הקלטה — ראו wordTimestamps
+// למטה) — קבוע נפרד מ-READ_SECONDS_PER_WORD (המשמש למצבי word/letter
+// המצטברים) לפי בקשה מפורשת להאיץ רק כאן, לא בשאר המצבים. ההאצה בין מילים
+// לא נוגעת בעצירה בסוף משפט (SENTENCE_PAUSE_SECONDS למטה) — נשארת כמו שהיא.
+const WORD_CENTER_PACE_SECONDS = 0.26;
 // עצירה נוספת אחרי מילה שמסתיימת בסימן פיסוק שמסמן סוף משפט — לפי בקשה
 // מפורשת "מנוחה בין המשפטים" במצב "מילה במרכז". לא רלוונטי למצבי word/letter
 // (יש להם כבר holdExtraSeconds בסוף כתובית).
@@ -246,10 +251,10 @@ async function renderWordCenterFrames(
     const baseDuration = wordTimestamps
       ? Math.max(
           0.05,
-          (i + 1 < wordTimestamps.length ? wordTimestamps[i + 1] : narrationTotalSeconds ?? wordTimestamps[i] + READ_SECONDS_PER_WORD) -
+          (i + 1 < wordTimestamps.length ? wordTimestamps[i + 1] : narrationTotalSeconds ?? wordTimestamps[i] + WORD_CENTER_PACE_SECONDS) -
             wordTimestamps[i]
         )
-      : READ_SECONDS_PER_WORD;
+      : WORD_CENTER_PACE_SECONDS;
     const isSentenceEnd = /[.!?]$/.test(word);
     await addFrame(word, baseDuration + (isSentenceEnd ? SENTENCE_PAUSE_SECONDS : 0));
   }
@@ -469,7 +474,10 @@ function detectWordTimestamps(
   const weights = words.map(wordTimingWeight);
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
   const averageGap = activeSeconds / words.length;
-  const searchRadiusSeconds = Math.min(averageGap * 0.6, 0.4);
+  // הצומצם (היה 0.6/0.4) — לפי משוב מפורש שהתזמון עדיין "קופץ": חיפוש רחב
+  // מדי ליד ההערכה הפרופורציונלית יכול "לתפוס" בליפ שקט רגעי בתוך המילה
+  // השכנה כאילו זו הפסקה אמיתית, ולקפוץ לשם בטעות.
+  const searchRadiusSeconds = Math.min(averageGap * 0.45, 0.3);
 
   const timestamps: number[] = [speechStartSeconds];
   let cumulativeWeight = 0;
@@ -477,11 +485,12 @@ function detectWordTimestamps(
   for (let k = 1; k < words.length; k++) {
     cumulativeWeight += weights[k - 1];
     const idealTime = speechStartSeconds + activeSeconds * (cumulativeWeight / totalWeight);
+    const idealIndex = Math.min(energies.length - 1, Math.max(0, Math.round(idealTime / windowSeconds)));
     const loIndex = Math.max(0, Math.floor((idealTime - searchRadiusSeconds) / windowSeconds));
     const hiIndex = Math.min(energies.length - 1, Math.ceil((idealTime + searchRadiusSeconds) / windowSeconds));
 
-    let bestIndex = Math.round(idealTime / windowSeconds);
-    let bestEnergy = Infinity;
+    let bestIndex = idealIndex;
+    let bestEnergy = energies[idealIndex] ?? Infinity;
     for (let i = loIndex; i <= hiIndex; i++) {
       if (energies[i] < bestEnergy) {
         bestEnergy = energies[i];
@@ -489,7 +498,14 @@ function detectWordTimestamps(
       }
     }
 
-    const candidateTime = bestIndex * windowSeconds;
+    // מקבלים את הנקודה השקטה-יותר שנמצאה רק אם היא *משמעותית* יותר שקטה
+    // מהנקודה הצפויה עצמה (לא רק "השקטה ביותר בחלון", שיכולה להיות עדיין
+    // חלק מדיבור רגיל) — אחרת נשארים עם ההערכה הפרופורציונלית. זה מה שמונע
+    // "קפיצות" לרעש/בליפ קצר שאינו הפסקה אמיתית בין מילים.
+    const idealEnergy = energies[idealIndex] ?? bestEnergy;
+    const snappedIndex = bestEnergy < idealEnergy * 0.75 ? bestIndex : idealIndex;
+
+    const candidateTime = snappedIndex * windowSeconds;
     // ביטחון נוסף למונוטוניות (בפועל כבר מובטח כי חלונות החיפוש לא חופפים).
     timestamps.push(Math.max(candidateTime, timestamps[k - 1] + 0.05));
   }

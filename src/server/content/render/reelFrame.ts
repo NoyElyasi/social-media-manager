@@ -1,6 +1,6 @@
 import { h, type SatoriNode } from "./h";
 import { pickAccessibleTextColor, MIN_FONT_SIZE_REEL } from "../accessibility";
-import { prepareRtlWordLines, renderPreparedLines, type RevealGranularity } from "./rtlText";
+import { prepareRtlWordLines, renderPreparedLines, buildWordRowNode, type RevealGranularity } from "./rtlText";
 
 export const REEL_WIDTH = 1080;
 export const REEL_HEIGHT = 1920; // יחס 9:16
@@ -197,11 +197,11 @@ export function buildWordCenterFrameNode(input: WordCenterFrameInput): SatoriNod
             paddingRight: HORIZONTAL_PADDING,
           },
         },
-        h(
-          "span",
-          { style: { fontSize: WORD_CENTER_FONT_SIZE, fontWeight: 700, color: textColor, textAlign: "center" } },
-          input.word
-        )
+        // buildWordRowNode (לא span עם המחרוזת הגולמית) — כדי שסימני פיסוק
+        // צמודים למילה (למשל "שלום.") יפוצלו לריצה נפרדת ויוצגו *אחרי*
+        // המילה, בדיוק כמו בשאר מצבי הכתיבה (ראו rtlText.ts) — לא לפני, כמו
+        // שקורה כשמעבירים לסאטורי מחרוזת RTL גולמית עם פיסוק בסופה.
+        buildWordRowNode([input.word], { fontSize: WORD_CENTER_FONT_SIZE, fontWeight: 700, color: textColor })
       )
   );
 }

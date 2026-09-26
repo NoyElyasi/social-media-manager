@@ -306,6 +306,8 @@ export async function updatePostRawText(
     regenerateReel?: boolean;
     /** הקלטת הקראה מסונכרנת חדשה — לא סופק/null = בלי הקראה (גם אם הייתה קודם, ראו ReelNarration). */
     reelNarration?: ReelNarration | null;
+    /** משנה את אנימציית הריל (מילה/אות/מילה-במרכז) גם לריל שכבר נוצר — לא סופק = משאירים את הקיים. נשמר על הפוסט לרינדורים הבאים. */
+    revealMode?: RevealMode;
   }
 ) {
   const storage = getStorageService();
@@ -319,11 +321,11 @@ export async function updatePostRawText(
   const cleanText = stripSlideMarkers(newRawText);
   const privacyFlags = scanForIdentifyingDetails(cleanText);
   const splitMode = post.splitMode as SplitMode;
-  const revealMode = post.revealMode as RevealMode;
+  const revealMode = (options?.revealMode ?? post.revealMode) as RevealMode;
 
   await prisma.post.update({
     where: { id: postId },
-    data: { rawText: newRawText, privacyFlags: JSON.stringify(privacyFlags) },
+    data: { rawText: newRawText, privacyFlags: JSON.stringify(privacyFlags), revealMode },
   });
   await storage.saveTextFile(post.folderPath, "טקסט-מקור.txt", newRawText);
 

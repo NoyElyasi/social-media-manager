@@ -25,6 +25,7 @@ export default function EditablePostText({
   existingNarrationUrl,
   notionTag,
   notionUrl,
+  initialRevealMode,
 }: {
   postId: string;
   initialRawText: string;
@@ -39,6 +40,8 @@ export default function EditablePostText({
   /** התגית/קישור שממנו יובא הטקסט מנושיין, אם ככה — מציגה כפתור "עדכני מהנושיין" (ראו refresh-from-notion). */
   notionTag: string | null;
   notionUrl: string | null;
+  /** אנימציית הריל הנוכחית (מילה/אות/מילה-במרכז) — ניתנת לשינוי כאן גם לריל שכבר נוצר. */
+  initialRevealMode: "word" | "letter" | "word-center";
 }) {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -57,6 +60,7 @@ export default function EditablePostText({
   const [carouselBackgroundPath, setCarouselBackgroundPath] = useState<string | null>(initialCarouselBackgroundPath);
   const [reelBackgroundPath, setReelBackgroundPath] = useState<string | null>(initialReelBackgroundPath);
   const [coverBackgroundPath, setCoverBackgroundPath] = useState<string | null>(initialCoverBackgroundPath);
+  const [revealMode, setRevealMode] = useState<"word" | "letter" | "word-center">(initialRevealMode);
   const [updateCarousel, setUpdateCarousel] = useState(true);
   const [updateReel, setUpdateReel] = useState(true);
   // undefined = לא נגעה בהקלטה בעריכה הזו — משתמשים מחדש בהקלטה הקיימת
@@ -148,6 +152,7 @@ export default function EditablePostText({
             ? {
                 reelBackgroundPath,
                 regenerateReel: hasCarousel ? updateReel : true,
+                revealMode,
                 ...(reelNarration !== undefined ? { reelNarration } : {}),
               }
             : {}),
@@ -282,6 +287,19 @@ export default function EditablePostText({
       )}
       {hasReel && updateReel && (
         <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-xs">
+            <span className="text-neutral-500">אנימציית הריל:</span>
+            <select
+              value={revealMode}
+              onChange={(e) => setRevealMode(e.target.value as "word" | "letter" | "word-center")}
+              className="rounded border border-brand-pink/40 bg-white px-1.5 py-1 text-xs"
+            >
+              <option value="word">מילה-מילה</option>
+              <option value="letter">אות-אות</option>
+              <option value="word-center">מילה במרכז</option>
+            </select>
+            <span className="text-neutral-400">(ייכנס לתוקף בלחיצה על &quot;שמור טקסט&quot;)</span>
+          </label>
           {existingNarrationUrl && reelNarration === undefined && (
             <div className="flex flex-col gap-2 rounded-lg border border-green-200 bg-green-50 p-2">
               <p className="text-xs text-green-700">
