@@ -107,6 +107,13 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
   }
 
   const strongHourLabels = plan.strength.hourBuckets.filter((b) => b.isStrong).map((b) => b.name);
+  // השעה הבודדת (לא בלוק) עם ההגעה הממוצעת הגבוהה ביותר מבין השעות ה"חזקות"
+  // — לתלמיץ על ⚡ בכל יום (ראו למטה): איזו שעה ספציפית הכי מומלצת, לא רק
+  // "יש בלוק חזק". גלובלי (לא ספציפי ליום הזה) — אין עדיין נתון משולב יום+שעה.
+  const bestHourEntry = [...plan.strength.hourly].filter((h) => h.isStrong).sort((a, b) => (b.avgReach ?? 0) - (a.avgReach ?? 0))[0];
+  const bestHourTitle = bestHourEntry
+    ? `הרבה חשיפה — השעה הכי מומלצת (מכל הימים): ${String(bestHourEntry.hour).padStart(2, "0")}:00`
+    : "הרבה חשיפה";
 
   return (
     <div className="flex flex-col gap-4">
@@ -211,7 +218,7 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
                 <span className="text-sm font-semibold text-brand-maroon">{day.label}</span>
                 <span className="text-xs text-brand-maroon/50">{day.date.slice(5)}</span>
               </div>
-              {plan.strength.days[i]?.isStrong && <span className="text-[10px] text-green-700" title="הרבה חשיפה">⚡ יום חזק</span>}
+              {plan.strength.days[i]?.isStrong && <span className="text-[10px] text-green-700" title={bestHourTitle}>⚡ יום חזק</span>}
               {plan.engagement.days[i]?.isStrong && <span className="text-[10px] text-pink-700" title="הרבה אנגייג'מנט">❤️ יום מעורבות</span>}
               {day.specialDays.map((sd) => (
                 <span
