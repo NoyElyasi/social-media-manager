@@ -974,9 +974,19 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
       const hashtags = extractCaptionHashtags(item.caption);
       const normalizedHashtags = new Set(hashtags.map(normalizeTagText));
 
+      // אם התגית בנושיין שונתה (ראו refresh-from-notion) אחרי שהשיבוץ תוכנן,
+      // plannedNotionTag כאן הוא תמונת מצב קפואה מלפני השינוי — ההתאמה לפי
+      // תגית יכולה לפספס גם כשזה באמת אותו תוכן, ויוצרת שיבוץ כפול במקום
+      // לעדכן את הקיים. נפילה שלישית: אם יש שיבוץ יחיד (לא יותר, כדי לא
+      // לנחש בין כמה) עם תוכן אמיתי מוכן שעדיין pending באותו יום — זה כנראה
+      // בדיוק זה שהתפרסם.
+      const pendingContentSlots = daySlots.filter(
+        (s) => !claimedSlotIds.has(s.id) && s.platformContentId && s.actualStatus === "pending"
+      );
       const matchedSlot =
         daySlots.find((s) => !claimedSlotIds.has(s.id) && s.platformContent?.instagramMediaId === item.id) ??
-        daySlots.find((s) => !claimedSlotIds.has(s.id) && s.plannedNotionTag && normalizedHashtags.has(normalizeTagText(s.plannedNotionTag)));
+        daySlots.find((s) => !claimedSlotIds.has(s.id) && s.plannedNotionTag && normalizedHashtags.has(normalizeTagText(s.plannedNotionTag))) ??
+        (pendingContentSlots.length === 1 ? pendingContentSlots[0] : undefined);
 
       const tag = matchedSlot?.plannedNotionTag ?? hashtags[0] ?? null;
       const typeValues = tag ? await lookupType(tag) : null;
@@ -1001,6 +1011,16 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
             ...(matchedSlot.plannedFormat ? {} : parsed?.format ? { plannedFormat: parsed.format } : {}),
           },
         });
+        // מקשרת גם את התוכן המקומי לפוסט האמיתי (כמו "קשר לפוסט מאינסטגרם"
+        // הידני) — בלי זה, התאמה עתידית לפי instagramMediaId (השכבה
+        // האמינה ביותר) לא תעבוד על התוכן הזה, ותמיד תישאר תלויה בתגית
+        // (שיכולה להתיישן, ראו ההערה למעלה) או בנפילה השלישית.
+        if (matchedSlot.platformContentId && !matchedSlot.platformContent?.instagramMediaId) {
+          await prisma.platformContent.update({
+            where: { id: matchedSlot.platformContentId },
+            data: { instagramMediaId: item.id, instagramPermalink: item.permalink },
+          });
+        }
         matchedSlots++;
       } else {
         const created = await prisma.scheduledSlot.create({
