@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z, flattenError } from "zod";
 import { prisma } from "@/server/db";
-import { getWeekPlan, getWeekStart, parseCalendarDate, type WeekSlot } from "@/lib/weeklySchedule";
+import { getWeekPlan, getWeekStart, parseCalendarDate, extractCaptionHashtags, type WeekSlot } from "@/lib/weeklySchedule";
 import { findReadySegmentByTag } from "@/server/notion";
 import { createAndPreparePost, addTargetToPost } from "@/server/content/preparePost";
 import { ReelCancelledError } from "@/server/content/instagramReel";
@@ -80,8 +80,51 @@ export async function POST(req: NextRequest) {
           if (slot.recommendedReelCandidate) {
             const postId = slot.recommendedReelCandidate.postId;
             if (!postId) {
-              skipped++;
-              send({ type: "item", date: slot.date, hour: slot.hour, status: "skipped", message: "הריל המומלץ לא מקושר לפוסט בכלי — לא הוכן ריל" });
+              // אין פוסט מקומי לקרוסלה הזו כלל (התפרסמה בלי לעבור בכלי) —
+              // מחפשת את התגית שלה (מהכיתוב בפועל) בנושיין, בלי סינון סטטוס
+              // (הקרוסלה כבר התפרסמה, אז הסטטוס בנושיין כבר לא בהכרח "מוכן",
+              // ראו findSegmentTypeByTag), ומכינה ריל *חדש* מהטקסט שלה — לא
+              // את הקרוסלה עצמה, היא כבר אמיתית ולא צריך לשכפל אותה.
+              const candidateTag = extractCaptionHashtags(slot.recommendedReelCandidate.caption)[0] ?? null;
+              const segmentResult = candidateTag ? await findReadySegmentByTag(candidateTag, { requireReadyStatus: false }) : null;
+              if (!candidateTag || !segmentResult?.ok || !segmentResult.segment) {
+                skipped++;
+                send({
+                  type: "item",
+                  date: slot.date,
+                  hour: slot.hour,
+                  status: "skipped",
+                  message: "הריל המומלץ לא מקושר לפוסט בכלי, ולא נמצא קטע מתאים בנושיין — לא הוכן ריל",
+                });
+                continue;
+              }
+              const segment = segmentResult.segment;
+              const { format, theme } = parseNotionType(segment.typeValues);
+              await registerThemeIfNew(theme);
+              const manualHashtags = segment.tagValues.map((t) => (t.startsWith("#") ? t : `#${t}`));
+              const post = await createAndPreparePost({
+                rawText: segment.bodyText,
+                selectedTargets: ["instagram_reel"],
+                manualHashtags,
+                aiTheme: theme,
+                aiFormat: format ?? undefined,
+                notionUrl: segment.pageUrl,
+                notionTag: candidateTag,
+                reelBackgroundPath: pickDefaultBackgroundPath(profile.defaultReelBackgroundPathsJson, format),
+                signal: req.signal,
+              });
+              const newContent = post.platformContents.find((pc) => pc.type === "instagram_reel");
+              if (!newContent) throw new Error("הריל לא נוצר");
+              await prisma.scheduledSlot.update({ where: { id: slot.slotId! }, data: { platformContentId: newContent.id, isManual: true } });
+              created++;
+              send({
+                type: "item",
+                date: slot.date,
+                hour: slot.hour,
+                status: "created",
+                message: "ריל חדש הוכן מקטע בנושיין (הקרוסלה כבר התפרסמה, לא הוכנה מחדש)",
+                postId: post.id,
+              });
               continue;
             }
             const existingPost = await prisma.post.findUniqueOrThrow({ where: { id: postId }, select: { aiFormat: true } });

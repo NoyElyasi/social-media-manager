@@ -806,7 +806,7 @@ function mediaTypeToPlannedType(mediaType: string): "instagram_reel" | "instagra
   return null; // IMAGE בודדת — לא בשימוש בזרימת העבודה שלה, לא ניתן להתאמה (כמו mediaTypeToLocalType ב-server/settings/meta.ts).
 }
 
-function extractCaptionHashtags(caption: string | null): string[] {
+export function extractCaptionHashtags(caption: string | null): string[] {
   if (!caption) return [];
   const matches = caption.match(/#[^\s#@]+/g) ?? [];
   return matches.filter((t) => t !== ALWAYS_FIRST_HASHTAG);
