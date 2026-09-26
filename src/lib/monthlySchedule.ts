@@ -140,7 +140,7 @@ export async function getMonthPlan(monthStart: Date): Promise<MonthPlan> {
               s.recommendedNotionSegment?.tag ??
               (s.recommendedReelCandidate ? s.recommendedReelCandidate.caption ?? "(ללא כיתוב)" : null),
             type: s.content?.type ?? s.recommendedType ?? null,
-            format: s.content ? null : s.recommendedFormat,
+            format: s.content?.format ?? s.recommendedFormat,
             actualStatus: s.actualStatus,
           })),
       };

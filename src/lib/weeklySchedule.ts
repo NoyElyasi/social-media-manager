@@ -173,6 +173,8 @@ export interface SlotContentPreview {
   // התגית הראשונה שאינה #אחתביום — לכותרת בחלונית הפרטים, ראו firstRealHashtag.
   titleTag: string | null;
   notionUrl: string | null;
+  // פורמט בפועל של הפוסט המקושר (Post.aiFormat) — לא ההמלצה, התוכן האמיתי.
+  format: "letter" | "tip" | null;
 }
 
 export interface RecommendedNotionSegment {
@@ -318,7 +320,14 @@ function toSlot(row: {
   actualStatus: string;
   actualAt: Date | null;
   platformContent:
-    | { id: string; type: string; text: string | null; postId: string; hashtags: string; post: { hashtags: string; notionUrl: string | null } }
+    | {
+        id: string;
+        type: string;
+        text: string | null;
+        postId: string;
+        hashtags: string;
+        post: { hashtags: string; notionUrl: string | null; aiFormat: string | null };
+      }
     | null;
 }, strength: StrengthData, engagement: EngagementData, candidateMap: Map<string, NextReelCandidate>): WeekSlot {
   const dateStr = formatCalendarDate(row.date);
@@ -346,6 +355,7 @@ function toSlot(row: {
           text: row.platformContent.text,
           titleTag: firstRealHashtag(row.platformContent.hashtags) ?? firstRealHashtag(row.platformContent.post.hashtags),
           notionUrl: row.platformContent.post.notionUrl,
+          format: row.platformContent.post.aiFormat as "letter" | "tip" | null,
         }
       : null,
   };
@@ -1118,7 +1128,14 @@ function buildPlanResponse(
     actualStatus: string;
     actualAt: Date | null;
     platformContent:
-      | { id: string; type: string; text: string | null; postId: string; hashtags: string; post: { hashtags: string; notionUrl: string | null } }
+      | {
+          id: string;
+          type: string;
+          text: string | null;
+          postId: string;
+          hashtags: string;
+          post: { hashtags: string; notionUrl: string | null; aiFormat: string | null };
+        }
       | null;
   }[],
   blockedDays: { id: string; date: Date; note: string | null }[],

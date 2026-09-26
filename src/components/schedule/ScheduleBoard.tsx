@@ -218,7 +218,14 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
                 <span className="text-sm font-semibold text-brand-maroon">{day.label}</span>
                 <span className="text-xs text-brand-maroon/50">{day.date.slice(5)}</span>
               </div>
-              {plan.strength.days[i]?.isStrong && <span className="text-[10px] text-green-700" title={bestHourTitle}>⚡ יום חזק</span>}
+              {plan.strength.days[i]?.isStrong && (
+                <span className="group relative inline-block text-[10px] text-green-700">
+                  ⚡ יום חזק
+                  <span className="pointer-events-none absolute top-full right-0 z-20 mt-1 hidden whitespace-nowrap rounded-md bg-brand-maroon px-2 py-1 text-[10px] text-white group-hover:block">
+                    {bestHourTitle}
+                  </span>
+                </span>
+              )}
               {plan.engagement.days[i]?.isStrong && <span className="text-[10px] text-pink-700" title="הרבה אנגייג'מנט">❤️ יום מעורבות</span>}
               {day.specialDays.map((sd) => (
                 <span
