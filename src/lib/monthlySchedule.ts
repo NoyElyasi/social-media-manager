@@ -37,6 +37,24 @@ function weekStartsInMonth(monthStart: Date): Date[] {
   return starts;
 }
 
+/**
+ * כמו weekStartsInMonth, אבל כוללת גם את השבוע החופף מהחודש הקודם (אם יש) —
+ * לתצוגה בלבד (getMonthPlan), לא ליצירה (generateMonthlySchedule ממשיכה
+ * להשתמש ב-weekStartsInMonth הבלעדית, כדי שלא ייווצר פעמיים). לפי בקשה
+ * מפורשת: שבוע שמפוצל בין חודשים צריך להיות *נראה* בשני החודשים (עם החלק
+ * שלא שייך לחודש הזה מוחשך, כמו היום), לא רק בחודש שבו הוא "רשום".
+ */
+function weekStartsOverlappingMonth(monthStart: Date): Date[] {
+  const monthEnd = addMonths(monthStart, 1);
+  const starts: Date[] = [];
+  let cursor = getWeekStart(monthStart);
+  while (cursor.getTime() < monthEnd.getTime()) {
+    starts.push(cursor);
+    cursor = addDays(cursor, 7);
+  }
+  return starts;
+}
+
 export interface MonthDaySlotPreview {
   slotId: string | null;
   hour: number;
@@ -44,6 +62,9 @@ export interface MonthDaySlotPreview {
   // אחרת null (עדיין רק "צריך ריל/פוסט" גנרי, בלי תוכן ספציפי מאחוריו).
   tag: string | null;
   type: string | null;
+  // פורמט מומלץ (מכתב/טיפ) לסלוט הזה שעדיין אין לו תוכן — כמו ב-ScheduleSlotChip
+  // בנראות השבועית, ראו recommendedFormat. null אם יש תוכן, או אין המלצת פורמט.
+  format: "letter" | "tip" | null;
   actualStatus: "pending" | "done" | "skipped";
 }
 
@@ -83,7 +104,7 @@ export interface MonthPlan {
 
 export async function getMonthPlan(monthStart: Date): Promise<MonthPlan> {
   const monthEnd = addMonths(monthStart, 1);
-  const weekStarts = weekStartsInMonth(monthStart);
+  const weekStarts = weekStartsOverlappingMonth(monthStart);
 
   const [weekPlans, formatAlerts] = await Promise.all([Promise.all(weekStarts.map((ws) => getWeekPlan(ws))), getMonthlyFormatPace(monthStart, monthEnd)]);
 
@@ -119,6 +140,7 @@ export async function getMonthPlan(monthStart: Date): Promise<MonthPlan> {
               s.recommendedNotionSegment?.tag ??
               (s.recommendedReelCandidate ? s.recommendedReelCandidate.caption ?? "(ללא כיתוב)" : null),
             type: s.content?.type ?? s.recommendedType ?? null,
+            format: s.content ? null : s.recommendedFormat,
             actualStatus: s.actualStatus,
           })),
       };

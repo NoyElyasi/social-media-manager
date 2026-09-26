@@ -257,6 +257,8 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
                           >
                             {slot.actualStatus === "done" && "✅ "}
                             {slotIcon(slot.type)} {slot.tag ?? (slot.type === "instagram_reel" ? "צריך ריל" : slot.type === "instagram_carousel" ? "צריך פוסט" : "ריק")}
+                            {slot.format === "letter" && " ✉️"}
+                            {slot.format === "tip" && " 💡"}
                           </span>
                         );
                       })}
@@ -269,7 +271,7 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
                   {week.totalPosts} פוסטים ({week.reels} רילים) — {week.existingReady} מוכן, {week.newNeeded} חדש
                 </span>
                 <Link href={`/schedule/week?week=${week.weekStart}`} className="rounded-lg border border-brand-pink/40 px-2 py-1 hover:bg-brand-pink/10">
-                  פתיחת השבוע ›
+                  פתיחת השבוע
                 </Link>
               </div>
               {week.reasonLines.length > 0 && (
