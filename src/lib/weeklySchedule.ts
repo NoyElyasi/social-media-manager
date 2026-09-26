@@ -292,6 +292,20 @@ async function buildCandidateMap(slots: { plannedReelCandidateMediaId?: string |
 }
 
 /**
+ * שולפת ומרכיבה מפה mediaId->aiFormat, לשיבוצים שסונכרנו מפוסט אמיתי בלי
+ * תוכן מקומי מקושר (ראו matchedInstagramMediaId בסכימה) — התגית בנושיין
+ * עצמה יכולה להיות לא-קיימת יותר עד שמנסים לשלוף ממנה פורמט (נמחקת/סטטוס
+ * משתנה אחרי פרסום), אז זה נופל ל-InstagramMedia.aiFormat, שניתן לתיוג ידני
+ * בדשבורד (InstagramMediaLabelEditor) גם בדיעבד.
+ */
+async function buildMediaFormatMap(slots: { matchedInstagramMediaId?: string | null }[]): Promise<Map<string, string | null>> {
+  const mediaIds = slots.map((s) => s.matchedInstagramMediaId).filter((id): id is string => !!id);
+  if (mediaIds.length === 0) return new Map();
+  const media = await prisma.instagramMedia.findMany({ where: { id: { in: [...new Set(mediaIds)] } }, select: { id: true, aiFormat: true } });
+  return new Map(media.map((m) => [m.id, m.aiFormat]));
+}
+
+/**
  * תגיות נושיין שכבר "נתפסו" ע"י סלוט קיים — כדי לא להציע את אותו קטע
  * פעמיים. נספרות רק תפיסות משבוע נתון (since) ואילך: תפיסה משבוע שכבר עבר
  * ולא טופל (לא הפכה לפוסט בפועל) היא "הצעה שלא נוצלה" — היא לא צריכה
@@ -317,6 +331,7 @@ function toSlot(row: {
   plannedNotionTag: string | null;
   plannedNotionPreview: string | null;
   plannedNotionPageUrl: string | null;
+  matchedInstagramMediaId: string | null;
   actualStatus: string;
   actualAt: Date | null;
   platformContent:
@@ -329,9 +344,15 @@ function toSlot(row: {
         post: { hashtags: string; notionUrl: string | null; aiFormat: string | null };
       }
     | null;
-}, strength: StrengthData, engagement: EngagementData, candidateMap: Map<string, NextReelCandidate>): WeekSlot {
+}, strength: StrengthData, engagement: EngagementData, candidateMap: Map<string, NextReelCandidate>, mediaFormatMap: Map<string, string | null>): WeekSlot {
   const dateStr = formatCalendarDate(row.date);
   const dayOfWeek = row.date.getUTCDay();
+  // פורמט בזמן היצירה (plannedFormat) — ואם ריק (השיבוץ נוצר/עודכן מפרסום
+  // אמיתי בלי תוכן מקומי, והתגית בנושיין כבר לא הייתה קיימת בזמן ההתאמה),
+  // נופל ל-InstagramMedia.aiFormat של הפוסט שהותאם, ראו matchedInstagramMediaId.
+  const recommendedFormat =
+    (row.plannedFormat as "letter" | "tip" | null) ??
+    (row.matchedInstagramMediaId ? (mediaFormatMap.get(row.matchedInstagramMediaId) as "letter" | "tip" | null) ?? null : null);
   return {
     slotId: row.id,
     date: dateStr,
@@ -341,7 +362,7 @@ function toSlot(row: {
     dayIsStrong: strength.days[dayOfWeek]?.isStrong ?? false,
     dayIsEngaging: engagement.days[dayOfWeek]?.isStrong ?? false,
     recommendedType: row.plannedType as "instagram_reel" | "instagram_carousel" | null,
-    recommendedFormat: row.plannedFormat as "letter" | "tip" | null,
+    recommendedFormat,
     recommendedReelCandidate: row.plannedReelCandidateMediaId ? candidateMap.get(row.plannedReelCandidateMediaId) ?? null : null,
     recommendedNotionSegment: row.plannedNotionTag
       ? { tag: row.plannedNotionTag, preview: row.plannedNotionPreview ?? "", pageUrl: row.plannedNotionPageUrl ?? "" }
@@ -365,7 +386,8 @@ function toSlot(row: {
 export async function getWeekPlan(weekStart: Date): Promise<WeekPlan> {
   const { existingSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles } = await loadWeekContext(weekStart);
   const candidateMap = await buildCandidateMap(existingSlots);
-  return buildPlanResponse(weekStart, existingSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles, candidateMap);
+  const mediaFormatMap = await buildMediaFormatMap(existingSlots);
+  return buildPlanResponse(weekStart, existingSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles, candidateMap, mediaFormatMap);
 }
 
 /**
@@ -797,7 +819,8 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
 
   const allSlots = [...manualSlots, ...createdSlots];
   const candidateMap = await buildCandidateMap(allSlots);
-  return buildPlanResponse(weekStart, allSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles, candidateMap);
+  const mediaFormatMap = await buildMediaFormatMap(allSlots);
+  return buildPlanResponse(weekStart, allSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles, candidateMap, mediaFormatMap);
 }
 
 /** שבועות עתידיים (אחרי weekStart) שיש בהם כבר סלוט אוטומטי — למי שצריך ריענון לאחר שהשבוע הקרוב תפס תוכן/מועמדים. */
@@ -1019,6 +1042,11 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
             plannedType,
             ...(matchedSlot.plannedNotionTag ? {} : { plannedNotionTag: tag, plannedNotionPreview: preview }),
             ...(matchedSlot.plannedFormat ? {} : parsed?.format ? { plannedFormat: parsed.format } : {}),
+            // תמיד (לא רק אם עוד ריק) — התגית בנושיין עצמה עלולה כבר לא
+            // להתקיים בזמן שהתאמה הזו רצה (נמחקת/סטטוס משתנה אחרי פרסום, ראו
+            // ההערה על matchedInstagramMediaId בסכימה), אז זה תמיד המקור
+            // האמין ביותר לפורמט/נושא בדיעבד, לא תמונת מצב חד-פעמית.
+            matchedInstagramMediaId: item.id,
           },
         });
         // מקשרת גם את התוכן המקומי לפוסט האמיתי (כמו "קשר לפוסט מאינסטגרם"
@@ -1044,6 +1072,7 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
             plannedFormat: parsed?.format ?? null,
             plannedNotionTag: tag,
             plannedNotionPreview: tag ? preview : null,
+            matchedInstagramMediaId: item.id,
           },
         });
         claimedSlotIds.add(created.id);
@@ -1125,6 +1154,7 @@ function buildPlanResponse(
     plannedNotionTag: string | null;
     plannedNotionPreview: string | null;
     plannedNotionPageUrl: string | null;
+    matchedInstagramMediaId: string | null;
     actualStatus: string;
     actualAt: Date | null;
     platformContent:
@@ -1145,10 +1175,11 @@ function buildPlanResponse(
   formatAlerts: FormatGap[],
   formatPerf: FormatPerformance,
   topAngles: ContentAngle[],
-  candidateMap: Map<string, NextReelCandidate>
+  candidateMap: Map<string, NextReelCandidate>,
+  mediaFormatMap: Map<string, string | null>
 ): WeekPlan {
   const slots = slotsRaw
-    .map((row) => toSlot(row, strength, engagement, candidateMap))
+    .map((row) => toSlot(row, strength, engagement, candidateMap, mediaFormatMap))
     .sort((a, b) => (a.date === b.date ? a.hour - b.hour : a.date.localeCompare(b.date)));
 
   const days = Array.from({ length: 7 }, (_, i) => {

@@ -164,6 +164,13 @@ model ScheduledSlot {
   plannedNotionPreview String?
   plannedNotionPageUrl String?
 
+  // InstagramMedia.id שהותאם לשיבוץ הזה בסנכרון בפועל (ראו
+  // reconcileScheduleWithInstagram) — כשאין תוכן מקומי מקושר (פורסם בלי
+  // לעבור בכלי), זה המקור היחיד לפורמט/נושא בדיעבד (ראו InstagramMediaLabelEditor,
+  // תיוג ידני), כי התגית עצמה בנושיין כבר לא קיימת בהכרח לחיפוש (נמחקת/
+  // סטטוס משתנה אחרי פרסום).
+  matchedInstagramMediaId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
