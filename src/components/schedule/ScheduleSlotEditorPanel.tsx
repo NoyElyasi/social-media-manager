@@ -3,17 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { PLATFORM_LABELS, STATUS_LABELS } from "@/lib/labels";
+import { PLATFORM_LABELS } from "@/lib/labels";
 import type { WeekSlot } from "@/lib/weeklySchedule";
 import OpenFolderButton from "@/components/OpenFolderButton";
-
-interface ReadyContentItem {
-  id: string;
-  postId: string;
-  type: string;
-  text: string | null;
-  status: string;
-}
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const FORMAT_LABELS: Record<string, string> = { letter: "✉️ מכתב", tip: "💡 טיפ" };
@@ -26,8 +18,6 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   const [hour, setHour] = useState(target.mode === "existing" ? target.slot.hour : target.hour);
   const [dateInput, setDateInput] = useState(target.mode === "existing" ? target.slot.date : target.date);
   const [busy, setBusy] = useState(false);
-  const [readyItems, setReadyItems] = useState<ReadyContentItem[] | null>(null);
-  const [loadingPicker, setLoadingPicker] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [noteInput, setNoteInput] = useState(target.mode === "existing" ? target.slot.note ?? "" : "");
   const [notionTags, setNotionTags] = useState<{ tag: string; typeValues: string[] }[] | null>(null);
@@ -48,18 +38,13 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   const recommendedNotionSegment = target.mode === "existing" ? target.slot.recommendedNotionSegment : null;
   const isManual = target.mode === "existing" ? target.slot.isManual : true;
 
-  async function ensurePicker() {
+  /** פותחת/סוגרת את בורר "שיבוץ קטע מנושיין" — משתמש באותה רשימת תגיות "מוכן" כמו הדרופ-דאון של שם/הערה. */
+  function ensurePicker() {
     setPickerOpen((v) => !v);
-    if (!readyItems) {
-      setLoadingPicker(true);
-      const res = await fetch("/api/schedule/ready-content");
-      const data = await res.json();
-      setReadyItems(data.items ?? []);
-      setLoadingPicker(false);
-    }
+    void ensureNotionTags();
   }
 
-  /** טוענת פעם אחת (בפוקוס ראשון על שם/הערה) את כל תגיות "מוכן" מנושיין — לדרופ-דאון ולבדיקת קיום. */
+  /** טוענת פעם אחת (בפוקוס ראשון על שם/הערה, או פתיחת הבורר) את כל תגיות "מוכן" מנושיין — לדרופ-דאון ולבדיקת קיום. */
   async function ensureNotionTags() {
     if (notionTags || notionTagsLoading) return;
     setNotionTagsLoading(true);
@@ -104,14 +89,20 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
     await refreshAndClose();
   }
 
-  async function createNew(platformContentId: string | null) {
+  async function createNew(platformContentId: string | null, noteOverride?: string) {
     setBusy(true);
     await fetch("/api/schedule/slots", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date, hour, platformContentId, note: noteInput.trim() || null }),
+      body: JSON.stringify({ date, hour, platformContentId, note: (noteOverride ?? noteInput).trim() || null }),
     });
     await refreshAndClose();
+  }
+
+  /** בחירת תגית מנושיין מהבורר "שיבוץ קטע מנושיין" — שמה כהערה על הסלוט (בלי תוכן מקומי, הקטע עדיין לא הוכן בכלי). */
+  function selectNotionTagAsContent(tag: string) {
+    if (target.mode === "existing") return patchExisting({ note: tag, platformContentId: null });
+    return createNew(null, tag);
   }
 
   async function saveNote() {
@@ -409,21 +400,22 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
             )}
 
             <button type="button" onClick={ensurePicker} className="self-start rounded border border-brand-pink/40 bg-white px-2 py-1 text-xs hover:bg-brand-pink/10">
-              שיבוץ תוכן קיים...
+              שיבוץ קטע מנושיין...
             </button>
             {pickerOpen && (
               <div className="rounded border border-brand-pink/40 bg-white p-1.5 max-h-40 overflow-y-auto flex flex-col gap-1">
-                {loadingPicker && <span className="text-brand-maroon/50 text-xs">טוענת...</span>}
-                {!loadingPicker && readyItems?.length === 0 && <span className="text-brand-maroon/50 text-xs">אין תוכן שמחכה כרגע</span>}
-                {!loadingPicker &&
-                  readyItems?.map((item) => (
+                {notionTagsLoading && <span className="text-brand-maroon/50 text-xs">טוענת רשימת נושיין...</span>}
+                {!notionTagsLoading && notionTags?.length === 0 && <span className="text-brand-maroon/50 text-xs">אין קטעים &quot;מוכן&quot; בנושיין כרגע</span>}
+                {!notionTagsLoading &&
+                  notionTags?.map((item) => (
                     <button
-                      key={item.id}
+                      key={item.tag}
                       type="button"
-                      onClick={() => (target.mode === "existing" ? patchExisting({ platformContentId: item.id }) : createNew(item.id))}
+                      onClick={() => selectNotionTagAsContent(item.tag)}
                       className="text-right rounded px-1 py-0.5 text-xs hover:bg-brand-pink/10 truncate"
                     >
-                      {PLATFORM_LABELS[item.type] ?? item.type} ({STATUS_LABELS[item.status] ?? item.status}) — {item.text ? item.text.slice(0, 30) : "(ללא טקסט)"}
+                      {item.tag.startsWith("#") ? item.tag : `#${item.tag}`}
+                      {item.typeValues.length > 0 && <span className="text-brand-maroon/40"> · {item.typeValues.join(", ")}</span>}
                     </button>
                   ))}
               </div>
