@@ -62,8 +62,8 @@ export interface MonthDaySlotPreview {
   // אחרת null (עדיין רק "צריך ריל/פוסט" גנרי, בלי תוכן ספציפי מאחוריו).
   tag: string | null;
   type: string | null;
-  // פורמט מומלץ (מכתב/טיפ) לסלוט הזה שעדיין אין לו תוכן — כמו ב-ScheduleSlotChip
-  // בנראות השבועית, ראו recommendedFormat. null אם יש תוכן, או אין המלצת פורמט.
+  // הפורמט האמיתי (מכתב/טיפ) של התוכן המקושר בפועל — לא המלצה/תזכורת לסלוט
+  // ריק (זו הוסרה לפי בקשה מפורשת, הייתה מבלבלת), רק תיוג של תוכן שכבר קיים.
   format: "letter" | "tip" | null;
   actualStatus: "pending" | "done" | "skipped";
 }
@@ -140,7 +140,7 @@ export async function getMonthPlan(monthStart: Date): Promise<MonthPlan> {
               s.recommendedNotionSegment?.tag ??
               (s.recommendedReelCandidate ? s.recommendedReelCandidate.caption ?? "(ללא כיתוב)" : null),
             type: s.content?.type ?? s.recommendedType ?? null,
-            format: s.content?.format ?? s.recommendedFormat,
+            format: s.content?.format ?? null,
             actualStatus: s.actualStatus,
           })),
       };

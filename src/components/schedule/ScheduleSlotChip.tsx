@@ -37,8 +37,6 @@ export default function ScheduleSlotChip({ slot, onClick }: { slot: WeekSlot; on
         <span className="shrink-0 flex items-center gap-0.5">
           {slot.actualStatus === "done" && <span title="עלה בפועל">✅</span>}
           {slot.actualStatus === "skipped" && <span title="לא עלה בפועל">❌</span>}
-          {!content && slot.recommendedFormat === "letter" && <span title="הרבה זמן בלי מכתב">✉️</span>}
-          {!content && slot.recommendedFormat === "tip" && <span title="הרבה זמן בלי טיפ">💡</span>}
           {!slot.isManual && <span className="opacity-60">🤖</span>}
         </span>
       </div>
