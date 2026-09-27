@@ -41,6 +41,20 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
   const [generatingContent, setGeneratingContent] = useState(false);
   const [contentProgress, setContentProgress] = useState<{ index: number; total: number } | null>(null);
   const [contentResults, setContentResults] = useState<ContentResultItem[] | null>(null);
+  const [clearing, setClearing] = useState(false);
+
+  /** מוחקת את כל התכנון (הצעה + שיבוצים ידניים) לשבוע הזה — משאירה שיבוצים שסומנו done/skipped בפועל. */
+  async function handleClearWeek() {
+    if (!window.confirm("למחוק את כל התכנון לשבוע הזה? שיבוצים שסומנו כ׳עלה בפועל׳ או ׳לא עלה׳ יישארו.")) return;
+    setClearing(true);
+    await fetch("/api/schedule/clear", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weekStart: plan.weekStart }),
+    });
+    setClearing(false);
+    router.refresh();
+  }
 
   /** גרירת שיבוץ קיים לתא (יום+שעה) אחר — מזיזה אותה בדיוק כמו שינוי תאריך/שעה בפאנל (נועלת אותה, ראו PATCH). */
   async function handleDrop(e: DragEvent<HTMLDivElement>, date: string, hour: number) {
@@ -172,6 +186,15 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
             className="rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium hover:bg-brand-red-dark disabled:opacity-50"
           >
             {generating ? "מייצרת הצעה..." : "צרי/רענני הצעה לשבוע"}
+          </button>
+          <button
+            type="button"
+            onClick={handleClearWeek}
+            disabled={clearing}
+            title="מוחקת את כל התכנון לשבוע הזה — לא כולל שיבוצים שסומנו עלה/לא עלה בפועל"
+            className="rounded-lg border border-brand-maroon/30 bg-white px-4 py-2 text-brand-maroon/70 text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
+          >
+            {clearing ? "מוחקת..." : "🗑️ מחקי את כל התכנון לשבוע"}
           </button>
         </div>
       </div>

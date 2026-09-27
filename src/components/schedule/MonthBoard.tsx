@@ -34,6 +34,7 @@ function slotStyle(type: string | null): string {
 export default function MonthBoard({ plan }: { plan: MonthPlan }) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [reconciling, setReconciling] = useState(false);
   const [reconcileSummary, setReconcileSummary] = useState<string | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
@@ -95,6 +96,19 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
       body: JSON.stringify({ month: monthKey }),
     });
     setGenerating(false);
+    router.refresh();
+  }
+
+  /** מוחקת את כל התכנון (הצעה + שיבוצים ידניים) לחודש הזה — משאירה שיבוצים שסומנו done/skipped בפועל. */
+  async function handleClearMonth() {
+    if (!window.confirm("למחוק את כל התכנון לחודש הזה? שיבוצים שסומנו כ׳עלה בפועל׳ או ׳לא עלה׳ יישארו.")) return;
+    setClearing(true);
+    await fetch("/api/schedule/month/clear", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ month: monthKey }),
+    });
+    setClearing(false);
     router.refresh();
   }
 
@@ -161,6 +175,15 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
               className="rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium hover:bg-brand-red-dark disabled:opacity-50"
             >
               {generating ? "מייצרת הצעה לחודש..." : "צרי/רענני הצעה לכל החודש"}
+            </button>
+            <button
+              type="button"
+              onClick={handleClearMonth}
+              disabled={clearing}
+              title="מוחקת את כל התכנון לחודש הזה — לא כולל שיבוצים שסומנו עלה/לא עלה בפועל"
+              className="rounded-lg border border-brand-maroon/30 bg-white px-4 py-2 text-brand-maroon/70 text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
+            >
+              {clearing ? "מוחקת..." : "🗑️ מחקי את כל התכנון לחודש"}
             </button>
           </div>
           {reconcileSummary && <span className="text-[11px] text-brand-maroon/60">{reconcileSummary}</span>}
