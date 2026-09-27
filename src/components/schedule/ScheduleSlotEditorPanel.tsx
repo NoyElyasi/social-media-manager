@@ -96,12 +96,6 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
     await patchExisting({ date: newDate });
   }
 
-  function shiftWeek(days: number) {
-    const d = new Date(`${dateInput}T00:00:00.000Z`);
-    d.setUTCDate(d.getUTCDate() + days);
-    void moveToDate(d.toISOString().slice(0, 10));
-  }
-
   async function deleteExisting() {
     if (!slotId) return;
     setBusy(true);
@@ -201,13 +195,16 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-xl flex flex-col gap-3 text-sm" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-maroon/20 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-2xl border border-brand-pink/15 bg-white p-4 shadow-lg flex flex-col gap-3 text-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between pb-1 border-b border-brand-pink/15">
           <h2 className="font-semibold text-brand-maroon">
             {dayLabel ?? ""} · {date}
           </h2>
-          <button type="button" onClick={onClose} className="text-brand-maroon/40 hover:text-brand-red">
+          <button type="button" onClick={onClose} className="text-brand-maroon/30 hover:text-brand-red">
             ✕
           </button>
         </div>
@@ -222,7 +219,7 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
               setHour(next);
               if (target.mode === "existing") patchExisting({ hour: next });
             }}
-            className="rounded border border-brand-pink/40 bg-white px-1 py-0.5 text-xs"
+            className="rounded-md border border-brand-pink/20 bg-white px-1 py-0.5 text-xs"
           >
             {HOURS.map((h) => (
               <option key={h} value={h}>
@@ -235,20 +232,14 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
 
         {target.mode === "existing" && (
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-brand-maroon/60">תאריך:</span>
+            <span className="text-brand-maroon/50">תאריך:</span>
             <input
               type="date"
               value={dateInput}
               disabled={busy}
               onChange={(e) => e.target.value && moveToDate(e.target.value)}
-              className="rounded border border-brand-pink/40 bg-white px-1 py-0.5 text-xs"
+              className="rounded-md border border-brand-pink/20 bg-white px-1.5 py-0.5 text-xs"
             />
-            <button type="button" onClick={() => shiftWeek(-7)} disabled={busy} className="rounded border border-brand-pink/40 px-1.5 py-0.5 hover:bg-brand-pink/10">
-              שבוע קודם
-            </button>
-            <button type="button" onClick={() => shiftWeek(7)} disabled={busy} className="rounded border border-brand-pink/40 px-1.5 py-0.5 hover:bg-brand-pink/10">
-              שבוע הבא
-            </button>
           </div>
         )}
 
@@ -258,46 +249,10 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
               type="button"
               onClick={() => patchExisting({ isManual: !isManual })}
               disabled={busy}
-              className="text-[11px] text-brand-maroon/60 hover:text-brand-red underline"
+              className="text-[11px] text-brand-maroon/50 hover:text-brand-red"
             >
               {isManual ? "🔓 בטלי נעילה — תיכלל בהצעה הבאה" : "🔒 נעלי — לא תשתנה בהצעה הבאה"}
             </button>
-          </div>
-        )}
-
-        {target.mode === "existing" && (
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-brand-maroon/60">מה קרה בפועל:</span>
-            <button
-              type="button"
-              onClick={() => patchExisting({ actualStatus: "done" })}
-              disabled={busy}
-              className={`rounded-full px-2 py-0.5 ${
-                target.slot.actualStatus === "done" ? "bg-green-100 text-green-700" : "border border-brand-pink/40 hover:bg-brand-pink/10"
-              }`}
-            >
-              ✓ עלה
-            </button>
-            <button
-              type="button"
-              onClick={() => patchExisting({ actualStatus: "skipped" })}
-              disabled={busy}
-              className={`rounded-full px-2 py-0.5 ${
-                target.slot.actualStatus === "skipped" ? "bg-red-100 text-red-700" : "border border-brand-pink/40 hover:bg-brand-pink/10"
-              }`}
-            >
-              ✗ לא עלה
-            </button>
-            {target.slot.actualStatus !== "pending" && (
-              <button type="button" onClick={() => patchExisting({ actualStatus: "pending" })} disabled={busy} className="text-brand-maroon/40 hover:text-brand-red">
-                איפוס
-              </button>
-            )}
-            {target.slot.actualAt && (
-              <span className="text-[11px] text-brand-maroon/40">
-                (סומן ב-{new Date(target.slot.actualAt).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" })})
-              </span>
-            )}
           </div>
         )}
 
@@ -322,7 +277,7 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
             {content.text && <p className="text-xs text-brand-maroon/80 truncate">{content.text}</p>}
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <Link href={`/posts/${content.postId}`} className="rounded border border-brand-pink/40 bg-white px-2 py-1 hover:bg-brand-pink/10">
+              <Link href={`/posts/${content.postId}`} className="rounded-md border border-brand-pink/20 bg-white px-2 py-1 hover:bg-brand-pink/10">
                 ✏️ עריכת הפוסט
               </Link>
               <OpenFolderButton postId={content.postId} />
@@ -339,13 +294,13 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
                     onChange={(e) => setNotionInput(e.target.value)}
                     placeholder="https://notion.so/..."
                     dir="ltr"
-                    className="flex-1 rounded border border-brand-pink/40 bg-white px-2 py-1 text-xs"
+                    className="flex-1 rounded-md border border-brand-pink/20 bg-white px-2 py-1 text-xs"
                   />
                   <button
                     type="button"
                     onClick={saveNotionUrl}
                     disabled={savingNotion}
-                    className="rounded border border-brand-pink/40 bg-white px-2 py-1 text-xs hover:bg-brand-pink/10"
+                    className="rounded-md border border-brand-pink/20 bg-white px-2 py-1 text-xs hover:bg-brand-pink/10"
                   >
                     שמירה
                   </button>
@@ -370,7 +325,7 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
                 type="button"
                 onClick={() => selectManualType("instagram_carousel")}
                 className={`rounded-full px-2 py-0.5 text-[11px] border ${
-                  manualType === "instagram_carousel" ? "border-brand-maroon bg-brand-maroon text-white" : "border-brand-pink/40 bg-white text-brand-maroon/60 hover:bg-brand-pink/10"
+                  manualType === "instagram_carousel" ? "border-brand-maroon bg-brand-maroon text-white" : "border-brand-pink/20 bg-white text-brand-maroon/60 hover:bg-brand-pink/10"
                 }`}
               >
                 📄 פוסט
@@ -379,7 +334,7 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
                 type="button"
                 onClick={() => selectManualType("instagram_reel")}
                 className={`rounded-full px-2 py-0.5 text-[11px] border ${
-                  manualType === "instagram_reel" ? "border-brand-maroon bg-brand-maroon text-white" : "border-brand-pink/40 bg-white text-brand-maroon/60 hover:bg-brand-pink/10"
+                  manualType === "instagram_reel" ? "border-brand-maroon bg-brand-maroon text-white" : "border-brand-pink/20 bg-white text-brand-maroon/60 hover:bg-brand-pink/10"
                 }`}
               >
                 🎬 ריל
@@ -387,7 +342,7 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
             </div>
 
             {recommendedNotionSegment && (
-              <div className="rounded-lg border border-brand-pink/40 bg-brand-pink/5 p-2 flex flex-col gap-1">
+              <div className="rounded-lg border border-brand-pink/20 bg-brand-pink/5 p-2 flex flex-col gap-1">
                 <span className="text-[11px] text-brand-maroon/60">
                   📓 קטע מוכן בנושיין שמתאים לשיבוץ הזה (תגית {recommendedNotionSegment.tag.startsWith("#") ? recommendedNotionSegment.tag : `#${recommendedNotionSegment.tag}`}):
                 </span>
@@ -408,7 +363,7 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
 
 
             {recommendedReelCandidate && (
-              <div className="rounded-lg border border-brand-pink/40 bg-brand-pink/5 p-2 flex flex-col gap-1">
+              <div className="rounded-lg border border-brand-pink/20 bg-brand-pink/5 p-2 flex flex-col gap-1">
                 <span className="text-[11px] text-brand-maroon/60">🎬 זה הריל שכדאי לייצר (מ&quot;המלצות לרילים הבאים&quot; בדשבורד):</span>
                 <a href={recommendedReelCandidate.permalink} target="_blank" rel="noreferrer" className="text-brand-maroon hover:underline text-xs truncate">
                   {recommendedReelCandidate.caption ?? "(ללא כיתוב)"}
@@ -430,11 +385,11 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
               </div>
             )}
 
-            <button type="button" onClick={ensurePicker} className="self-start rounded border border-brand-pink/40 bg-white px-2 py-1 text-xs hover:bg-brand-pink/10">
+            <button type="button" onClick={ensurePicker} className="self-start rounded-md border border-brand-pink/20 bg-white px-2 py-1 text-xs hover:bg-brand-pink/10">
               שיבוץ קטע מנושיין...
             </button>
             {pickerOpen && (
-              <div className="rounded border border-brand-pink/40 bg-white p-1.5 max-h-40 overflow-y-auto">
+              <div className="rounded-md border border-brand-pink/20 bg-white p-1.5 max-h-40 overflow-y-auto">
                 {notionTagsLoading && <span className="text-brand-maroon/50 text-xs">טוענת רשימת נושיין...</span>}
                 {!notionTagsLoading && notionTags?.length === 0 && <span className="text-brand-maroon/50 text-xs">אין קטעים &quot;מוכן&quot; בנושיין כרגע</span>}
                 {!notionTagsLoading &&
@@ -444,7 +399,7 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
                       type="button"
                       onClick={() => selectNotionTagAsContent(item.tag)}
                       title={item.alreadyScheduled ? "כבר משובץ ליום אחר — בחירה כאן תשבץ אותו גם כאן" : undefined}
-                      className="block w-full text-right rounded px-1 py-1 text-xs hover:bg-brand-pink/10 truncate"
+                      className="block w-full text-right rounded-md px-1 py-1 text-xs hover:bg-brand-pink/10 truncate"
                     >
                       {item.tag.startsWith("#") ? item.tag : `#${item.tag}`}
                       {item.typeValues.length > 0 && <span className="text-brand-maroon/40"> · {item.typeValues.join(", ")}</span>}
@@ -456,11 +411,11 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
 
             {manualType === "instagram_reel" && (
               <>
-                <button type="button" onClick={ensureReelPicker} className="self-start rounded border border-brand-pink/40 bg-white px-2 py-1 text-xs hover:bg-brand-pink/10">
+                <button type="button" onClick={ensureReelPicker} className="self-start rounded-md border border-brand-pink/20 bg-white px-2 py-1 text-xs hover:bg-brand-pink/10">
                   בחר מהרילים הבאים...
                 </button>
                 {reelPickerOpen && (
-                  <div className="rounded border border-brand-pink/40 bg-white p-1.5 max-h-40 overflow-y-auto">
+                  <div className="rounded-md border border-brand-pink/20 bg-white p-1.5 max-h-40 overflow-y-auto">
                     {reelCandidatesLoading && <span className="text-brand-maroon/50 text-xs">טוענת המלצות...</span>}
                     {!reelCandidatesLoading && reelCandidates?.length === 0 && <span className="text-brand-maroon/50 text-xs">אין כרגע מועמדים פנויים</span>}
                     {!reelCandidatesLoading &&
@@ -469,7 +424,7 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
                           key={c.mediaId}
                           type="button"
                           onClick={() => selectReelCandidate(c.mediaId)}
-                          className="block w-full text-right rounded px-1 py-1 text-xs hover:bg-brand-pink/10 truncate"
+                          className="block w-full text-right rounded-md px-1 py-1 text-xs hover:bg-brand-pink/10 truncate"
                         >
                           {c.caption ?? "(ללא כיתוב)"}
                           <span className="text-brand-maroon/40" dir="ltr">

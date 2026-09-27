@@ -164,7 +164,7 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
               onClick={handleReconcile}
               disabled={reconciling}
               title="בודקת את הימים שעברו החודש מול מה שכבר פורסם באינסטגרם (מהמטמון הקיים בדשבורד) ומסמנת/משלימה בלוח"
-              className="rounded-lg border border-brand-pink/40 bg-white px-4 py-2 text-brand-maroon text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
+              className="rounded-lg border border-brand-pink/25 bg-white px-3.5 py-2 text-brand-maroon/80 text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
             >
               {reconciling ? "מסנכרנת..." : "🔄 סנכרון בפועל"}
             </button>
@@ -172,19 +172,21 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
               type="button"
               onClick={handleGenerate}
               disabled={generating}
-              className="rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium hover:bg-brand-red-dark disabled:opacity-50"
+              className="rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium shadow-sm hover:bg-brand-red-dark disabled:opacity-50"
             >
               {generating ? "מייצרת הצעה לחודש..." : "צרי/רענני הצעה לכל החודש"}
             </button>
-            <button
-              type="button"
-              onClick={handleClearMonth}
-              disabled={clearing}
-              title="מוחקת את כל התכנון לחודש הזה — לא כולל שיבוצים שסומנו עלה/לא עלה בפועל"
-              className="rounded-lg border border-brand-maroon/30 bg-white px-4 py-2 text-brand-maroon/70 text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
-            >
-              {clearing ? "מוחקת..." : "🗑️ מחקי את כל התכנון לחודש"}
-            </button>
+            <div className="me-1 flex items-center border-s border-brand-pink/20 ps-3">
+              <button
+                type="button"
+                onClick={handleClearMonth}
+                disabled={clearing}
+                title="מוחקת את כל התכנון לחודש הזה — לא כולל שיבוצים נעולים או שסומנו עלה/לא עלה בפועל"
+                className="text-xs text-brand-maroon/45 hover:text-brand-red disabled:opacity-50"
+              >
+                {clearing ? "מוחקת..." : "🗑️ מחקי תכנון לחודש"}
+              </button>
+            </div>
           </div>
           {reconcileSummary && <span className="text-[11px] text-brand-maroon/60">{reconcileSummary}</span>}
         </div>

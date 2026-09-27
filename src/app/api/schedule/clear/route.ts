@@ -15,9 +15,11 @@ function addDays(d: Date, days: number): Date {
 /**
  * מוחקת את כל התכנון (הצעה + שיבוצים ידניים) לשבוע נתון — לפי בקשה מפורשת
  * לאפס שבוע ולהתחיל מחדש. משאירה שיבוצים עם actualStatus שסומן בפועל
- * (done/skipped) — אלה עובדה שקרתה, לא הצעה שאפשר "לנקות". לא נוגעת בימים
- * שכבר עברו, ובתוך היום הנוכחי לא נוגעת בשעות שכבר עברו (למשל שיבוץ ל-9:00
- * כשכבר 15:00 — אפילו אם הוא עדיין pending) — לפי בקשה מפורשת.
+ * (done/skipped) — אלה עובדה שקרתה, לא הצעה שאפשר "לנקות". גם לא נוגעת
+ * בשיבוצים נעולים (isManual) — נעילה אמורה להגן מכל שינוי אוטומטי, כולל
+ * ניקוי גורף, לא רק מרענון הצעה. לא נוגעת בימים שכבר עברו, ובתוך היום
+ * הנוכחי לא נוגעת בשעות שכבר עברו (למשל שיבוץ ל-9:00 כשכבר 15:00 — אפילו
+ * אם הוא עדיין pending) — לפי בקשה מפורשת.
  */
 export async function DELETE(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
@@ -43,7 +45,7 @@ export async function DELETE(req: NextRequest) {
   const { count } =
     conditions.length > 0
       ? await prisma.scheduledSlot.deleteMany({
-          where: { actualStatus: "pending", OR: conditions },
+          where: { actualStatus: "pending", isManual: false, OR: conditions },
         })
       : { count: 0 };
 

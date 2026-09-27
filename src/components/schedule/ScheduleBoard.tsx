@@ -156,7 +156,7 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
           {plan.summary.existingReady > 0 ? (
             <a
               href={`/api/schedule/download-zip?weekStart=${plan.weekStart}`}
-              className="rounded-lg border border-brand-pink/40 bg-white px-4 py-2 text-brand-maroon text-sm font-medium hover:bg-brand-pink/10"
+              className="rounded-lg border border-brand-pink/25 bg-white px-3.5 py-2 text-brand-maroon/80 text-sm font-medium hover:bg-brand-pink/10"
             >
               📦 הורדת תכני השבוע
             </a>
@@ -165,7 +165,7 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
               type="button"
               disabled
               title="עוד אין תוכן משובץ להוריד — שבצי תוכן קיים באחד הסלוטים"
-              className="rounded-lg border border-brand-pink/40 bg-white px-4 py-2 text-brand-maroon/40 text-sm font-medium cursor-not-allowed"
+              className="rounded-lg border border-brand-pink/25 bg-white px-3.5 py-2 text-brand-maroon/35 text-sm font-medium cursor-not-allowed"
             >
               📦 הורדת תכני השבוע
             </button>
@@ -175,7 +175,7 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
             onClick={handleGenerateContent}
             disabled={generatingContent}
             title="שולפת מהנושיין ומכינה בפועל כל תוכן שעדיין חסר לשבוע הזה — פוסטים חדשים מקטעים מוכנים, ורילים לקרוסלות שכבר בכלי. בלי המלצה קונקרטית — מדלגת, לא ממציאה תוכן."
-            className="rounded-lg border border-brand-red/50 bg-white px-4 py-2 text-brand-red text-sm font-medium hover:bg-brand-red/10 disabled:opacity-50"
+            className="rounded-lg border border-brand-pink/25 bg-white px-3.5 py-2 text-brand-maroon/80 text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
           >
             {generatingContent ? (contentProgress ? `מכינה ${contentProgress.index}/${contentProgress.total}...` : "מתחילה...") : "🚀 הכיני תוכן לכל השבוע"}
           </button>
@@ -183,19 +183,21 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
             type="button"
             onClick={handleGenerate}
             disabled={generating}
-            className="rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium hover:bg-brand-red-dark disabled:opacity-50"
+            className="rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium shadow-sm hover:bg-brand-red-dark disabled:opacity-50"
           >
             {generating ? "מייצרת הצעה..." : "צרי/רענני הצעה לשבוע"}
           </button>
-          <button
-            type="button"
-            onClick={handleClearWeek}
-            disabled={clearing}
-            title="מוחקת את כל התכנון לשבוע הזה — לא כולל שיבוצים שסומנו עלה/לא עלה בפועל"
-            className="rounded-lg border border-brand-maroon/30 bg-white px-4 py-2 text-brand-maroon/70 text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
-          >
-            {clearing ? "מוחקת..." : "🗑️ מחקי את כל התכנון לשבוע"}
-          </button>
+          <div className="me-1 flex items-center border-s border-brand-pink/20 ps-3">
+            <button
+              type="button"
+              onClick={handleClearWeek}
+              disabled={clearing}
+              title="מוחקת את כל התכנון לשבוע הזה — לא כולל שיבוצים נעולים או שסומנו עלה/לא עלה בפועל"
+              className="text-xs text-brand-maroon/45 hover:text-brand-red disabled:opacity-50"
+            >
+              {clearing ? "מוחקת..." : "🗑️ מחקי תכנון לשבוע"}
+            </button>
+          </div>
         </div>
       </div>
 
