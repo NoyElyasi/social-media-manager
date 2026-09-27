@@ -111,9 +111,8 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
   // — לתלמיץ על ⚡ בכל יום (ראו למטה): איזו שעה ספציפית הכי מומלצת, לא רק
   // "יש בלוק חזק". גלובלי (לא ספציפי ליום הזה) — אין עדיין נתון משולב יום+שעה.
   const bestHourEntry = [...plan.strength.hourly].filter((h) => h.isStrong).sort((a, b) => (b.avgReach ?? 0) - (a.avgReach ?? 0))[0];
-  const bestHourTitle = bestHourEntry
-    ? `הרבה חשיפה — השעה הכי מומלצת (מכל הימים): ${String(bestHourEntry.hour).padStart(2, "0")}:00`
-    : "הרבה חשיפה";
+  // קצר בכוונה (רק השעה) — לפי בקשה מפורשת, טקסט ארוך יותר נחתך בבועית.
+  const bestHourTitle = bestHourEntry ? `${String(bestHourEntry.hour).padStart(2, "0")}:00` : "—";
 
   return (
     <div className="flex flex-col gap-4">
