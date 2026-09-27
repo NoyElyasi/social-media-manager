@@ -24,10 +24,17 @@ export async function DELETE(req: NextRequest) {
   }
   const weekStart = getWeekStart(parseCalendarDate(parsed.data.weekStart));
   const weekEnd = addDays(weekStart, 7);
+  // לא נוגעת בימים שכבר עברו — לפי בקשה מפורשת, "לנקות תכנון" הוא קדימה
+  // בזמן בלבד, לא מוחק שיבוץ (אפילו pending) של יום שכבר קרה.
+  const today = parseCalendarDate(formatCalendarDate(new Date()));
+  const deleteFrom = today > weekStart ? today : weekStart;
 
-  const { count } = await prisma.scheduledSlot.deleteMany({
-    where: { date: { gte: weekStart, lt: weekEnd }, actualStatus: "pending" },
-  });
+  const { count } =
+    deleteFrom < weekEnd
+      ? await prisma.scheduledSlot.deleteMany({
+          where: { date: { gte: deleteFrom, lt: weekEnd }, actualStatus: "pending" },
+        })
+      : { count: 0 };
 
   return NextResponse.json({ deleted: count, weekStart: formatCalendarDate(weekStart) });
 }
