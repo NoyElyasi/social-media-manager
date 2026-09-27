@@ -9,6 +9,13 @@ import OpenFolderButton from "@/components/OpenFolderButton";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 
+// כמו ב-ScheduleSlotChip.tsx — כותרת הפופ-אפ מציגה את אותה תגית שהצ'יפ מציג
+// בלוח, לפי בקשה מפורשת ("שיהיה למעלה התגית, לא התאריך"), לא רק תאריך גנרי.
+const RECOMMENDED_TYPE_SHORT_LABELS: Record<string, string> = {
+  instagram_reel: "צריך ריל",
+  instagram_carousel: "צריך פוסט",
+};
+
 export type EditorTarget = { mode: "existing"; slot: WeekSlot } | { mode: "new"; date: string; dayLabel: string; hour: number };
 
 /** פאנל עריכה לסלוט קיים או ליצירת סלוט חדש בתא ריק שנלחץ בלוח השנה. */
@@ -42,6 +49,19 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   const recommendedReelCandidate = target.mode === "existing" ? target.slot.recommendedReelCandidate : null;
   const recommendedNotionSegment = target.mode === "existing" ? target.slot.recommendedNotionSegment : null;
   const isManual = target.mode === "existing" ? target.slot.isManual : true;
+
+  // תגית הכותרת — בדיוק אותה לוגיקה כמו הצ'יפ בלוח (ScheduleSlotChip): שם
+  // התוכן, ואם אין — תגית נושיין/ריל מומלץ/סוג מתוכנן, ורק אם באמת אין כלום
+  // (שיבוץ ריק חדש) חוזרים לתאריך/יום.
+  const notionTagLabel = recommendedNotionSegment
+    ? recommendedNotionSegment.tag.startsWith("#")
+      ? recommendedNotionSegment.tag
+      : `#${recommendedNotionSegment.tag}`
+    : null;
+  const reelLabel = recommendedReelCandidate ? `🎬 ${recommendedReelCandidate.caption ?? "(ללא כיתוב)"}` : null;
+  const recommendedTypeLabel =
+    target.mode === "existing" && target.slot.recommendedType ? RECOMMENDED_TYPE_SHORT_LABELS[target.slot.recommendedType] ?? null : null;
+  const headerTag = content?.titleTag ?? notionTagLabel ?? reelLabel ?? recommendedTypeLabel;
 
   /** פותחת/סוגרת את בורר "שיבוץ קטע מנושיין" — משתמש באותה רשימת תגיות "מוכן" כמו הדרופ-דאון של שם/הערה. */
   function ensurePicker() {
@@ -201,9 +221,7 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between pb-1 border-b border-brand-pink/15">
-          <h2 className="font-semibold text-brand-maroon">
-            {dayLabel ?? ""} · {date}
-          </h2>
+          <h2 className="font-semibold text-brand-maroon truncate">{headerTag ?? dayLabel ?? date}</h2>
           <button type="button" onClick={onClose} className="text-brand-maroon/30 hover:text-brand-red">
             ✕
           </button>
