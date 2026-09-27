@@ -10,6 +10,8 @@ const createSchema = z.object({
   // שם/הערה חופשיים לסלוט בלי תוכן בכלי — למשל קטע שעדיין בעבודה במקום חוץ
   // (Notion וכו') ולא הוכן/יובא לכלי עדיין, אבל היא רוצה לשמור לו את המקום.
   note: z.string().nullable().optional(),
+  // סוג ידני (פוסט/ריל) לשיבוץ בלי תוכן — קובע גם את הצביעה של הצ'יפ (ראו postTypeStyle).
+  plannedType: z.enum(["instagram_carousel", "instagram_reel"]).nullable().optional(),
 });
 
 /** יוצרת סלוט חדש בתכנון — תמיד ידני (מה שהמשתמשת משבצת בעצמה, בניגוד להצעה האוטומטית). */
@@ -26,6 +28,7 @@ export async function POST(req: NextRequest) {
       hour: parsed.data.hour,
       platformContentId: parsed.data.platformContentId ?? null,
       note: parsed.data.note ?? null,
+      plannedType: parsed.data.plannedType ?? null,
       isManual: true,
     },
   });

@@ -9,6 +9,8 @@ const patchSchema = z.object({
   date: z.string().optional(),
   platformContentId: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
+  // סוג ידני (פוסט/ריל) לשיבוץ בלי תוכן — קובע גם את הצביעה של הצ'יפ (ראו postTypeStyle).
+  plannedType: z.enum(["instagram_carousel", "instagram_reel"]).nullable().optional(),
   actualStatus: z.enum(["pending", "done", "skipped"]).optional(),
   // נעילה/שחרור מפורש (ראו כפתור "נעלי"/"בטלי נעילה") — אם לא סופק, כל
   // עדכון אחר עדיין "נועל" אותו כברירת מחדל (התנהגות קיימת, ראו למטה).

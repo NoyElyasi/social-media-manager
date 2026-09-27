@@ -23,6 +23,11 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   const [notionTags, setNotionTags] = useState<{ tag: string; typeValues: string[] }[] | null>(null);
   const [notionTagsLoading, setNotionTagsLoading] = useState(false);
   const [noteDropdownOpen, setNoteDropdownOpen] = useState(false);
+  // סוג ידני (פוסט/ריל) לשיבוץ בלי תוכן אמיתי — קובע את הצביעה של הצ'יפ
+  // (ראו postTypeStyle) וגם את התווית ("צריך ריל"/"צריך פוסט") כשאין תגית/מועמד.
+  const [manualType, setManualType] = useState<"instagram_carousel" | "instagram_reel">(
+    (target.mode === "existing" ? target.slot.recommendedType : null) ?? "instagram_carousel"
+  );
 
   const slotId = target.mode === "existing" ? target.slot.slotId : null;
   const date = target.mode === "existing" ? target.slot.date : target.date;
@@ -32,7 +37,6 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   const [notionInput, setNotionInput] = useState(content?.notionUrl ?? "");
   const [notionEditing, setNotionEditing] = useState(!content?.notionUrl);
   const [savingNotion, setSavingNotion] = useState(false);
-  const recommendedType = target.mode === "existing" ? target.slot.recommendedType : "instagram_reel";
   const recommendedFormat = target.mode === "existing" ? target.slot.recommendedFormat : null;
   const recommendedReelCandidate = target.mode === "existing" ? target.slot.recommendedReelCandidate : null;
   const recommendedNotionSegment = target.mode === "existing" ? target.slot.recommendedNotionSegment : null;
@@ -94,14 +98,26 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
     await fetch("/api/schedule/slots", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date, hour, platformContentId, note: (noteOverride ?? noteInput).trim() || null }),
+      body: JSON.stringify({
+        date,
+        hour,
+        platformContentId,
+        note: (noteOverride ?? noteInput).trim() || null,
+        plannedType: platformContentId ? null : manualType,
+      }),
     });
     await refreshAndClose();
   }
 
+  /** בוחרת סוג (פוסט/ריל) לשיבוץ בלי תוכן — לסלוט קיים שומרת מיד (כמו כל שינוי אחר בפאנל הזה), לסלוט חדש רק מעדכנת את המצב המקומי עד ליצירה בפועל. */
+  function selectManualType(next: "instagram_carousel" | "instagram_reel") {
+    setManualType(next);
+    if (target.mode === "existing") void patchExisting({ plannedType: next });
+  }
+
   /** בחירת תגית מנושיין מהבורר "שיבוץ קטע מנושיין" — שמה כהערה על הסלוט (בלי תוכן מקומי, הקטע עדיין לא הוכן בכלי). */
   function selectNotionTagAsContent(tag: string) {
-    if (target.mode === "existing") return patchExisting({ note: tag, platformContentId: null });
+    if (target.mode === "existing") return patchExisting({ note: tag, platformContentId: null, plannedType: manualType });
     return createNew(null, tag);
   }
 
@@ -294,8 +310,29 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
           </div>
         ) : (
           <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-brand-maroon/60">סוג:</span>
+              <button
+                type="button"
+                onClick={() => selectManualType("instagram_carousel")}
+                className={`rounded-full px-2 py-0.5 text-[11px] border ${
+                  manualType === "instagram_carousel" ? "border-brand-maroon bg-brand-maroon text-white" : "border-brand-pink/40 bg-white text-brand-maroon/60 hover:bg-brand-pink/10"
+                }`}
+              >
+                📄 פוסט
+              </button>
+              <button
+                type="button"
+                onClick={() => selectManualType("instagram_reel")}
+                className={`rounded-full px-2 py-0.5 text-[11px] border ${
+                  manualType === "instagram_reel" ? "border-brand-maroon bg-brand-maroon text-white" : "border-brand-pink/40 bg-white text-brand-maroon/60 hover:bg-brand-pink/10"
+                }`}
+              >
+                🎬 ריל
+              </button>
+            </div>
             <span className="text-amber-700 text-xs font-medium">
-              אין תוכן מוכן ברשימה — צריך להכין {recommendedType ? PLATFORM_LABELS[recommendedType] : "תוכן"} ליום הזה, בשעה {String(hour).padStart(2, "0")}:00
+              אין תוכן מוכן ברשימה — צריך להכין {PLATFORM_LABELS[manualType]} ליום הזה, בשעה {String(hour).padStart(2, "0")}:00
               {recommendedFormat ? ` (מומלץ בפורמט ${FORMAT_LABELS[recommendedFormat]} — הרבה זמן בלי אחד)` : ""}
             </span>
 
