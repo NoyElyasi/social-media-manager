@@ -20,9 +20,14 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   const [busy, setBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [noteInput, setNoteInput] = useState(target.mode === "existing" ? target.slot.note ?? "" : "");
-  const [notionTags, setNotionTags] = useState<{ tag: string; typeValues: string[] }[] | null>(null);
+  const [notionTags, setNotionTags] = useState<{ tag: string; typeValues: string[]; alreadyScheduled?: boolean }[] | null>(null);
   const [notionTagsLoading, setNotionTagsLoading] = useState(false);
   const [noteDropdownOpen, setNoteDropdownOpen] = useState(false);
+  const [reelPickerOpen, setReelPickerOpen] = useState(false);
+  const [reelCandidates, setReelCandidates] = useState<
+    { mediaId: string; caption: string | null; permalink: string; viewsCount: number | null; likesCount: number | null; commentsCount: number | null }[] | null
+  >(null);
+  const [reelCandidatesLoading, setReelCandidatesLoading] = useState(false);
   // סוג ידני (פוסט/ריל) לשיבוץ בלי תוכן אמיתי — קובע את הצביעה של הצ'יפ
   // (ראו postTypeStyle) וגם את התווית ("צריך ריל"/"צריך פוסט") כשאין תגית/מועמד.
   const [manualType, setManualType] = useState<"instagram_carousel" | "instagram_reel">(
@@ -56,6 +61,21 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
     const data = await res.json();
     setNotionTags(data.tags ?? []);
     setNotionTagsLoading(false);
+  }
+
+  /** פותחת/סוגרת את בורר "בחר מהרילים הבאים" (אותה רשימה כמו בדשבורד) — רק כשסוג ריל נבחר. */
+  function ensureReelPicker() {
+    setReelPickerOpen((v) => !v);
+    void ensureReelCandidates();
+  }
+
+  async function ensureReelCandidates() {
+    if (reelCandidates || reelCandidatesLoading) return;
+    setReelCandidatesLoading(true);
+    const res = await fetch("/api/schedule/reel-candidates");
+    const data = await res.json();
+    setReelCandidates(data.candidates ?? []);
+    setReelCandidatesLoading(false);
   }
 
   async function refreshAndClose() {
@@ -96,7 +116,13 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   async function createNew(
     platformContentId: string | null,
     noteOverride?: string,
-    notionExtra?: { tag: string; preview: string | null; pageUrl: string | null }
+    extra?: {
+      plannedType?: "instagram_carousel" | "instagram_reel" | null;
+      plannedNotionTag?: string | null;
+      plannedNotionPreview?: string | null;
+      plannedNotionPageUrl?: string | null;
+      plannedReelCandidateMediaId?: string | null;
+    }
   ) {
     setBusy(true);
     await fetch("/api/schedule/slots", {
@@ -107,10 +133,11 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
         hour,
         platformContentId,
         note: (noteOverride ?? noteInput).trim() || null,
-        plannedType: platformContentId ? null : manualType,
-        plannedNotionTag: notionExtra?.tag ?? null,
-        plannedNotionPreview: notionExtra?.preview ?? null,
-        plannedNotionPageUrl: notionExtra?.pageUrl ?? null,
+        plannedType: extra?.plannedType !== undefined ? extra.plannedType : platformContentId ? null : manualType,
+        plannedNotionTag: extra?.plannedNotionTag ?? null,
+        plannedNotionPreview: extra?.plannedNotionPreview ?? null,
+        plannedNotionPageUrl: extra?.plannedNotionPageUrl ?? null,
+        plannedReelCandidateMediaId: extra?.plannedReelCandidateMediaId ?? null,
       }),
     });
     await refreshAndClose();
@@ -132,19 +159,36 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
     const res = await fetch(`/api/notion/lookup?tag=${encodeURIComponent(tag)}`);
     const data = await res.json().catch(() => null);
     const segment = data?.segment as { pageUrl: string; bodyText: string } | null | undefined;
-    const notionExtra = { tag, preview: segment?.bodyText ? segment.bodyText.slice(0, 120) : null, pageUrl: segment?.pageUrl ?? null };
+    // מוחקת מועמד ריל שנבחר קודם (ראו selectReelCandidate) — שני המקורות
+    // מייצגים תוכן שונה, בחירה חדשה מחליפה את הקודמת, לא מצטרפת אליה.
+    const extra = {
+      plannedType: manualType,
+      plannedNotionTag: tag,
+      plannedNotionPreview: segment?.bodyText ? segment.bodyText.slice(0, 120) : null,
+      plannedNotionPageUrl: segment?.pageUrl ?? null,
+      plannedReelCandidateMediaId: null,
+    };
 
     if (target.mode === "existing") {
-      return patchExisting({
-        note: tag,
-        platformContentId: null,
-        plannedType: manualType,
-        plannedNotionTag: notionExtra.tag,
-        plannedNotionPreview: notionExtra.preview,
-        plannedNotionPageUrl: notionExtra.pageUrl,
-      });
+      return patchExisting({ note: tag, platformContentId: null, ...extra });
     }
-    return createNew(null, tag, notionExtra);
+    return createNew(null, tag, extra);
+  }
+
+  /** בחירת מועמד מהבורר "בחר מהרילים הבאים" (כמו בדשבורד) — קובעת גם את הסוג לריל, ומוחקת קטע נושיין שנבחר קודם (ראו selectNotionTagAsContent). */
+  async function selectReelCandidate(mediaId: string) {
+    setManualType("instagram_reel");
+    const extra = {
+      plannedType: "instagram_reel" as const,
+      plannedNotionTag: null,
+      plannedNotionPreview: null,
+      plannedNotionPageUrl: null,
+      plannedReelCandidateMediaId: mediaId,
+    };
+    if (target.mode === "existing") {
+      return patchExisting({ platformContentId: null, ...extra });
+    }
+    return createNew(null, undefined, extra);
   }
 
   async function saveNote() {
@@ -475,13 +519,44 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
                       key={item.tag}
                       type="button"
                       onClick={() => selectNotionTagAsContent(item.tag)}
+                      title={item.alreadyScheduled ? "כבר משובץ ליום אחר — בחירה כאן תשבץ אותו גם כאן" : undefined}
                       className="block w-full text-right rounded px-1 py-1 text-xs hover:bg-brand-pink/10 truncate"
                     >
                       {item.tag.startsWith("#") ? item.tag : `#${item.tag}`}
                       {item.typeValues.length > 0 && <span className="text-brand-maroon/40"> · {item.typeValues.join(", ")}</span>}
+                      {item.alreadyScheduled && <span className="text-amber-600"> · ✓ משובץ</span>}
                     </button>
                   ))}
               </div>
+            )}
+
+            {manualType === "instagram_reel" && (
+              <>
+                <button type="button" onClick={ensureReelPicker} className="self-start rounded border border-brand-pink/40 bg-white px-2 py-1 text-xs hover:bg-brand-pink/10">
+                  בחר מהרילים הבאים...
+                </button>
+                {reelPickerOpen && (
+                  <div className="rounded border border-brand-pink/40 bg-white p-1.5 max-h-40 overflow-y-auto">
+                    {reelCandidatesLoading && <span className="text-brand-maroon/50 text-xs">טוענת המלצות...</span>}
+                    {!reelCandidatesLoading && reelCandidates?.length === 0 && <span className="text-brand-maroon/50 text-xs">אין כרגע מועמדים פנויים</span>}
+                    {!reelCandidatesLoading &&
+                      reelCandidates?.map((c) => (
+                        <button
+                          key={c.mediaId}
+                          type="button"
+                          onClick={() => selectReelCandidate(c.mediaId)}
+                          className="block w-full text-right rounded px-1 py-1 text-xs hover:bg-brand-pink/10 truncate"
+                        >
+                          {c.caption ?? "(ללא כיתוב)"}
+                          <span className="text-brand-maroon/40" dir="ltr">
+                            {" "}
+                            · 👁 {c.viewsCount ?? "—"} · ❤️ {c.likesCount ?? "—"} · 💬 {c.commentsCount ?? "—"}
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

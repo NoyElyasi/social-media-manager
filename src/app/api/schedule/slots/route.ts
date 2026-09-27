@@ -17,6 +17,8 @@ const createSchema = z.object({
   plannedNotionTag: z.string().nullable().optional(),
   plannedNotionPreview: z.string().nullable().optional(),
   plannedNotionPageUrl: z.string().nullable().optional(),
+  // מועמד ריל שנבחר בבורר "בחר מהרילים הבאים" (ראו getNextReelCandidates).
+  plannedReelCandidateMediaId: z.string().nullable().optional(),
 });
 
 /** יוצרת סלוט חדש בתכנון — תמיד ידני (מה שהמשתמשת משבצת בעצמה, בניגוד להצעה האוטומטית). */
@@ -37,6 +39,7 @@ export async function POST(req: NextRequest) {
       plannedNotionTag: parsed.data.plannedNotionTag ?? null,
       plannedNotionPreview: parsed.data.plannedNotionPreview ?? null,
       plannedNotionPageUrl: parsed.data.plannedNotionPageUrl ?? null,
+      plannedReelCandidateMediaId: parsed.data.plannedReelCandidateMediaId ?? null,
       isManual: true,
     },
   });

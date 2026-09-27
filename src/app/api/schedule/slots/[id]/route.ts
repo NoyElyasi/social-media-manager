@@ -16,6 +16,8 @@ const patchSchema = z.object({
   plannedNotionTag: z.string().nullable().optional(),
   plannedNotionPreview: z.string().nullable().optional(),
   plannedNotionPageUrl: z.string().nullable().optional(),
+  // מועמד ריל שנבחר בבורר "בחר מהרילים הבאים" (ראו getNextReelCandidates).
+  plannedReelCandidateMediaId: z.string().nullable().optional(),
   actualStatus: z.enum(["pending", "done", "skipped"]).optional(),
   // נעילה/שחרור מפורש (ראו כפתור "נעלי"/"בטלי נעילה") — אם לא סופק, כל
   // עדכון אחר עדיין "נועל" אותו כברירת מחדל (התנהגות קיימת, ראו למטה).

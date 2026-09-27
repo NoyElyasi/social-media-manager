@@ -845,7 +845,7 @@ export function extractCaptionHashtags(caption: string | null): string[] {
   return matches.filter((t) => t !== ALWAYS_FIRST_HASHTAG);
 }
 
-function normalizeTagText(t: string): string {
+export function normalizeTagText(t: string): string {
   return t.replace(/^#/, "").trim().toLowerCase();
 }
 
