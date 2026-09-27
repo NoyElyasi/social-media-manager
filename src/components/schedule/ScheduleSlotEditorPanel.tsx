@@ -403,7 +403,7 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
               שיבוץ קטע מנושיין...
             </button>
             {pickerOpen && (
-              <div className="rounded border border-brand-pink/40 bg-white p-1.5 max-h-40 overflow-y-auto flex flex-col gap-1">
+              <div className="rounded border border-brand-pink/40 bg-white p-1.5 max-h-40 overflow-y-auto">
                 {notionTagsLoading && <span className="text-brand-maroon/50 text-xs">טוענת רשימת נושיין...</span>}
                 {!notionTagsLoading && notionTags?.length === 0 && <span className="text-brand-maroon/50 text-xs">אין קטעים &quot;מוכן&quot; בנושיין כרגע</span>}
                 {!notionTagsLoading &&
@@ -412,7 +412,7 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
                       key={item.tag}
                       type="button"
                       onClick={() => selectNotionTagAsContent(item.tag)}
-                      className="text-right rounded px-1 py-0.5 text-xs hover:bg-brand-pink/10 truncate"
+                      className="block w-full text-right rounded px-1 py-1 text-xs hover:bg-brand-pink/10 truncate"
                     >
                       {item.tag.startsWith("#") ? item.tag : `#${item.tag}`}
                       {item.typeValues.length > 0 && <span className="text-brand-maroon/40"> · {item.typeValues.join(", ")}</span>}
