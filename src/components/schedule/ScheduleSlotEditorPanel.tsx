@@ -8,7 +8,6 @@ import type { WeekSlot } from "@/lib/weeklySchedule";
 import OpenFolderButton from "@/components/OpenFolderButton";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
-const FORMAT_LABELS: Record<string, string> = { letter: "✉️ מכתב", tip: "💡 טיפ" };
 
 export type EditorTarget = { mode: "existing"; slot: WeekSlot } | { mode: "new"; date: string; dayLabel: string; hour: number };
 
@@ -19,10 +18,8 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   const [dateInput, setDateInput] = useState(target.mode === "existing" ? target.slot.date : target.date);
   const [busy, setBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [noteInput, setNoteInput] = useState(target.mode === "existing" ? target.slot.note ?? "" : "");
   const [notionTags, setNotionTags] = useState<{ tag: string; typeValues: string[]; alreadyScheduled?: boolean }[] | null>(null);
   const [notionTagsLoading, setNotionTagsLoading] = useState(false);
-  const [noteDropdownOpen, setNoteDropdownOpen] = useState(false);
   const [reelPickerOpen, setReelPickerOpen] = useState(false);
   const [reelCandidates, setReelCandidates] = useState<
     { mediaId: string; caption: string | null; permalink: string; viewsCount: number | null; likesCount: number | null; commentsCount: number | null }[] | null
@@ -42,7 +39,6 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   const [notionInput, setNotionInput] = useState(content?.notionUrl ?? "");
   const [notionEditing, setNotionEditing] = useState(!content?.notionUrl);
   const [savingNotion, setSavingNotion] = useState(false);
-  const recommendedFormat = target.mode === "existing" ? target.slot.recommendedFormat : null;
   const recommendedReelCandidate = target.mode === "existing" ? target.slot.recommendedReelCandidate : null;
   const recommendedNotionSegment = target.mode === "existing" ? target.slot.recommendedNotionSegment : null;
   const isManual = target.mode === "existing" ? target.slot.isManual : true;
@@ -132,7 +128,7 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
         date,
         hour,
         platformContentId,
-        note: (noteOverride ?? noteInput).trim() || null,
+        note: noteOverride?.trim() || null,
         plannedType: extra?.plannedType !== undefined ? extra.plannedType : platformContentId ? null : manualType,
         plannedNotionTag: extra?.plannedNotionTag ?? null,
         plannedNotionPreview: extra?.plannedNotionPreview ?? null,
@@ -191,12 +187,6 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
     return createNew(null, undefined, extra);
   }
 
-  async function saveNote() {
-    if (target.mode === "existing") {
-      await patchExisting({ note: noteInput.trim() || null });
-    }
-  }
-
   async function saveNotionUrl() {
     if (!content) return;
     setSavingNotion(true);
@@ -209,12 +199,6 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
     setNotionEditing(false);
     router.refresh();
   }
-
-  const normalizeTag = (t: string) => t.replace(/^#/, "").trim().toLowerCase();
-  const noteMatches =
-    notionTags && noteInput.trim() ? notionTags.filter((t) => normalizeTag(t.tag).includes(normalizeTag(noteInput))) : [];
-  const noteExistsInNotion =
-    notionTags && noteInput.trim() ? notionTags.some((t) => normalizeTag(t.tag) === normalizeTag(noteInput)) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
@@ -401,10 +385,6 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
                 🎬 ריל
               </button>
             </div>
-            <span className="text-amber-700 text-xs font-medium">
-              אין תוכן מוכן ברשימה — צריך להכין {PLATFORM_LABELS[manualType]} ליום הזה, בשעה {String(hour).padStart(2, "0")}:00
-              {recommendedFormat ? ` (מומלץ בפורמט ${FORMAT_LABELS[recommendedFormat]} — הרבה זמן בלי אחד)` : ""}
-            </span>
 
             {recommendedNotionSegment && (
               <div className="rounded-lg border border-brand-pink/40 bg-brand-pink/5 p-2 flex flex-col gap-1">
@@ -426,62 +406,6 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
               </div>
             )}
 
-            <div className="flex flex-col gap-1 relative">
-              <span className="text-[11px] text-brand-maroon/50">שם/הערה (למשל קטע שעדיין בעבודה במקום אחר, כמו Notion, ולא הוכן עדיין בכלי):</span>
-              <div className="flex gap-1">
-                <input
-                  type="text"
-                  value={noteInput}
-                  disabled={busy}
-                  onFocus={() => {
-                    void ensureNotionTags();
-                    setNoteDropdownOpen(true);
-                  }}
-                  onBlur={() => setNoteDropdownOpen(false)}
-                  onChange={(e) => {
-                    setNoteInput(e.target.value);
-                    setNoteDropdownOpen(true);
-                  }}
-                  placeholder="לדוגמה: קטע געגוע לאמא"
-                  className="flex-1 rounded border border-brand-pink/40 bg-white px-2 py-1 text-xs"
-                />
-                {target.mode === "existing" && (
-                  <button
-                    type="button"
-                    onClick={saveNote}
-                    disabled={busy}
-                    className="rounded border border-brand-pink/40 bg-white px-2 py-1 text-xs hover:bg-brand-pink/10"
-                  >
-                    שמירה
-                  </button>
-                )}
-              </div>
-              {notionTagsLoading && <span className="text-[11px] text-brand-maroon/40">טוענת רשימת נושיין...</span>}
-              {!notionTagsLoading && notionTags && noteInput.trim() && (
-                <span className={`text-[11px] ${noteExistsInNotion ? "text-green-700" : "text-brand-maroon/40"}`}>
-                  {noteExistsInNotion ? "✓ קיים בנושיין (מוכן)" : "לא נמצא בנושיין קטע 'מוכן' בשם הזה"}
-                </span>
-              )}
-              {noteDropdownOpen && noteMatches.length > 0 && (
-                <div className="absolute top-full right-0 left-0 z-10 mt-1 rounded border border-brand-pink/40 bg-white shadow-md max-h-32 overflow-y-auto">
-                  {noteMatches.map((m) => (
-                    <button
-                      key={m.tag}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        setNoteInput(m.tag);
-                        setNoteDropdownOpen(false);
-                      }}
-                      className="w-full text-right px-2 py-1 text-xs hover:bg-brand-pink/10 truncate"
-                    >
-                      {m.tag.startsWith("#") ? m.tag : `#${m.tag}`}
-                      {m.typeValues.length > 0 && <span className="text-brand-maroon/40"> · {m.typeValues.join(", ")}</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
 
             {recommendedReelCandidate && (
               <div className="rounded-lg border border-brand-pink/40 bg-brand-pink/5 p-2 flex flex-col gap-1">
