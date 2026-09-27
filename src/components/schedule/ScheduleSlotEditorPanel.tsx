@@ -93,7 +93,11 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
     await refreshAndClose();
   }
 
-  async function createNew(platformContentId: string | null, noteOverride?: string) {
+  async function createNew(
+    platformContentId: string | null,
+    noteOverride?: string,
+    notionExtra?: { tag: string; preview: string | null; pageUrl: string | null }
+  ) {
     setBusy(true);
     await fetch("/api/schedule/slots", {
       method: "POST",
@@ -104,6 +108,9 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
         platformContentId,
         note: (noteOverride ?? noteInput).trim() || null,
         plannedType: platformContentId ? null : manualType,
+        plannedNotionTag: notionExtra?.tag ?? null,
+        plannedNotionPreview: notionExtra?.preview ?? null,
+        plannedNotionPageUrl: notionExtra?.pageUrl ?? null,
       }),
     });
     await refreshAndClose();
@@ -115,10 +122,29 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
     if (target.mode === "existing") void patchExisting({ plannedType: next });
   }
 
-  /** בחירת תגית מנושיין מהבורר "שיבוץ קטע מנושיין" — שמה כהערה על הסלוט (בלי תוכן מקומי, הקטע עדיין לא הוכן בכלי). */
-  function selectNotionTagAsContent(tag: string) {
-    if (target.mode === "existing") return patchExisting({ note: tag, platformContentId: null, plannedType: manualType });
-    return createNew(null, tag);
+  /**
+   * בחירת תגית מנושיין מהבורר "שיבוץ קטע מנושיין" — שולפת גם קישור/תקציר
+   * (כמו הצעה אוטומטית, ראו notionPick ב-weeklySchedule.ts) כדי שהצ'יפ יציג
+   * את התגית עצמה (📓 #תגית), לא "צריך פוסט/ריל" גנרי — לא רק note חופשי.
+   */
+  async function selectNotionTagAsContent(tag: string) {
+    setBusy(true);
+    const res = await fetch(`/api/notion/lookup?tag=${encodeURIComponent(tag)}`);
+    const data = await res.json().catch(() => null);
+    const segment = data?.segment as { pageUrl: string; bodyText: string } | null | undefined;
+    const notionExtra = { tag, preview: segment?.bodyText ? segment.bodyText.slice(0, 120) : null, pageUrl: segment?.pageUrl ?? null };
+
+    if (target.mode === "existing") {
+      return patchExisting({
+        note: tag,
+        platformContentId: null,
+        plannedType: manualType,
+        plannedNotionTag: notionExtra.tag,
+        plannedNotionPreview: notionExtra.preview,
+        plannedNotionPageUrl: notionExtra.pageUrl,
+      });
+    }
+    return createNew(null, tag, notionExtra);
   }
 
   async function saveNote() {

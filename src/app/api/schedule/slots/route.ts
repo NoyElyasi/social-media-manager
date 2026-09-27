@@ -12,6 +12,11 @@ const createSchema = z.object({
   note: z.string().nullable().optional(),
   // סוג ידני (פוסט/ריל) לשיבוץ בלי תוכן — קובע גם את הצביעה של הצ'יפ (ראו postTypeStyle).
   plannedType: z.enum(["instagram_carousel", "instagram_reel"]).nullable().optional(),
+  // תגית/תקציר/קישור קטע מנושיין שנבחר בבורר "שיבוץ קטע מנושיין" — כדי
+  // שהצ'יפ יציג את התגית עצמה (ראו ScheduleSlotChip), לא "צריך פוסט/ריל" גנרי.
+  plannedNotionTag: z.string().nullable().optional(),
+  plannedNotionPreview: z.string().nullable().optional(),
+  plannedNotionPageUrl: z.string().nullable().optional(),
 });
 
 /** יוצרת סלוט חדש בתכנון — תמיד ידני (מה שהמשתמשת משבצת בעצמה, בניגוד להצעה האוטומטית). */
@@ -29,6 +34,9 @@ export async function POST(req: NextRequest) {
       platformContentId: parsed.data.platformContentId ?? null,
       note: parsed.data.note ?? null,
       plannedType: parsed.data.plannedType ?? null,
+      plannedNotionTag: parsed.data.plannedNotionTag ?? null,
+      plannedNotionPreview: parsed.data.plannedNotionPreview ?? null,
+      plannedNotionPageUrl: parsed.data.plannedNotionPageUrl ?? null,
       isManual: true,
     },
   });

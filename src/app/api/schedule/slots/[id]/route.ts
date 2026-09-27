@@ -11,6 +11,11 @@ const patchSchema = z.object({
   note: z.string().nullable().optional(),
   // סוג ידני (פוסט/ריל) לשיבוץ בלי תוכן — קובע גם את הצביעה של הצ'יפ (ראו postTypeStyle).
   plannedType: z.enum(["instagram_carousel", "instagram_reel"]).nullable().optional(),
+  // תגית/תקציר/קישור קטע מנושיין שנבחר בבורר "שיבוץ קטע מנושיין" — כדי
+  // שהצ'יפ יציג את התגית עצמה (ראו ScheduleSlotChip), לא "צריך פוסט/ריל" גנרי.
+  plannedNotionTag: z.string().nullable().optional(),
+  plannedNotionPreview: z.string().nullable().optional(),
+  plannedNotionPageUrl: z.string().nullable().optional(),
   actualStatus: z.enum(["pending", "done", "skipped"]).optional(),
   // נעילה/שחרור מפורש (ראו כפתור "נעלי"/"בטלי נעילה") — אם לא סופק, כל
   // עדכון אחר עדיין "נועל" אותו כברירת מחדל (התנהגות קיימת, ראו למטה).
