@@ -25,7 +25,7 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   const [dateInput, setDateInput] = useState(target.mode === "existing" ? target.slot.date : target.date);
   const [busy, setBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [notionTags, setNotionTags] = useState<{ tag: string; typeValues: string[]; alreadyScheduled?: boolean }[] | null>(null);
+  const [notionTags, setNotionTags] = useState<{ tag: string; typeValues: string[]; scheduledDate?: string | null }[] | null>(null);
   const [notionTagsLoading, setNotionTagsLoading] = useState(false);
   const [reelPickerOpen, setReelPickerOpen] = useState(false);
   const [reelCandidates, setReelCandidates] = useState<
@@ -66,14 +66,14 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   /** פותחת/סוגרת את בורר "שיבוץ קטע מנושיין" — משתמש באותה רשימת תגיות "מוכן" כמו הדרופ-דאון של שם/הערה. */
   function ensurePicker() {
     setPickerOpen((v) => !v);
-    void ensureNotionTags();
+    void ensureNotionTags(true);
   }
 
   /** טוענת פעם אחת (בפוקוס ראשון על שם/הערה, או פתיחת הבורר) את כל תגיות "מוכן" מנושיין — לדרופ-דאון ולבדיקת קיום. */
-  async function ensureNotionTags() {
-    if (notionTags || notionTagsLoading) return;
+  async function ensureNotionTags(forceRefresh = false) {
+    if (notionTagsLoading || (notionTags && !forceRefresh)) return;
     setNotionTagsLoading(true);
-    const res = await fetch("/api/notion/ready-tags");
+    const res = await fetch("/api/notion/ready-tags", { cache: "no-store" });
     const data = await res.json();
     setNotionTags(data.tags ?? []);
     setNotionTagsLoading(false);
@@ -426,12 +426,12 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
                       key={item.tag}
                       type="button"
                       onClick={() => selectNotionTagAsContent(item.tag)}
-                      title={item.alreadyScheduled ? "כבר משובץ ליום אחר — בחירה כאן תשבץ אותו גם כאן" : undefined}
+                      title={item.scheduledDate ? "כבר משובץ ליום אחר — בחירה כאן תשבץ אותו גם כאן" : undefined}
                       className="block w-full text-right rounded-md px-1 py-1 text-xs hover:bg-brand-pink/10 truncate"
                     >
                       {item.tag.startsWith("#") ? item.tag : `#${item.tag}`}
                       {item.typeValues.length > 0 && <span className="text-brand-maroon/40"> · {item.typeValues.join(", ")}</span>}
-                      {item.alreadyScheduled && <span className="text-amber-600"> · ✓ משובץ</span>}
+                      {item.scheduledDate && <span className="text-amber-600"> · ✓ משובץ ב-{item.scheduledDate.slice(8)}/{item.scheduledDate.slice(5, 7)}</span>}
                     </button>
                   ))}
               </div>
