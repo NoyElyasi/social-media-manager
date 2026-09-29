@@ -201,7 +201,7 @@ export async function generateMonthlySchedule(monthStart: Date): Promise<MonthPl
 }
 
 /** מסנכרנת בפועל בלבד (ראו reconcileScheduleWithInstagram), בלי ליצור/לרענן הצעות — לכפתור הנפרד "סנכרון בפועל" בלוח החודשי. */
-export async function reconcileMonth(monthStart: Date): Promise<ReconcileResult> {
+export async function reconcileMonth(monthStart: Date, options: { force?: boolean } = {}): Promise<ReconcileResult> {
   const monthEnd = addMonths(monthStart, 1);
-  return reconcileScheduleWithInstagram(monthStart, monthEnd);
+  return reconcileScheduleWithInstagram(monthStart, monthEnd, options);
 }

@@ -967,9 +967,14 @@ async function ensureTodaySynced(): Promise<void> {
  * גם כל "צריך ריל/פוסט" (או הערה) בלי תוכן אמיתי שנשאר לא ממומש בימים
  * שעברו *לגמרי* (לא היום) — לפי בקשה מפורשת להשאיר בימים שעברו רק את מה
  * שבאמת פורסם. rangeStart/rangeEnd הם כל טווח (לא רק חודש קלנדרי) — נקראת
- * גם עם טווח שבוע, ראו generateWeeklySchedule.
+ * גם עם טווח שבוע, ראו generateWeeklySchedule. force=true — "בדיקה חוזרת":
+ * בודקת כל יום בטווח גם אם כבר סומן כנבדק.
  */
-export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd: Date): Promise<ReconcileResult> {
+export async function reconcileScheduleWithInstagram(
+  rangeStart: Date,
+  rangeEnd: Date,
+  options: { force?: boolean } = {}
+): Promise<ReconcileResult> {
   const today = formatCalendarDate(new Date());
   const lastDayIso = formatCalendarDate(addDays(rangeEnd, -1));
   const scanEndIso = lastDayIso < today ? lastDayIso : today;
@@ -994,7 +999,7 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
     // "היום" נכנס תמיד, גם אם כבר נבדק קודם באותו יום — ראו הערה למעלה. אותו
     // דבר לימים האחרונים: סימון "נבדק" שנכתב באותו יום (לפני שפורסם בו משהו
     // נוסף) לא אמין, וההתאמה בטוחה להרצה חוזרת (לפי matchedInstagramMediaId).
-    if (dIso >= recheckFromIso || !doneSet.has(dIso)) candidateDays.push(d);
+    if (options.force || dIso >= recheckFromIso || !doneSet.has(dIso)) candidateDays.push(d);
   }
 
   let matchedSlots = 0;

@@ -42,6 +42,27 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
   const [contentProgress, setContentProgress] = useState<{ index: number; total: number } | null>(null);
   const [contentResults, setContentResults] = useState<ContentResultItem[] | null>(null);
   const [clearing, setClearing] = useState(false);
+  const [rechecking, setRechecking] = useState(false);
+  const [recheckSummary, setRecheckSummary] = useState<string | null>(null);
+
+  /** "בדיקה חוזרת" — בודקת מחדש מול אינסטגרם את כל ימי השבוע הזה בלבד, גם ימים שכבר נבדקו. */
+  async function handleRecheckWeek() {
+    setRechecking(true);
+    setRecheckSummary(null);
+    const res = await fetch("/api/schedule/reconcile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weekStart: plan.weekStart, force: true }),
+    });
+    const r = (await res.json()).result;
+    setRecheckSummary(
+      r
+        ? `נבדקו ${r.checkedDays} ימים — ${r.matchedSlots} שיבוצים עודכנו, ${r.createdSlots} נוספו, ${r.deletedPlaceholders} הצעות שלא התממשו נמחקו`
+        : "שגיאה בבדיקה"
+    );
+    setRechecking(false);
+    router.refresh();
+  }
 
   /** מוחקת את כל התכנון (הצעה + שיבוצים ידניים) לשבוע הזה — משאירה שיבוצים שסומנו done/skipped בפועל. */
   async function handleClearWeek() {
@@ -181,6 +202,15 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
           </button>
           <button
             type="button"
+            onClick={handleRecheckWeek}
+            disabled={rechecking}
+            title="בודקת מחדש מול אינסטגרם את כל ימי השבוע הזה בלבד, גם ימים שכבר נבדקו בעבר"
+            className="rounded-lg border border-brand-pink/25 bg-white px-3.5 py-2 text-brand-maroon/80 text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
+          >
+            {rechecking ? "בודקת..." : "🔍 בדיקה חוזרת לשבוע"}
+          </button>
+          <button
+            type="button"
             onClick={handleGenerate}
             disabled={generating}
             className="rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium shadow-sm hover:bg-brand-red-dark disabled:opacity-50"
@@ -200,6 +230,8 @@ export default function ScheduleBoard({ plan }: { plan: WeekPlan }) {
           </div>
         </div>
       </div>
+
+      {recheckSummary && <p className="text-[11px] text-brand-maroon/60">{recheckSummary}</p>}
 
       {contentResults && (
         <details open className="rounded-lg border border-brand-pink/30 bg-white">

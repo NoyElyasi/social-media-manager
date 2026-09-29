@@ -113,13 +113,13 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
   }
 
   /** "סנכרון בפועל" — מתאימה בין מה שכבר פורסם באינסטגרם (מהמטמון הקיים) לבין הלוח, ראו reconcileMonthWithInstagram. */
-  async function handleReconcile() {
+  async function handleReconcile(force = false) {
     setReconciling(true);
     setReconcileSummary(null);
     const res = await fetch("/api/schedule/month/reconcile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ month: monthKey }),
+      body: JSON.stringify({ month: monthKey, force }),
     });
     const data = await res.json();
     const r = data.result;
@@ -161,12 +161,21 @@ export default function MonthBoard({ plan }: { plan: MonthPlan }) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleReconcile}
+              onClick={() => handleReconcile()}
               disabled={reconciling}
               title="בודקת את הימים שעברו החודש מול מה שכבר פורסם באינסטגרם (מהמטמון הקיים בדשבורד) ומסמנת/משלימה בלוח"
               className="rounded-lg border border-brand-pink/25 bg-white px-3.5 py-2 text-brand-maroon/80 text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
             >
               {reconciling ? "מסנכרנת..." : "🔄 סנכרון בפועל"}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleReconcile(true)}
+              disabled={reconciling}
+              title="בודקת מחדש את כל ימי החודש מול אינסטגרם, גם ימים שכבר נבדקו בעבר"
+              className="rounded-lg border border-brand-pink/25 bg-white px-3.5 py-2 text-brand-maroon/80 text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
+            >
+              🔍 בדיקה חוזרת לחודש
             </button>
             <button
               type="button"
