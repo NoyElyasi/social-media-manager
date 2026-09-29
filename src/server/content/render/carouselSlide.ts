@@ -204,6 +204,7 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
         })
       )
     ),
+    input.pageCount > 1 &&
     h(
       "div",
       {
