@@ -938,11 +938,16 @@ export interface ReconcileResult {
 // קודם מאותו יום. שעה נותנת מרווח סביר בלי למשוך שוב על כל לחיצה, בלי לפספס
 // פרסום חדש מהשעה האחרונה.
 const SYNC_FRESHNESS_MS = 60 * 60 * 1000;
+const RECHECK_RECENT_DAYS = 3;
 async function ensureTodaySynced(): Promise<void> {
   const profile = await prisma.profileSettings.findUnique({ where: { id: "default" } });
   if (profile?.lastDashboardSyncAt && Date.now() - profile.lastDashboardSyncAt.getTime() < SYNC_FRESHNESS_MS) return;
+  // אחרי הפסקה ארוכה 8 פוסטים אחרונים לא מספיקים לכסות את כל הימים החסרים.
+  const daysSinceSync = profile?.lastDashboardSyncAt
+    ? Math.ceil((Date.now() - profile.lastDashboardSyncAt.getTime()) / (24 * 60 * 60 * 1000))
+    : 30;
   try {
-    await syncLatestInstagramMedia(8);
+    await syncLatestInstagramMedia(Math.min(50, 8 + daysSinceSync * 4));
   } catch {
     // אין חיבור פעיל ל-Meta / כשל ברשת — לא עוצרים את הסנכרון בפועל בגלל זה.
   }
@@ -982,11 +987,14 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
   });
   const doneSet = new Set(alreadyDone.map((r) => formatCalendarDate(r.date)));
 
+  const recheckFromIso = formatCalendarDate(addDays(parseCalendarDate(today), -RECHECK_RECENT_DAYS));
   const candidateDays: Date[] = [];
   for (let d = rangeStart; formatCalendarDate(d) <= scanEndIso; d = addDays(d, 1)) {
     const dIso = formatCalendarDate(d);
-    // "היום" נכנס תמיד, גם אם כבר נבדק קודם באותו יום — ראו הערה למעלה.
-    if (dIso === today || !doneSet.has(dIso)) candidateDays.push(d);
+    // "היום" נכנס תמיד, גם אם כבר נבדק קודם באותו יום — ראו הערה למעלה. אותו
+    // דבר לימים האחרונים: סימון "נבדק" שנכתב באותו יום (לפני שפורסם בו משהו
+    // נוסף) לא אמין, וההתאמה בטוחה להרצה חוזרת (לפי matchedInstagramMediaId).
+    if (dIso >= recheckFromIso || !doneSet.has(dIso)) candidateDays.push(d);
   }
 
   let matchedSlots = 0;
@@ -1055,6 +1063,7 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
         (s) => !claimedSlotIds.has(s.id) && s.platformContentId && s.actualStatus === "pending"
       );
       const matchedSlot =
+        daySlots.find((s) => !claimedSlotIds.has(s.id) && s.matchedInstagramMediaId === item.id) ??
         daySlots.find((s) => !claimedSlotIds.has(s.id) && s.platformContent?.instagramMediaId === item.id) ??
         daySlots.find((s) => !claimedSlotIds.has(s.id) && s.plannedNotionTag && normalizedHashtags.has(normalizeTagText(s.plannedNotionTag))) ??
         (pendingContentSlots.length === 1 ? pendingContentSlots[0] : undefined);
@@ -1129,7 +1138,29 @@ export async function reconcileScheduleWithInstagram(rangeStart: Date, rangeEnd:
       }
     }
 
-      await prisma.reconciledDay.upsert({ where: { date: day }, create: { date: day }, update: {} });
+      if (dayIso < today) {
+        await prisma.reconciledDay.upsert({ where: { date: day }, create: { date: day }, update: {} });
+      }
+    }
+
+    // כפילויות שנוצרו בעבר (הרצות חוזרות על פוסט בלי תגית יצרו שיבוץ חדש כל
+    // פעם): לכל פוסט אמיתי נשאר שיבוץ אחד — עם תוכן/הערה אם יש, אחרת הוותיק.
+    const seenMediaIds = [...new Set(media.map((m) => m.id))];
+    if (seenMediaIds.length > 0) {
+      const matched = await prisma.scheduledSlot.findMany({
+        where: { matchedInstagramMediaId: { in: seenMediaIds } },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, matchedInstagramMediaId: true, platformContentId: true, note: true },
+      });
+      const byMedia = new Map<string, typeof matched>();
+      for (const m of matched) byMedia.set(m.matchedInstagramMediaId!, [...(byMedia.get(m.matchedInstagramMediaId!) ?? []), m]);
+      const dupIds: string[] = [];
+      for (const group of byMedia.values()) {
+        if (group.length < 2) continue;
+        const keeper = group.find((g) => g.platformContentId) ?? group.find((g) => g.note) ?? group[0];
+        for (const g of group) if (g.id !== keeper.id && !g.platformContentId && !g.note) dupIds.push(g.id);
+      }
+      if (dupIds.length > 0) await prisma.scheduledSlot.deleteMany({ where: { id: { in: dupIds } } });
     }
 
     // רק אחרי שכל הימים בהרצה הזו עובדו — תגית שהתאימה בפועל (usedRealTags)
