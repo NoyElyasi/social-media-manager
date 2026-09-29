@@ -124,6 +124,12 @@ export async function getDayHourStrength(topN = 3): Promise<{ days: DayStrength[
   return { days, hourBuckets, hourly };
 }
 
+/** שעות פרסום הגיוניות בישראל — הצעות "לנסות שעה חדשה" לא יורדות ללילה (00:00-06:59). */
+export const EARLIEST_POST_HOUR = 7;
+export function isRealisticPostHour(hour: number): boolean {
+  return hour >= EARLIEST_POST_HOUR && hour <= 23;
+}
+
 export interface HourTestSummary {
   /** שעות (0-23) שאין עדיין אף פוסט בהן — שווה לבדוק. */
   untestedHours: number[];
@@ -133,7 +139,7 @@ export interface HourTestSummary {
 
 /** מסכמת אילו שעות ספציפיות (לא בלוקים) עדיין לא נבדקו, ואילו כבר נבדקו מספיק ומתבררות כחזקות — ראו hourly. */
 export function summarizeHourTesting(hourly: HourlyStrength[]): HourTestSummary {
-  const untestedHours = hourly.filter((h) => h.count === 0).map((h) => h.hour);
+  const untestedHours = hourly.filter((h) => h.count === 0 && isRealisticPostHour(h.hour)).map((h) => h.hour);
   const testedHoursRanked = hourly
     .filter((h): h is HourlyStrength & { avgReach: number } => h.avgReach !== null && h.count >= MIN_PER_GROUP)
     .sort((a, b) => b.avgReach - a.avgReach)

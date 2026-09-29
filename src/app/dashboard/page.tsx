@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/server/db";
 import { getProfileSettings } from "@/server/settings/profile";
+import { isRealisticPostHour } from "@/lib/reachInsights";
 import { getMetaConnectionStatus, isDashboardSyncRunning } from "@/server/settings/meta";
 import DashboardSyncPanel from "@/components/dashboard/DashboardSyncPanel";
 import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
@@ -417,7 +418,7 @@ export default async function DashboardPage({
   // בדיקת שעה בודדת (לא בלוק) — אילו שעות עדיין לא נבדקו כלל, ואילו כבר
   // נבדקו מספיק (MIN_PER_GROUP+) ומתבררות כחזקות בפועל — לפי בקשה מפורשת.
   const hourlyRows = Array.from({ length: 24 }, (_, h) => rows.filter((r) => r.hour === h));
-  const untestedHours = hourlyRows.map((rs, h) => ({ h, rs })).filter(({ rs }) => rs.length === 0).map(({ h }) => h);
+  const untestedHours = hourlyRows.map((rs, h) => ({ h, rs })).filter(({ h, rs }) => rs.length === 0 && isRealisticPostHour(h)).map(({ h }) => h);
   const testedHoursRanked = hourlyRows
     .map((rs, h) => ({ hour: h, avgReach: avg(rs.map((r) => r.reachCount)), count: rs.filter((r) => r.reachCount !== null).length }))
     .filter((h): h is { hour: number; avgReach: number; count: number } => h.avgReach !== null && h.count >= MIN_PER_GROUP)
@@ -674,7 +675,7 @@ export default async function DashboardPage({
 
   const testSuggestions = [
     ...weekdayBucketsFull.map((b) => ({ scope: "יום", label: b.name, count: b.rows.length })),
-    ...hourBuckets.map((b) => ({ scope: "שעות", label: b.name, count: b.rows.length })),
+    ...hourBuckets.filter((b) => isRealisticPostHour(Number(b.name.slice(0, 2)))).map((b) => ({ scope: "שעות", label: b.name, count: b.rows.length })),
   ]
     .filter((b) => b.count < MIN_PER_GROUP)
     .map((b) => {
