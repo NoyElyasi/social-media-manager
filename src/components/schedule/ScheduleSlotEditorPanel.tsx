@@ -370,10 +370,15 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
                     פתיחה ב-Notion
                   </a>
                   <Link
-                    href={`/posts/new?notionTag=${encodeURIComponent(recommendedNotionSegment.tag)}`}
+                    href={
+                      recommendedNotionSegment.existingPostId
+                        ? `/posts/${recommendedNotionSegment.existingPostId}`
+                        : `/posts/new?notionTag=${encodeURIComponent(recommendedNotionSegment.tag)}`
+                    }
+                    title={recommendedNotionSegment.existingPostId ? "כבר יש פוסט בהכנה עם התגית הזו — פותחת אותו, לא יוצרת כפול" : undefined}
                     className="rounded-md bg-brand-red px-2 py-1 text-white text-xs hover:bg-brand-red-dark"
                   >
-                    + יצירת פוסט מהקטע הזה
+                    {recommendedNotionSegment.existingPostId ? "→ פתחי את הפוסט הקיים" : "+ יצירת פוסט מהקטע הזה"}
                   </Link>
                 </div>
               </div>

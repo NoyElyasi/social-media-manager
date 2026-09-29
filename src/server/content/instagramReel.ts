@@ -452,14 +452,55 @@ function wordTimingWeight(word: string): number {
   return weight;
 }
 
+interface SilenceGap {
+  center: number;
+}
+
 /**
- * מזהה תזמון גס למילים בהקלטת הקראה, לפי רגישות לעוצמת הסאונד — לא זיהוי
- * דיבור אמיתי, לפי בקשה מפורשת "לא צריך להיות מדויק במאה אחוז" (אבל כן
- * מדויק יותר מחלוקה שווה בין מילים — ראו wordTimingWeight). מעריכה זמן
- * "צפוי" לכל גבול בין שתי מילים לפי האורך המצטבר של המילים עד כה, ואז
- * "נמשכת" מהזמן הצפוי הזה לנקודת העוצמה-הנמוכה ביותר בסביבתו הקרובה —
- * כלומר לרגע הכי דומה לרווח/שקט קצר בין מילים. תמיד מחזירה בדיוק
- * words.length נקודות התחלה (הראשונה = speechStartSeconds).
+ * מאתרת הפסקות שקט "אמיתיות" על פני ההקלטה *כולה* בסריקה אחת — לא ליד מילה
+ * בודדת. דורשת גם עומק (עוצמה נמוכה יחסית למקסימום) וגם משך מינימלי (0.12
+ * שנייה) — עיצורים חדים בתוך מילה (למשל "ת", "ק") יוצרים "שקט" של חלון-שניים
+ * שאין לבלבל עם הפסקה בין מילים/משפטים. זו רשימת המועמדים היחידה ל"עוגן"
+ * אמיתי בזמן — לא מחפשים שקט מקומי בסביבת כל מילה (זה מה שגרם ל"קפיצות"
+ * בגרסה הקודמת: חלון חיפוש קטן ליד כל מילה תפס בליפים רגעיים כאילו הם
+ * הפסקה אמיתית).
+ */
+function detectSilenceGaps(energies: number[], windowSeconds: number): SilenceGap[] {
+  const maxEnergy = Math.max(...energies, 1);
+  const threshold = maxEnergy * 0.22;
+  const minWindows = Math.max(1, Math.round(0.12 / windowSeconds));
+  const gaps: SilenceGap[] = [];
+  let runStart = -1;
+  for (let i = 0; i <= energies.length; i++) {
+    const below = i < energies.length && energies[i] < threshold;
+    if (below) {
+      if (runStart === -1) runStart = i;
+    } else if (runStart !== -1) {
+      if (i - runStart >= minWindows) {
+        gaps.push({ center: ((runStart + i) / 2) * windowSeconds });
+      }
+      runStart = -1;
+    }
+  }
+  return gaps;
+}
+
+/**
+ * מזהה תזמון גס למילים בהקלטת הקראה — לא זיהוי דיבור אמיתי, לפי בקשה
+ * מפורשת "לא צריך להיות מדויק במאה אחוז", אבל גם לא חלוקה פרופורציונלית
+ * גרידא (ראו wordTimingWeight). הגישה (הוחלפה — הקודמת, "חיפוש שקט מקומי
+ * ליד כל מילה", עדיין "קפצה" בגלל בליפים רגעיים בתוך מילים):
+ * 1. מאתרת הפסקות שקט אמיתיות על פני ההקלטה *כולה* (detectSilenceGaps) —
+ *    משך+עומק מינימליים, לא סביבה מקומית ליד מילה ספציפית.
+ * 2. "עוגנים" רק בגבולות משפט/פסיק (סוף מילה שמסתיים ב-.!?, או פסיק
+ *    כשאין מספיק גבולות משפט) — התאמה חמדנית-מונוטונית של כל גבול כזה לפער
+ *    השקט הקרוב ביותר לאומדן הפרופורציונלי שלו, רק אם קרוב מספיק (לא "גונב"
+ *    פער שקשור בפועל למשהו אחר).
+ * 3. כל מילה *בין* שני עוגנים (או לפני/אחרי כולם) מקבלת זמן באינטרפולציה
+ *    לינארית לפי המשקל המצטבר שלה בתוך הקטע המעוגן — בלי לנסות "לתפוס" שקט
+ *    מקומי בעצמה. כך שגיאת הערכה מתאפסת בכל משפט (בעוגן האמיתי הבא), ומילים
+ *    בתוך משפט לא קופצות לבליפים מקריים.
+ * תמיד מחזירה בדיוק words.length נקודות התחלה (הראשונה = speechStartSeconds).
  */
 function detectWordTimestamps(
   energies: number[],
@@ -472,42 +513,68 @@ function detectWordTimestamps(
 
   const activeSeconds = Math.max(0.1, totalSeconds - speechStartSeconds);
   const weights = words.map(wordTimingWeight);
-  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
-  const averageGap = activeSeconds / words.length;
-  // הצומצם (היה 0.6/0.4) — לפי משוב מפורש שהתזמון עדיין "קופץ": חיפוש רחב
-  // מדי ליד ההערכה הפרופורציונלית יכול "לתפוס" בליפ שקט רגעי בתוך המילה
-  // השכנה כאילו זו הפסקה אמיתית, ולקפוץ לשם בטעות.
-  const searchRadiusSeconds = Math.min(averageGap * 0.45, 0.3);
+  // cumulative[i] = סכום המשקלים של words[0..i-1] — cumulative[0]=0,
+  // cumulative[words.length]=totalWeight. cumulative[k] הוא "הגבול לפני מילה k".
+  const cumulative: number[] = new Array(words.length + 1).fill(0);
+  for (let i = 0; i < words.length; i++) cumulative[i + 1] = cumulative[i] + weights[i];
+  const totalWeight = cumulative[words.length];
 
-  const timestamps: number[] = [speechStartSeconds];
-  let cumulativeWeight = 0;
+  const idealTimeAt = (index: number) => speechStartSeconds + activeSeconds * (cumulative[index] / totalWeight);
 
-  for (let k = 1; k < words.length; k++) {
-    cumulativeWeight += weights[k - 1];
-    const idealTime = speechStartSeconds + activeSeconds * (cumulativeWeight / totalWeight);
-    const idealIndex = Math.min(energies.length - 1, Math.max(0, Math.round(idealTime / windowSeconds)));
-    const loIndex = Math.max(0, Math.floor((idealTime - searchRadiusSeconds) / windowSeconds));
-    const hiIndex = Math.min(energies.length - 1, Math.ceil((idealTime + searchRadiusSeconds) / windowSeconds));
+  const gaps = detectSilenceGaps(energies, windowSeconds);
 
-    let bestIndex = idealIndex;
-    let bestEnergy = energies[idealIndex] ?? Infinity;
-    for (let i = loIndex; i <= hiIndex; i++) {
-      if (energies[i] < bestEnergy) {
-        bestEnergy = energies[i];
-        bestIndex = i;
+  /** התאמה חמדנית-מונוטונית: כל אינדקס-גבול ב-boundaryIndices מקבל את פער
+   * השקט הקרוב ביותר לאומדן שלו (מתוך מה שעדיין פנוי, קדימה מהעוגן הקודם),
+   * רק אם המרחק בתוך הסטייה המותרת. משנה את anchors/gapCursor במקום. */
+  function anchorBoundaries(boundaryIndices: number[], anchors: { index: number; time: number }[], maxDeviation: number, usedGaps: Set<number>) {
+    for (const k of boundaryIndices) {
+      const ideal = idealTimeAt(k);
+      const prevAnchorTime = anchors[anchors.length - 1].time;
+      let bestGapIdx = -1;
+      let bestDist = Infinity;
+      for (let g = 0; g < gaps.length; g++) {
+        if (usedGaps.has(g)) continue;
+        if (gaps[g].center <= prevAnchorTime) continue;
+        const dist = Math.abs(gaps[g].center - ideal);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestGapIdx = g;
+        }
+      }
+      if (bestGapIdx !== -1 && bestDist <= maxDeviation) {
+        usedGaps.add(bestGapIdx);
+        anchors.push({ index: k, time: Math.max(gaps[bestGapIdx].center, prevAnchorTime + 0.05) });
       }
     }
+    anchors.sort((a, b) => a.index - b.index);
+  }
 
-    // מקבלים את הנקודה השקטה-יותר שנמצאה רק אם היא *משמעותית* יותר שקטה
-    // מהנקודה הצפויה עצמה (לא רק "השקטה ביותר בחלון", שיכולה להיות עדיין
-    // חלק מדיבור רגיל) — אחרת נשארים עם ההערכה הפרופורציונלית. זה מה שמונע
-    // "קפיצות" לרעש/בליפ קצר שאינו הפסקה אמיתית בין מילים.
-    const idealEnergy = energies[idealIndex] ?? bestEnergy;
-    const snappedIndex = bestEnergy < idealEnergy * 0.75 ? bestIndex : idealIndex;
+  const sentenceEndIndices: number[] = [];
+  const commaIndices: number[] = [];
+  for (let k = 1; k < words.length; k++) {
+    if (/[.!?]$/.test(words[k - 1])) sentenceEndIndices.push(k);
+    else if (/[,;:]$/.test(words[k - 1])) commaIndices.push(k);
+  }
 
-    const candidateTime = snappedIndex * windowSeconds;
-    // ביטחון נוסף למונוטוניות (בפועל כבר מובטח כי חלונות החיפוש לא חופפים).
-    timestamps.push(Math.max(candidateTime, timestamps[k - 1] + 0.05));
+  const anchors: { index: number; time: number }[] = [{ index: 0, time: speechStartSeconds }];
+  const usedGaps = new Set<number>();
+  // סטיה מותרת רחבה יחסית לגבולות משפט (הביטחון הגבוה ביותר), צמודה יותר
+  // לפסיקים (פחות בטוח שיש שם הפסקה אמיתית בכלל — לא רוצים "לגנוב" פער
+  // שמתאים בפועל למשפט אחר קרוב יותר).
+  anchorBoundaries(sentenceEndIndices, anchors, Math.max(0.35, activeSeconds * 0.09), usedGaps);
+  anchorBoundaries(commaIndices, anchors, Math.max(0.2, activeSeconds * 0.05), usedGaps);
+  anchors.push({ index: words.length, time: speechStartSeconds + activeSeconds });
+
+  const timestamps: number[] = new Array(words.length);
+  for (let a = 0; a < anchors.length - 1; a++) {
+    const from = anchors[a];
+    const to = anchors[a + 1];
+    const segWeight = cumulative[to.index] - cumulative[from.index];
+    for (let k = from.index; k < to.index; k++) {
+      const fraction = segWeight > 0 ? (cumulative[k] - cumulative[from.index]) / segWeight : 0;
+      const raw = from.time + fraction * (to.time - from.time);
+      timestamps[k] = k === 0 ? raw : Math.max(raw, timestamps[k - 1] + 0.03);
+    }
   }
 
   return timestamps;

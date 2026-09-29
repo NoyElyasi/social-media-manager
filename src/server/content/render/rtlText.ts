@@ -37,6 +37,14 @@ const HAS_HEBREW_REGEX = new RegExp("[\\u0590-\\u05FF]");
 // נפרדת, ומציבים את שתיהן ב-row-reverse (ליבה מימין, פיסוק משמאל).
 const TRAILING_PUNCT_REGEX = /[.,!?;]+$/;
 
+// אותו כחול שכבר בשימוש לתגיות/קישורים (FB_LINK_COLOR ב-carouselSlide.ts,
+// #385898) — לפי בקשה מפורשת: מילה שמתחילה ב-@ בטקסט הגוף עצמו (לא רק
+// שורת התגיות הנפרדת) צבועה כמו תיוג, לא בצבע הטקסט הרגיל.
+const MENTION_COLOR = "#385898";
+function isMentionWord(word: string): boolean {
+  return word.length > 1 && word[0] === "@";
+}
+
 function charsRow(chars: string[], visibleCount: number): SatoriNode {
   return h(
     "div",
@@ -128,7 +136,12 @@ export function buildWordRowNode(
         ...style,
       },
     },
-    ...orderedIndices.map((i) => renderWordNode(words[i], revealedChars ? revealedChars[i] : Infinity))
+    ...orderedIndices.map((i) => {
+      const node = renderWordNode(words[i], revealedChars ? revealedChars[i] : Infinity);
+      // עוקף את צבע השורה שעלול לזלוג לילדים (inheritance) רק למילות תיוג —
+      // שאר המילים ממשיכות לקבל את צבע השורה הרגיל כמו קודם.
+      return isMentionWord(words[i]) ? h("div", { style: { display: "flex", color: MENTION_COLOR } }, node) : node;
+    })
   );
 }
 

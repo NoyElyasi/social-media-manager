@@ -181,6 +181,10 @@ export interface RecommendedNotionSegment {
   tag: string;
   preview: string;
   pageUrl: string;
+  // פוסט קיים (בכל סטטוס, גם טיוטה "בהכנה") שיש לו כבר את התגית הזו
+  // בהאשטגים שלו, אם יש — כדי להציע חיבור לפוסט קיים במקום ליצור כפול, גם
+  // כשהפוסט נוצר ידנית בלי לעבור בקישור העומק ?notionTag=. ראו buildExistingPostByTagMap.
+  existingPostId: string | null;
 }
 
 export interface WeekSlot {
@@ -306,6 +310,33 @@ async function buildMediaFormatMap(slots: { matchedInstagramMediaId?: string | n
 }
 
 /**
+ * מפה tag(מנורמל)->postId לפוסטים קיימים (כל סטטוס, גם טיוטה "בהכנה") עם
+ * תגית תואמת בהאשטגים שלהם — כדי שהצעת "קטע מוכן מנושיין" תציע חיבור לפוסט
+ * שכבר קיים במקום ליצור כפול, גם כשהפוסט נוצר ידנית (בלי notionTag רשום
+ * על הפוסט) — בדיוק כמו שהתגית משמשת לזיהוי בכל מקום אחר בכלי (ראו
+ * reconcileScheduleWithInstagram).
+ */
+async function buildExistingPostByTagMap(slots: { plannedNotionTag?: string | null }[]): Promise<Map<string, string>> {
+  const normalizedTags = new Set(slots.map((s) => s.plannedNotionTag).filter((t): t is string => !!t).map(normalizeTagText));
+  if (normalizedTags.size === 0) return new Map();
+  const posts = await prisma.post.findMany({ select: { id: true, hashtags: true } });
+  const map = new Map<string, string>();
+  for (const post of posts) {
+    let tags: string[];
+    try {
+      tags = JSON.parse(post.hashtags || "[]");
+    } catch {
+      continue;
+    }
+    for (const t of tags) {
+      const normalized = normalizeTagText(t);
+      if (normalizedTags.has(normalized) && !map.has(normalized)) map.set(normalized, post.id);
+    }
+  }
+  return map;
+}
+
+/**
  * תגיות נושיין שכבר "נתפסו" ע"י סלוט קיים — כדי לא להציע את אותו קטע
  * פעמיים. נספרות רק תפיסות משבוע נתון (since) ואילך: תפיסה משבוע שכבר עבר
  * ולא טופל (לא הפכה לפוסט בפועל) היא "הצעה שלא נוצלה" — היא לא צריכה
@@ -344,7 +375,7 @@ function toSlot(row: {
         post: { hashtags: string; notionUrl: string | null; aiFormat: string | null };
       }
     | null;
-}, strength: StrengthData, engagement: EngagementData, candidateMap: Map<string, NextReelCandidate>, mediaFormatMap: Map<string, string | null>): WeekSlot {
+}, strength: StrengthData, engagement: EngagementData, candidateMap: Map<string, NextReelCandidate>, mediaFormatMap: Map<string, string | null>, existingPostByTagMap: Map<string, string>): WeekSlot {
   const dateStr = formatCalendarDate(row.date);
   const dayOfWeek = row.date.getUTCDay();
   // פורמט בזמן היצירה (plannedFormat) — ואם ריק (השיבוץ נוצר/עודכן מפרסום
@@ -365,7 +396,12 @@ function toSlot(row: {
     recommendedFormat,
     recommendedReelCandidate: row.plannedReelCandidateMediaId ? candidateMap.get(row.plannedReelCandidateMediaId) ?? null : null,
     recommendedNotionSegment: row.plannedNotionTag
-      ? { tag: row.plannedNotionTag, preview: row.plannedNotionPreview ?? "", pageUrl: row.plannedNotionPageUrl ?? "" }
+      ? {
+          tag: row.plannedNotionTag,
+          preview: row.plannedNotionPreview ?? "",
+          pageUrl: row.plannedNotionPageUrl ?? "",
+          existingPostId: existingPostByTagMap.get(normalizeTagText(row.plannedNotionTag)) ?? null,
+        }
       : null,
     actualStatus: row.actualStatus as "pending" | "done" | "skipped",
     actualAt: row.actualAt ? row.actualAt.toISOString() : null,
@@ -387,7 +423,8 @@ export async function getWeekPlan(weekStart: Date): Promise<WeekPlan> {
   const { existingSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles } = await loadWeekContext(weekStart);
   const candidateMap = await buildCandidateMap(existingSlots);
   const mediaFormatMap = await buildMediaFormatMap(existingSlots);
-  return buildPlanResponse(weekStart, existingSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles, candidateMap, mediaFormatMap);
+  const existingPostByTagMap = await buildExistingPostByTagMap(existingSlots);
+  return buildPlanResponse(weekStart, existingSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles, candidateMap, mediaFormatMap, existingPostByTagMap);
 }
 
 /**
@@ -820,7 +857,8 @@ export async function generateWeeklySchedule(weekStart: Date, options: { cascade
   const allSlots = [...manualSlots, ...createdSlots];
   const candidateMap = await buildCandidateMap(allSlots);
   const mediaFormatMap = await buildMediaFormatMap(allSlots);
-  return buildPlanResponse(weekStart, allSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles, candidateMap, mediaFormatMap);
+  const existingPostByTagMap = await buildExistingPostByTagMap(allSlots);
+  return buildPlanResponse(weekStart, allSlots, blockedDays, specialDays, strength, engagement, formatAlerts, formatPerf, topAngles, candidateMap, mediaFormatMap, existingPostByTagMap);
 }
 
 /** שבועות עתידיים (אחרי weekStart) שיש בהם כבר סלוט אוטומטי — למי שצריך ריענון לאחר שהשבוע הקרוב תפס תוכן/מועמדים. */
@@ -1176,10 +1214,11 @@ function buildPlanResponse(
   formatPerf: FormatPerformance,
   topAngles: ContentAngle[],
   candidateMap: Map<string, NextReelCandidate>,
-  mediaFormatMap: Map<string, string | null>
+  mediaFormatMap: Map<string, string | null>,
+  existingPostByTagMap: Map<string, string>
 ): WeekPlan {
   const slots = slotsRaw
-    .map((row) => toSlot(row, strength, engagement, candidateMap, mediaFormatMap))
+    .map((row) => toSlot(row, strength, engagement, candidateMap, mediaFormatMap, existingPostByTagMap))
     .sort((a, b) => (a.date === b.date ? a.hour - b.hour : a.date.localeCompare(b.date)));
 
   const days = Array.from({ length: 7 }, (_, i) => {
