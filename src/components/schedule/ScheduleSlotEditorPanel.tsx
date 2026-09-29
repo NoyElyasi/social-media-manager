@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { PLATFORM_LABELS } from "@/lib/labels";
+import { PLATFORM_LABELS, newPostHrefForCaption } from "@/lib/labels";
 import type { WeekSlot } from "@/lib/weeklySchedule";
 import OpenFolderButton from "@/components/OpenFolderButton";
 
@@ -403,7 +403,12 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
                     + הוסיפי ריל לתוכן הזה
                   </Link>
                 ) : (
-                  <span className="text-[11px] text-brand-maroon/40">התוכן לא מקושר לפוסט בכלי — אין אפשרות להוסיף ריל ישירות מכאן</span>
+                  <Link
+                    href={newPostHrefForCaption(recommendedReelCandidate.caption)}
+                    className="self-start rounded-md bg-brand-red px-2 py-1 text-white text-xs hover:bg-brand-red-dark"
+                  >
+                    + יצירת פוסט חדש
+                  </Link>
                 )}
               </div>
             )}

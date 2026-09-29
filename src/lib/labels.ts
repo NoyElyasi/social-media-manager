@@ -44,3 +44,9 @@ const DEFAULT_POST_TYPE_STYLE = { solid: "bg-neutral-100 text-neutral-700", bord
 export function postTypeStyle(type: string | null): { solid: string; border: string } {
   return (type && POST_TYPE_STYLES[type]) || DEFAULT_POST_TYPE_STYLE;
 }
+
+/** קישור ליצירת פוסט חדש לתוכן שכבר פורסם באינסטגרם — התגית הייחודית מהכיתוב (לא #אחתביום) מחפשת את הקטע בנושיין. */
+export function newPostHrefForCaption(caption: string | null): string {
+  const tag = (caption?.match(/#[^\s#@]+/g) ?? []).find((t) => t !== ALWAYS_FIRST_HASHTAG);
+  return tag ? `/posts/new?notionTag=${encodeURIComponent(tag)}` : "/posts/new";
+}

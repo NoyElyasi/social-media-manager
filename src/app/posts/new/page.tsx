@@ -172,7 +172,7 @@ export default function NewPostPage() {
           return;
         }
         if (!data.segment) {
-          setNotionError("לא נמצא קטע מוכן עם התגית הזו ב-Notion");
+          setNotionError("לא נמצא קטע עם התגית הזו ב-Notion");
           return;
         }
         setNotionTag(tag);
@@ -325,7 +325,7 @@ export default function NewPostPage() {
       return;
     }
     if (!data.segment) {
-      setNotionError("לא נמצא קטע מוכן עם התגית הזו ב-Notion");
+      setNotionError("לא נמצא קטע עם התגית הזו ב-Notion");
       return;
     }
     setNotionSegment(data.segment);
@@ -482,7 +482,7 @@ export default function NewPostPage() {
 
       <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3 bg-brand-pink/10">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="text-sm font-medium">ייבוא קטע מוכן מ-Notion (לפי התגית הראשונה שלמעלה)</span>
+          <span className="text-sm font-medium">ייבוא קטע מ-Notion (לפי התגית הראשונה שלמעלה)</span>
           <button
             type="button"
             onClick={handleNotionLookup}

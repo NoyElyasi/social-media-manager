@@ -4,7 +4,7 @@ import { getProfileSettings } from "@/server/settings/profile";
 import { isRealisticPostHour } from "@/lib/reachInsights";
 import { getMetaConnectionStatus, isDashboardSyncRunning } from "@/server/settings/meta";
 import DashboardSyncPanel from "@/components/dashboard/DashboardSyncPanel";
-import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
+import { ALWAYS_FIRST_HASHTAG, newPostHrefForCaption } from "@/lib/labels";
 import { BarComparisonCard, ChartScrollRow, GroupedBarCard, LineTrendCard, PieBreakdownCard, type BarDatum } from "@/components/dashboard/ChartCard";
 import RecommendationCard, { type RecommendationBreakdownRow } from "@/components/dashboard/RecommendationCard";
 import InstagramMediaLabelEditor from "@/components/InstagramMediaLabelEditor";
@@ -768,7 +768,12 @@ export default async function DashboardPage({
                       + הוסיפי ריל לתוכן הזה
                     </Link>
                   ) : (
-                    <p className="text-brand-maroon/40">התוכן לא מקושר לפוסט בכלי — אין אפשרות להוסיף ריל ישירות מכאן</p>
+                    <Link
+                      href={newPostHrefForCaption(row.caption)}
+                      className="rounded-md bg-brand-red px-2 py-1 text-center text-white hover:bg-brand-red-dark"
+                    >
+                      + יצירת פוסט חדש
+                    </Link>
                   )}
                 </div>
               );
