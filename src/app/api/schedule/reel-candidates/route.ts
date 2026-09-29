@@ -14,7 +14,7 @@ export async function GET() {
   const claimedMediaIds = new Set(
     (
       await prisma.scheduledSlot.findMany({
-        where: { plannedReelCandidateMediaId: { not: null }, date: { gte: parseCalendarDate(today) } },
+        where: { plannedReelCandidateMediaId: { not: null }, actualStatus: "pending", date: { gte: parseCalendarDate(today) } },
         select: { plannedReelCandidateMediaId: true },
       })
     ).map((s) => s.plannedReelCandidateMediaId as string)

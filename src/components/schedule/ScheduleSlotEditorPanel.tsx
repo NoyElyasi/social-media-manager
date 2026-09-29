@@ -86,9 +86,9 @@ export default function ScheduleSlotEditorPanel({ target, onClose }: { target: E
   }
 
   async function ensureReelCandidates() {
-    if (reelCandidates || reelCandidatesLoading) return;
+    if (reelCandidatesLoading) return;
     setReelCandidatesLoading(true);
-    const res = await fetch("/api/schedule/reel-candidates");
+    const res = await fetch("/api/schedule/reel-candidates", { cache: "no-store" });
     const data = await res.json();
     setReelCandidates(data.candidates ?? []);
     setReelCandidatesLoading(false);
