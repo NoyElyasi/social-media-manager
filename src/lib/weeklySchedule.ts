@@ -947,7 +947,7 @@ async function ensureTodaySynced(): Promise<void> {
     ? Math.ceil((Date.now() - profile.lastDashboardSyncAt.getTime()) / (24 * 60 * 60 * 1000))
     : 30;
   try {
-    await syncLatestInstagramMedia(Math.min(50, 8 + daysSinceSync * 4));
+    await syncLatestInstagramMedia(Math.min(50, 8 + daysSinceSync * 4), { type: "auto" });
   } catch {
     // אין חיבור פעיל ל-Meta / כשל ברשת — לא עוצרים את הסנכרון בפועל בגלל זה.
   }

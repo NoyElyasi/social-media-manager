@@ -1,6 +1,5 @@
 import { getProfileSettings, parseBackgroundEntries, parseDefaultBackgroundPaths } from "@/server/settings/profile";
 import { getMetaConnectionStatus } from "@/server/settings/meta";
-import { prisma } from "@/server/db";
 import { buildFileUrlFromPath } from "@/lib/files";
 import ProfileSettingsForm from "@/components/ProfileSettingsForm";
 import BackgroundGallery from "@/components/BackgroundGallery";
@@ -20,7 +19,6 @@ export default async function SettingsPage() {
   const coverBackgroundEntries = parseBackgroundEntries(profile.coverBackgroundImagePaths);
   const aiThemeOptions: string[] = JSON.parse(profile.aiThemeOptions || "[]");
   const metaStatus = await getMetaConnectionStatus();
-  const latestSyncedPost = await prisma.instagramMedia.findFirst({ orderBy: { timestamp: "desc" }, select: { timestamp: true } });
 
   const tabs = [
     {
@@ -29,11 +27,7 @@ export default async function SettingsPage() {
       content: (
         <div className="rounded-xl border border-brand-pink/30 bg-brand-card p-5">
           <h2 className="mb-3 font-bold text-brand-maroon">חיבור לאינסטגרם/פייסבוק</h2>
-          <MetaConnectionForm
-            initial={metaStatus}
-            lastDashboardSyncAt={profile.lastDashboardSyncAt ? profile.lastDashboardSyncAt.toISOString() : null}
-            latestSyncedPostAt={latestSyncedPost ? latestSyncedPost.timestamp.toISOString() : null}
-          />
+          <MetaConnectionForm initial={metaStatus} />
         </div>
       ),
     },

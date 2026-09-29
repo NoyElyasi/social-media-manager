@@ -15,6 +15,7 @@ npm install
 
 echo "מריצה מיגרציות סכמה חדשות לדאטהבייס (אם יש — לא נוגע בנתונים קיימים)..."
 npx prisma migrate deploy
+npx prisma generate
 
 echo "מייצרת מחדש את לקוח Prisma (לא ב-git, ובלעדיו הקוד לא מכיר שדות חדשים בסכמה)..."
 npx prisma generate

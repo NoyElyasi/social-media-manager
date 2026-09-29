@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/server/db";
 import { getProfileSettings } from "@/server/settings/profile";
+import { getMetaConnectionStatus, isDashboardSyncRunning } from "@/server/settings/meta";
+import DashboardSyncPanel from "@/components/dashboard/DashboardSyncPanel";
 import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
 import { BarComparisonCard, ChartScrollRow, GroupedBarCard, LineTrendCard, PieBreakdownCard, type BarDatum } from "@/components/dashboard/ChartCard";
 import RecommendationCard, { type RecommendationBreakdownRow } from "@/components/dashboard/RecommendationCard";
@@ -12,7 +14,7 @@ import { getSpecialDays } from "@/lib/holidays";
 export const dynamic = "force-dynamic";
 
 // כל הנתונים כאן מגיעים מה-cache המקומי של Instagram Graph API (InstagramMedia)
-// — שנסונכרן ידנית מההגדרות ("סנכרון הדשבורד"). אין תלות בתוכן שנוצר בכלי
+// — שנסונכרן ידנית מהדשבורד. אין תלות בתוכן שנוצר בכלי
 // הזה, מלבד אורך הריל (durationSeconds) — שדה אופציונלי שממולא רק אם הפוסט
 // קושר לתוכן שנוצר בכלי, כי ה-API לא חושף אורך וידאו בעצמו.
 interface Row {
@@ -243,6 +245,8 @@ export default async function DashboardPage({
   const { theme: filterTheme, format: filterFormat, sort: sortBy } = await searchParams;
   const media = await prisma.instagramMedia.findMany({ orderBy: { timestamp: "asc" } });
   const profile = await getProfileSettings();
+  const metaStatus = await getMetaConnectionStatus();
+  const syncStillRunning = isDashboardSyncRunning(profile);
   const aiThemeOptions: string[] = JSON.parse(profile.aiThemeOptions || "[]");
 
   // דמוגרפיית עוקבים — תמונת מצב עדכנית (לא היסטוריה), נשלפת עם סנכרון הדשבורד.
@@ -702,14 +706,22 @@ export default async function DashboardPage({
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold text-brand-maroon">דשבורד אנליטיקס</h1>
 
+      <DashboardSyncPanel
+        connected={metaStatus.connected}
+        lastSyncAt={profile.lastDashboardSyncAt ? profile.lastDashboardSyncAt.toISOString() : null}
+        lastType={profile.lastDashboardSyncType}
+        runningType={syncStillRunning ? profile.dashboardSyncRunningType : null}
+        runningSince={syncStillRunning ? profile.dashboardSyncRunningSince!.toISOString() : null}
+      />
+
       <p className="text-sm text-brand-maroon/60">
         כל הנתונים כאן מבוססים על מה שסונכרן בפועל מהאינסטגרם שלך — לא על תוכן מהכלי (מלבד אורך ריל, שמגיע מהכלי רק
-        אם קושר). {rows.length} פוסטים מסונכרנים כרגע. לסנכרון עדכני, יש כפתור בעמוד ההגדרות.
+        אם קושר). {rows.length} פוסטים מסונכרנים כרגע.
       </p>
 
       {rows.length === 0 && (
         <p className="rounded-lg border border-brand-pink/30 bg-white p-6 text-center text-brand-maroon/50">
-          עוד לא סונכרן אף פוסט מהאינסטגרם. עברי להגדרות ולחצי על &quot;סנכרן את הדשבורד&quot;.
+          עוד לא סונכרן אף פוסט מהאינסטגרם.
         </p>
       )}
 

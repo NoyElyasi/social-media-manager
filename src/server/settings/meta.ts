@@ -427,7 +427,39 @@ async function syncMediaItems(
   return syncedCount;
 }
 
-export async function syncInstagramMediaSince(
+export type DashboardSyncType = "full" | "quick" | "auto";
+
+const STALE_SYNC_RUNNING_MS = 30 * 60 * 1000;
+
+export function isDashboardSyncRunning(profile: { dashboardSyncRunningType: string | null; dashboardSyncRunningSince: Date | null }): boolean {
+  return !!profile.dashboardSyncRunningType && !!profile.dashboardSyncRunningSince && Date.now() - profile.dashboardSyncRunningSince.getTime() < STALE_SYNC_RUNNING_MS;
+}
+
+/** מסמנת בשורת ההגדרות שסנכרון רץ עכשיו (נמחק תמיד בסיום, גם בכישלון/ביטול). */
+async function trackRunningSync<T>(type: DashboardSyncType, run: () => Promise<T>): Promise<T> {
+  await getProfileSettings();
+  await prisma.profileSettings.update({
+    where: { id: "default" },
+    data: { dashboardSyncRunningType: type, dashboardSyncRunningSince: new Date() },
+  });
+  try {
+    return await run();
+  } finally {
+    await prisma.profileSettings.update({
+      where: { id: "default" },
+      data: { dashboardSyncRunningType: null, dashboardSyncRunningSince: null },
+    });
+  }
+}
+
+export function syncInstagramMediaSince(
+  sinceDate: Date,
+  options?: { signal?: AbortSignal; onProgress?: (synced: number, total: number) => void }
+): Promise<{ syncedCount: number }> {
+  return trackRunningSync("full", () => runFullSync(sinceDate, options));
+}
+
+async function runFullSync(
   sinceDate: Date,
   options?: { signal?: AbortSignal; onProgress?: (synced: number, total: number) => void }
 ): Promise<{ syncedCount: number }> {
@@ -445,6 +477,7 @@ export async function syncInstagramMediaSince(
     where: { id: "default" },
     data: {
       lastDashboardSyncAt: new Date(),
+      lastDashboardSyncType: "full",
       ...(audience.genderJson !== null ? { audienceGenderJson: audience.genderJson } : {}),
       ...(audience.ageJson !== null ? { audienceAgeJson: audience.ageJson } : {}),
       ...(audience.countryJson !== null ? { audienceCountryJson: audience.countryJson } : {}),
@@ -461,8 +494,19 @@ export async function syncInstagramMediaSince(
  * לא רלוונטי כשמסנכרנים "כמה פוסטים אחרונים"). מיועד לעדכון זריז בין
  * סנכרונים מלאים, לא כתחליף להם.
  */
-export async function syncLatestInstagramMedia(
+export function syncLatestInstagramMedia(
   limit: number,
+  options?: { signal?: AbortSignal; onProgress?: (synced: number, total: number) => void; type?: "quick" | "auto" }
+): Promise<{ syncedCount: number }> {
+  const type = options?.type ?? "quick";
+  // סנכרון אוטומטי (מתוך התכנון) קצר ושקט — לא מוצג בלוח כ"רץ עכשיו".
+  if (type === "auto") return runLatestSync(limit, type, options);
+  return trackRunningSync(type, () => runLatestSync(limit, type, options));
+}
+
+async function runLatestSync(
+  limit: number,
+  type: "quick" | "auto",
   options?: { signal?: AbortSignal; onProgress?: (synced: number, total: number) => void }
 ): Promise<{ syncedCount: number }> {
   const { accessToken } = await requireMetaConnection();
@@ -472,7 +516,7 @@ export async function syncLatestInstagramMedia(
   await getProfileSettings();
   await prisma.profileSettings.update({
     where: { id: "default" },
-    data: { lastDashboardSyncAt: new Date() },
+    data: { lastDashboardSyncAt: new Date(), lastDashboardSyncType: type },
   });
 
   return { syncedCount };

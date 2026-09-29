@@ -282,6 +282,11 @@ model ProfileSettings {
   // מתי הופעל לאחרונה סנכרון הדשבורד בפועל (ראו syncInstagramMediaSince) —
   // שונה מה"טווח" שמסונכרן (התאריך העדכני ביותר בין הפוסטים עצמם).
   lastDashboardSyncAt DateTime?
+  // סוג הסנכרון האחרון ("full"/"quick"/"auto"), וסנכרון שרץ ברגע זה (נמחק
+  // בסיומו) — כדי שהלוח יציג סטטוס גם אחרי מעבר בין עמודים.
+  lastDashboardSyncType      String?
+  dashboardSyncRunningType   String?
+  dashboardSyncRunningSince  DateTime?
 
   // תמונת מצב של דמוגרפיית העוקבים (גיל/מין/מדינה) — לא היסטוריה, רק המצב
   // העדכני בזמן הסנכרון האחרון. JSON arrays של {label, value}.
