@@ -148,9 +148,8 @@ export default function NewPostPage() {
   // מחפש אוטומטית את הקטע המתאים בנושיין בלי להקליד את התגית שוב. לחיצה על
   // "יצירת פוסט מהקטע הזה" היא בקשה מפורשת לקטע *הזה* — לכן זה תמיד דורס
   // תגית ישנה שנשארה בטיוטה מקומית (אחרת קטע ב' תמיד יראה את תוצאת קטע א'
-  // הקודם, כי הטיוטה לא מתאפסת בין ביקורים בעמוד בלי שליחה מוצלחת). את
-  // הטקסט עצמו (rawText) עדיין לא נוגעים כאן — importNotionSegment שואל
-  // אישור בנפרד לפני שמחליף אותו.
+  // הקודם, כי הטיוטה לא מתאפסת בין ביקורים בעמוד בלי שליחה מוצלחת). מאותה
+  // סיבה גם הטקסט והתיוגים נטענים ישר, בלי אישור ובלי לחיצה נוספת.
   useEffect(() => {
     const tag = new URLSearchParams(window.location.search).get("notionTag");
     if (!tag) return;
@@ -158,9 +157,16 @@ export default function NewPostPage() {
       setManualHashtags(tag.startsWith("#") ? tag : `#${tag}`);
       setNotionLoading(true);
     });
-    fetch(`/api/notion/lookup?tag=${encodeURIComponent(tag)}`)
-      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
-      .then(({ ok, data }) => {
+    Promise.all([
+      fetch(`/api/notion/lookup?tag=${encodeURIComponent(tag)}`).then((res) =>
+        res.json().then((data) => ({ ok: res.ok, data }))
+      ),
+      fetch("/api/settings/profile")
+        .then((res) => res.json())
+        .then((d) => (d.profile?.aiThemeOptions ?? []) as string[])
+        .catch(() => [] as string[]),
+    ])
+      .then(([{ ok, data }, themeOptions]) => {
         if (!ok) {
           setNotionError(data.error ?? "החיפוש נכשל");
           return;
@@ -169,10 +175,11 @@ export default function NewPostPage() {
           setNotionError("לא נמצא קטע מוכן עם התגית הזו ב-Notion");
           return;
         }
-        setNotionSegment(data.segment);
         setNotionTag(tag);
+        return applyNotionSegment(data.segment, [tag.startsWith("#") ? tag : `#${tag}`], themeOptions);
       })
       .finally(() => setNotionLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- רץ פעם אחת בטעינה
   }, []);
 
   function insertMarkerAt(
@@ -332,7 +339,7 @@ export default function NewPostPage() {
    * נושא (aiTheme) — ואם היא לא ברשימת הנושאים הקיימת בהגדרות, מוסיפים
    * אותה לשם, כדי שתהיה זמינה לבחירה גם בעתיד.
    */
-  async function applyNotionTypeValue(typeValues: string[]) {
+  async function applyNotionTypeValue(typeValues: string[], knownThemeOptions: string[]) {
     if (typeValues.includes("טיפ")) setPostFormat("tip");
     if (typeValues.includes("מכתב")) setPostFormat("letter");
     if (typeValues.includes("ישן")) setNotionOldFlag(true);
@@ -341,8 +348,8 @@ export default function NewPostPage() {
     if (!theme) return;
 
     setAiTheme(theme);
-    if (!aiThemeOptions.includes(theme)) {
-      const nextOptions = [...aiThemeOptions, theme];
+    if (!knownThemeOptions.includes(theme)) {
+      const nextOptions = [...knownThemeOptions, theme];
       setAiThemeOptions(nextOptions);
       await fetch("/api/settings/profile", {
         method: "PUT",
@@ -352,24 +359,30 @@ export default function NewPostPage() {
     }
   }
 
-  async function importNotionSegment() {
-    if (!notionSegment) return;
-    if (rawText.trim() && !window.confirm("יש כבר טקסט בתיבה — להחליף אותו בטקסט מ-Notion?")) return;
-
-    setRawText(notionSegment.bodyText);
+  async function applyNotionSegment(
+    segment: { pageUrl: string; bodyText: string; typeValues: string[]; tagValues: string[] },
+    baseHashtags: string[],
+    knownThemeOptions: string[]
+  ) {
+    setRawText(segment.bodyText);
     setNotionOldFlag(false);
 
-    const extraTags = notionSegment.tagValues.map((t) => (t.startsWith("#") ? t : `#${t}`));
+    const extraTags = segment.tagValues.map((t) => (t.startsWith("#") ? t : `#${t}`));
     if (extraTags.length > 0) {
-      const existing = manualHashtags.trim().split(/\s+/).filter(Boolean);
-      const merged = [...existing, ...extraTags.filter((t) => !existing.includes(t))];
+      const merged = [...baseHashtags, ...extraTags.filter((t) => !baseHashtags.includes(t))];
       setManualHashtags(merged.join(" "));
     }
 
-    await applyNotionTypeValue(notionSegment.typeValues);
+    await applyNotionTypeValue(segment.typeValues, knownThemeOptions);
 
-    setNotionUrl(notionSegment.pageUrl);
+    setNotionUrl(segment.pageUrl);
     setNotionSegment(null);
+  }
+
+  async function importNotionSegment() {
+    if (!notionSegment) return;
+    if (rawText.trim() && !window.confirm("יש כבר טקסט בתיבה — להחליף אותו בטקסט מ-Notion?")) return;
+    await applyNotionSegment(notionSegment, manualHashtags.trim().split(/\s+/).filter(Boolean), aiThemeOptions);
   }
 
   return (
