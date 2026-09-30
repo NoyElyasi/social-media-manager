@@ -8,6 +8,8 @@ import BackgroundPicker from "@/components/BackgroundPicker";
 import type { BackgroundItem } from "@/components/BackgroundGallery";
 import { buildFileUrlFromPath } from "@/lib/files";
 import NarrationInput, { type CapturedNarration } from "@/components/NarrationInput";
+import HashtagBadge from "@/components/HashtagBadge";
+import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
 
 const MANUAL_SLIDE_BREAK = "///";
 const GLUE_MARKER = "&&";
@@ -28,6 +30,7 @@ export default function EditablePostText({
   initialRevealMode,
   initialIsShort,
   initialHideProgressBar,
+  initialHashtags,
 }: {
   postId: string;
   initialRawText: string;
@@ -47,6 +50,7 @@ export default function EditablePostText({
   /** פוסט "קצר" (מעט מלל) — קרוסלה בלי לוגו פרופיל ובפונט גדול, ריל בפונט גדול, תגית למעלה ומימין. */
   initialIsShort: boolean;
   initialHideProgressBar: boolean;
+  initialHashtags: string[];
 }) {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -68,6 +72,7 @@ export default function EditablePostText({
   const [revealMode, setRevealMode] = useState<"word" | "letter" | "word-center">(initialRevealMode);
   const [isShort, setIsShort] = useState(initialIsShort);
   const [hideProgressBar, setHideProgressBar] = useState(initialHideProgressBar);
+  const [hashtagsInput, setHashtagsInput] = useState(initialHashtags.join(" "));
   const [updateCarousel, setUpdateCarousel] = useState(true);
   const [updateReel, setUpdateReel] = useState(true);
   // undefined = לא נגעה בהקלטה בעריכה הזו — משתמשים מחדש בהקלטה הקיימת
@@ -148,6 +153,7 @@ export default function EditablePostText({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           rawText,
+          hashtags: hashtagsInput.split(/\s+/).filter(Boolean),
           isShort,
           hideProgressBar,
           ...(hasCarousel
@@ -255,6 +261,19 @@ export default function EditablePostText({
         rows={6}
         className="rounded-lg border border-brand-pink/40 p-3 text-base bg-white"
       />
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium">
+          תגיות (משותפות לכל התוכן של הפוסט. <HashtagBadge text={ALWAYS_FIRST_HASHTAG} /> מתווספת אוטומטית, אין צורך לכתוב
+          אותה) <span className="font-normal text-neutral-400">— ייכנסו לתוקף בלחיצה על &quot;שמור טקסט&quot;</span>
+        </label>
+        <input
+          type="text"
+          value={hashtagsInput}
+          onChange={(e) => setHashtagsInput(e.target.value)}
+          className="rounded-md border border-brand-pink/40 text-sm p-1.5 bg-white"
+          placeholder="#תגית2 #תגית3"
+        />
+      </div>
       {hasSplitTarget && (
         <div className="flex gap-2 text-xs">
           <button

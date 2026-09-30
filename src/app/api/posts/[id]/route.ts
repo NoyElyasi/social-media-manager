@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z, flattenError } from "zod";
 import { prisma } from "@/server/db";
-import { updatePostRawText } from "@/server/content/preparePost";
+import { updatePostRawText, updatePostHashtags } from "@/server/content/preparePost";
 import { ReelCancelledError } from "@/server/content/instagramReel";
 import { getStorageService } from "@/server/storage";
 
@@ -35,6 +35,7 @@ const updatePostSchema = z.object({
     .nullable()
     .optional(),
   revealMode: z.enum(["word", "letter", "word-center"]).optional(),
+  hashtags: z.array(z.string()).optional(),
   isShort: z.boolean().optional(),
   hideProgressBar: z.boolean().optional(),
 });
@@ -70,6 +71,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       };
 
       try {
+        if (parsed.data.hashtags) await updatePostHashtags(id, parsed.data.hashtags);
         const post = await updatePostRawText(id, parsed.data.rawText, {
           signal: req.signal,
           onProgress: (rendered, total) => send({ type: "progress", rendered, total }),

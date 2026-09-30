@@ -87,10 +87,10 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
             initialRevealMode={post.revealMode as "word" | "letter" | "word-center"}
             initialIsShort={post.isShort}
             initialHideProgressBar={post.hideProgressBar}
+            initialHashtags={JSON.parse(post.hashtags || "[]")}
           />
           <PostExtras
             postId={post.id}
-            hashtags={JSON.parse(post.hashtags || "[]")}
             existingTypes={visiblePlatformContents.map((pc) => pc.type)}
             rawText={post.rawText}
             splitMode={post.splitMode as "auto" | "manual"}

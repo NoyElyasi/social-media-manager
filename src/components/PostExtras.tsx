@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ALWAYS_FIRST_HASHTAG, SELECTABLE_TARGETS, type SelectedTarget } from "@/lib/labels";
+import { SELECTABLE_TARGETS, type SelectedTarget } from "@/lib/labels";
 import { readNdjsonStream, estimateRemainingSeconds } from "@/lib/ndjsonStream";
 import ReelProgress from "./ReelProgress";
-import HashtagBadge from "./HashtagBadge";
 import BackgroundPicker from "./BackgroundPicker";
 import type { BackgroundItem } from "./BackgroundGallery";
 import { buildFileUrlFromPath } from "@/lib/files";
@@ -36,21 +35,16 @@ function AddTargetButton({
 
 export default function PostExtras({
   postId,
-  hashtags,
   existingTypes,
   rawText,
   splitMode,
 }: {
   postId: string;
-  hashtags: string[];
   existingTypes: string[];
   rawText: string;
   splitMode: "auto" | "manual";
 }) {
   const router = useRouter();
-  const [hashtagsInput, setHashtagsInput] = useState(hashtags.join(" "));
-  const [savingHashtags, setSavingHashtags] = useState(false);
-  const [hashtagsSaved, setHashtagsSaved] = useState(false);
   const [addingTarget, setAddingTarget] = useState<SelectedTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ rendered: number; total: number } | null>(null);
@@ -73,26 +67,6 @@ export default function PostExtras({
         setReelBackgrounds(entries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path), category: e.category })));
       });
   }, [showReelBackgroundPicker]);
-
-  // שמירה קלה — רק שדה, בלי רינדור מחדש של קרוסלה/ריל (ראו updatePostHashtags
-  // ב-preparePost.ts). כדי שהתגית החדשה תיכנס גם לתוכן הקיים בפועל (התמונה/
-  // הסרטון) צריך ללחוץ על "שמור טקסט" למעלה — הכפתור היחיד שמריץ יצירה,
-  // עם התקדמות/ביטול, לפי בקשתה.
-  async function saveHashtags() {
-    setSavingHashtags(true);
-    try {
-      const tags = hashtagsInput.split(/\s+/).filter(Boolean);
-      await fetch(`/api/posts/${postId}/hashtags`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hashtags: tags }),
-      });
-      setHashtagsSaved(true);
-      router.refresh();
-    } finally {
-      setSavingHashtags(false);
-    }
-  }
 
   function cancelAddTarget() {
     abortControllerRef.current?.abort();
@@ -151,38 +125,6 @@ export default function PostExtras({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium">
-          תגיות (משותפות לכל התוכן של הפוסט. <HashtagBadge text={ALWAYS_FIRST_HASHTAG} />{" "}
-          מתווספת אוטומטית, אין צורך לכתוב אותה)
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={hashtagsInput}
-            onChange={(e) => {
-              setHashtagsInput(e.target.value);
-              setHashtagsSaved(false);
-            }}
-            className="flex-1 rounded-md border border-brand-pink/40 text-sm p-1.5 bg-white"
-            placeholder="#תגית2 #תגית3"
-          />
-          <button
-            type="button"
-            onClick={saveHashtags}
-            disabled={savingHashtags}
-            className="shrink-0 rounded-md border border-brand-pink/40 px-3 py-1.5 text-sm hover:bg-brand-pink/10 disabled:opacity-50"
-          >
-            {savingHashtags ? "שומר..." : "שמור תגיות לכל התוכן"}
-          </button>
-        </div>
-        {hashtagsSaved && (
-          <p className="text-xs text-brand-maroon/60">
-            נשמר ✓ — זה רק עדכן את השדה. כדי שהתגית תיכנס גם לתמונה/לסרטון בפועל, לחצי על &quot;שמור טקסט&quot; למעלה.
-          </p>
-        )}
-      </div>
-
       {missingTargets.length > 0 && (
         <div className="flex flex-col gap-2">
           <label className="text-xs font-medium">הוסיפו יעד נוסף לפוסט הזה</label>
