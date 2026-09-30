@@ -36,6 +36,36 @@ const TEMPLATE_TEXT_COLOR = "#4A1420";
 // ודרמטית יותר מטקסט רגיל שמצטבר בכמה שורות.
 const WORD_CENTER_FONT_SIZE = 130;
 
+// פוסט "קצר" (מעט מלל): פונט גדול יותר, והתגית גבוהה וימינית יותר — מוצבת
+// במיקום קבוע מתחת לסטיקרים שבתבנית (ולא צמודה לכתובית), ויושרת לשולי המסך הימניים.
+const SHORT_REEL_FONT_SIZE = MIN_FONT_SIZE_REEL + 56;
+const SHORT_WORD_CENTER_FONT_SIZE = 170;
+const SHORT_HASHTAG_FONT_SIZE = 58;
+const SHORT_HASHTAG_TOP_OFFSET = 470;
+
+function buildHashtagNode(hashtags: string[], textColor: string, isShort: boolean): SatoriNode | false {
+  if (hashtags.length === 0) return false;
+  const fontSize = isShort ? SHORT_HASHTAG_FONT_SIZE : HASHTAG_FONT_SIZE;
+  return h(
+    "div",
+    {
+      style: {
+        display: "flex",
+        position: "absolute",
+        flexDirection: "column",
+        alignItems: "flex-end",
+        ...(isShort ? { top: SHORT_HASHTAG_TOP_OFFSET, right: HORIZONTAL_PADDING } : { bottom: HASHTAG_BOTTOM_OFFSET, right: CAPTION_RIGHT_OFFSET }),
+      },
+    },
+    ...renderPreparedLines(prepareRtlWordLines(hashtags.join(" "), fontSize, REEL_WIDTH - 2 * HORIZONTAL_PADDING), {
+      fontSize,
+      fontWeight: 700,
+      color: textColor,
+      justifyContent: "flex-end",
+    })
+  );
+}
+
 export interface ReelFrameInput {
   /** הטקסט המלא של הכתובית הנוכחית — קבוע לאורך כל אנימציית הכתיבה שלה, כדי
    * שהפריסה/מיקום השורות תמיד יחושבו על הטקסט השלם (ראו revealedUnitCount). */
@@ -49,6 +79,8 @@ export interface ReelFrameInput {
   backgroundImageDataUri?: string | null;
   /** תגיות הפוסט (בלי #אחתביום — היא מוטמעת כבר בתבנית הרקע) — מוצגות למעלה, בנפרד מהכתובית. */
   hashtags: string[];
+  /** פוסט "קצר" — פונט גדול יותר ותגית גבוהה וימינית יותר. */
+  isShort?: boolean;
 }
 
 /**
@@ -62,6 +94,7 @@ export interface ReelFrameInput {
 export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
   const hasTemplate = !!input.backgroundImageDataUri;
   const textColor = hasTemplate ? TEMPLATE_TEXT_COLOR : pickAccessibleTextColor(input.backgroundHex).color;
+  const captionFontSize = input.isShort ? SHORT_REEL_FONT_SIZE : REEL_FONT_SIZE;
 
   return h(
     "div",
@@ -84,24 +117,7 @@ export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
         height: REEL_HEIGHT,
         style: { position: "absolute", top: 0, left: 0, width: REEL_WIDTH, height: REEL_HEIGHT, objectFit: "cover" },
       }),
-    input.hashtags.length > 0 &&
-      h(
-        "div",
-        {
-          style: {
-            display: "flex",
-            position: "absolute",
-            flexDirection: "column",
-            alignItems: "flex-end",
-            bottom: HASHTAG_BOTTOM_OFFSET,
-            right: CAPTION_RIGHT_OFFSET,
-          },
-        },
-        ...renderPreparedLines(
-          prepareRtlWordLines(input.hashtags.join(" "), HASHTAG_FONT_SIZE, REEL_WIDTH - 2 * HORIZONTAL_PADDING),
-          { fontSize: HASHTAG_FONT_SIZE, fontWeight: 700, color: textColor, justifyContent: "flex-end" }
-        )
-      ),
+    buildHashtagNode(input.hashtags, textColor, !!input.isShort),
     h(
       "div",
       {
@@ -116,8 +132,8 @@ export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
         },
       },
       ...renderPreparedLines(
-        prepareRtlWordLines(input.fullText, REEL_FONT_SIZE, REEL_WIDTH - 2 * HORIZONTAL_PADDING - CAPTION_RIGHT_INSET),
-        { fontSize: REEL_FONT_SIZE, fontWeight: 700, color: textColor, justifyContent: "flex-end" },
+        prepareRtlWordLines(input.fullText, captionFontSize, REEL_WIDTH - 2 * HORIZONTAL_PADDING - CAPTION_RIGHT_INSET),
+        { fontSize: captionFontSize, fontWeight: 700, color: textColor, justifyContent: "flex-end" },
         { count: input.revealedUnitCount, granularity: input.revealMode }
       )
     )
@@ -130,6 +146,7 @@ export interface WordCenterFrameInput {
   backgroundHex: string;
   backgroundImageDataUri?: string | null;
   hashtags: string[];
+  isShort?: boolean;
 }
 
 /**
@@ -162,24 +179,7 @@ export function buildWordCenterFrameNode(input: WordCenterFrameInput): SatoriNod
         height: REEL_HEIGHT,
         style: { position: "absolute", top: 0, left: 0, width: REEL_WIDTH, height: REEL_HEIGHT, objectFit: "cover" },
       }),
-    input.hashtags.length > 0 &&
-      h(
-        "div",
-        {
-          style: {
-            display: "flex",
-            position: "absolute",
-            flexDirection: "column",
-            alignItems: "flex-end",
-            bottom: HASHTAG_BOTTOM_OFFSET,
-            right: CAPTION_RIGHT_OFFSET,
-          },
-        },
-        ...renderPreparedLines(
-          prepareRtlWordLines(input.hashtags.join(" "), HASHTAG_FONT_SIZE, REEL_WIDTH - 2 * HORIZONTAL_PADDING),
-          { fontSize: HASHTAG_FONT_SIZE, fontWeight: 700, color: textColor, justifyContent: "flex-end" }
-        )
-      ),
+    buildHashtagNode(input.hashtags, textColor, !!input.isShort),
     input.word &&
       h(
         "div",
@@ -201,7 +201,7 @@ export function buildWordCenterFrameNode(input: WordCenterFrameInput): SatoriNod
         // צמודים למילה (למשל "שלום.") יפוצלו לריצה נפרדת ויוצגו *אחרי*
         // המילה, בדיוק כמו בשאר מצבי הכתיבה (ראו rtlText.ts) — לא לפני, כמו
         // שקורה כשמעבירים לסאטורי מחרוזת RTL גולמית עם פיסוק בסופה.
-        buildWordRowNode([input.word], { fontSize: WORD_CENTER_FONT_SIZE, fontWeight: 700, color: textColor })
+        buildWordRowNode([input.word], { fontSize: input.isShort ? SHORT_WORD_CENTER_FONT_SIZE : WORD_CENTER_FONT_SIZE, fontWeight: 700, color: textColor })
       )
   );
 }

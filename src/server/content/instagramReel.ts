@@ -22,6 +22,8 @@ export type RevealMode = RevealGranularity | "word-center";
 
 // כתוביות קצרות לריל — מסך אחד קטן וקריא, לא פסקה שלמה (סעיף 4.4).
 const MAX_CHARS_PER_CAPTION = 50;
+// פוסט "קצר" משתמש בפונט גדול יותר, אז פחות תווים נכנסים לכתובית.
+const MAX_CHARS_PER_SHORT_CAPTION = 36;
 
 // קצב "כתיבה בלייב" של מילה חדשה על המסך — לא קצב קריאה, רק אפקט חזותי.
 // לפי בקשה מפורשת "בקצב מהיר יותר" (היה 0.28).
@@ -98,6 +100,8 @@ export interface PrepareReelParams {
   onProgress?: (renderedFrames: number, totalFrames: number) => void;
   /** ראו ReelNarration — אופציונלי, לא "נדבק" בין רינדורים. */
   narration?: ReelNarration | null;
+  /** פוסט "קצר" — פונט גדול יותר ותגית גבוהה וימינית יותר (ראו reelFrame.ts). */
+  isShort?: boolean;
 }
 
 async function renderCaptionFrames(
@@ -118,7 +122,8 @@ async function renderCaptionFrames(
   // detectSpeechStartSeconds) — לפי משוב מפורש שההתחלה תמיד שקטה ("לוקח לי
   // זמן להתחיל להקריא"), אז מוסיפים מסגרת פותחת "ריקה" (בלי טקסט חשוף) באורך
   // הזה, כדי שהמילה הראשונה על המסך לא תופיע לפני שבאמת אמרו אותה בהקלטה.
-  leadInSeconds: number
+  leadInSeconds: number,
+  isShort: boolean
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
@@ -135,7 +140,7 @@ async function renderCaptionFrames(
   async function addFrame(fullText: string, revealedUnitCount: number, duration: number): Promise<void> {
     if (signal?.aborted) throw new ReelCancelledError();
     const svg = await renderNodeToSvg(
-      buildReelFrameNode({ fullText, revealedUnitCount, revealMode, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags }),
+      buildReelFrameNode({ fullText, revealedUnitCount, revealMode, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags, isShort }),
       REEL_WIDTH,
       REEL_HEIGHT
     );
@@ -220,7 +225,8 @@ async function renderWordCenterFrames(
   onProgress: ((renderedFrames: number, totalFrames: number) => void) | undefined,
   wordTimestamps: number[] | null,
   narrationTotalSeconds: number | null,
-  leadInSeconds: number
+  leadInSeconds: number,
+  isShort: boolean
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
@@ -230,7 +236,7 @@ async function renderWordCenterFrames(
   async function addFrame(word: string, duration: number): Promise<void> {
     if (signal?.aborted) throw new ReelCancelledError();
     const svg = await renderNodeToSvg(
-      buildWordCenterFrameNode({ word, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags }),
+      buildWordCenterFrameNode({ word, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags, isShort }),
       REEL_WIDTH,
       REEL_HEIGHT
     );
@@ -600,7 +606,12 @@ async function muxAudioIntoVideo(videoPath: string, audioPath: string, outputPat
 export async function prepareInstagramReel(params: PrepareReelParams): Promise<InstagramReelResult> {
   // חשוב: מפצלים על rawText המקורי (עם סימוני ///), לא על טקסט מנוקה —
   // splitIntoSlides בעצמו אחראי על הטיפול בסימונים (ראו instagramCarousel.ts).
-  const captions = splitIntoSlides(params.rawText, params.splitMode ?? "auto", MAX_CHARS_PER_CAPTION);
+  const isShort = !!params.isShort;
+  const captions = splitIntoSlides(
+    params.rawText,
+    params.splitMode ?? "auto",
+    isShort ? MAX_CHARS_PER_SHORT_CAPTION : MAX_CHARS_PER_CAPTION
+  );
   const backgroundHex = pickBackgroundColor(params.seed + "-reel");
   // #אחתביום לא מוצגת כאן — היא מוטמעת כבר בתבנית הרקע (אם יש), אין צורך לכפול אותה.
   const displayHashtags = (params.hashtags ?? []).filter((tag) => tag !== ALWAYS_FIRST_HASHTAG);
@@ -652,7 +663,8 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
             params.onProgress,
             wordTimestamps,
             narrationTotalSeconds,
-            wordTimestamps?.[0] ?? 0
+            wordTimestamps?.[0] ?? 0,
+            isShort
           )
         : await renderCaptionFrames(
             captions,
@@ -665,7 +677,8 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
             params.onProgress,
             wordTimestamps,
             narrationTotalSeconds,
-            wordTimestamps?.[0] ?? 0
+            wordTimestamps?.[0] ?? 0,
+            isShort
           );
     if (params.signal?.aborted) throw new ReelCancelledError();
     const silentPath = path.join(workDir, "reel-silent.mp4");

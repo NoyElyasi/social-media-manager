@@ -26,6 +26,7 @@ export default function EditablePostText({
   notionTag,
   notionUrl,
   initialRevealMode,
+  initialIsShort,
 }: {
   postId: string;
   initialRawText: string;
@@ -42,6 +43,8 @@ export default function EditablePostText({
   notionUrl: string | null;
   /** אנימציית הריל הנוכחית (מילה/אות/מילה-במרכז) — ניתנת לשינוי כאן גם לריל שכבר נוצר. */
   initialRevealMode: "word" | "letter" | "word-center";
+  /** פוסט "קצר" (מעט מלל) — קרוסלה בלי לוגו פרופיל ובפונט גדול, ריל בפונט גדול, תגית למעלה ומימין. */
+  initialIsShort: boolean;
 }) {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -61,6 +64,7 @@ export default function EditablePostText({
   const [reelBackgroundPath, setReelBackgroundPath] = useState<string | null>(initialReelBackgroundPath);
   const [coverBackgroundPath, setCoverBackgroundPath] = useState<string | null>(initialCoverBackgroundPath);
   const [revealMode, setRevealMode] = useState<"word" | "letter" | "word-center">(initialRevealMode);
+  const [isShort, setIsShort] = useState(initialIsShort);
   const [updateCarousel, setUpdateCarousel] = useState(true);
   const [updateReel, setUpdateReel] = useState(true);
   // undefined = לא נגעה בהקלטה בעריכה הזו — משתמשים מחדש בהקלטה הקיימת
@@ -141,6 +145,7 @@ export default function EditablePostText({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           rawText,
+          isShort,
           ...(hasCarousel
             ? {
                 carouselBackgroundPath,
@@ -268,6 +273,11 @@ export default function EditablePostText({
           </button>
         </div>
       )}
+      <label className="flex items-center gap-1.5 text-xs">
+        <input type="checkbox" checked={isShort} onChange={(e) => setIsShort(e.target.checked)} />
+        פוסט קצר
+        <span className="text-neutral-400">(ייכנס לתוקף בלחיצה על &quot;שמור טקסט&quot;)</span>
+      </label>
       {hasCarousel && hasReel && (
         <div className="flex items-center gap-4 text-xs">
           <span className="text-neutral-500">עדכן ברענון:</span>

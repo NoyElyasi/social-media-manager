@@ -17,6 +17,12 @@ const FB_AVATAR_BG = "#E4E6EB";
 const BODY_FONT_SIZE = MIN_FONT_SIZE_CAROUSEL + 14;
 const BODY_LINE_GAP = 20;
 
+// פוסט "קצר" (מעט מלל): פונט גדול יותר, בלי לוגו תמונת הפרופיל, והתגית (ראשונה
+// בבלוק) גבוהה וימינית יותר — הבלוק מתחיל ישר בנקודת ההתחלה של התבנית ומוצמד
+// ימינה יותר בהפחתת SHORT_RIGHT_INSET_REDUCTION מהשוליים הרגילים.
+const SHORT_BODY_FONT_SIZE = MIN_FONT_SIZE_CAROUSEL + 34;
+const SHORT_RIGHT_INSET_REDUCTION = 40;
+
 // מיקום קבוע (לא יחסי לגובה התוכן) לתחילת הכותרת/טקסט — לפי בקשה מפורשת
 // "המיקום משתנה כל עמוד, אני רוצה שיהיה קבוע" (הגרסה הקודמת השתמשה ב-flex
 // כדי למרכז אנכית, ולכן זזה בהתאם לכמות השורות). לא גבוה מידי (יש רווח נוח
@@ -66,6 +72,8 @@ export interface CarouselSlideInput {
   /** מיקום טקסט מותאם לתבנית הזו (ראו setBackgroundTextPosition) — override לקבועים הרגילים, כדי שהטקסט לא יתנגש בעיטורים של הרקע. null/undefined = ברירת המחדל (CONTENT_TOP_OFFSET/CONTENT_RIGHT_INSET). */
   textTopOffset?: number | null;
   textRightInset?: number | null;
+  /** פוסט "קצר" — ראו SHORT_BODY_FONT_SIZE. */
+  isShort?: boolean;
 }
 
 function avatarNode(displayName: string, profileImageDataUri: string | null | undefined) {
@@ -101,9 +109,11 @@ function avatarNode(displayName: string, profileImageDataUri: string | null | un
 export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
   const topOffset = input.textTopOffset ?? CONTENT_TOP_OFFSET;
   const rightInset = input.textRightInset ?? CONTENT_RIGHT_INSET;
-  const rightOffset = HORIZONTAL_PADDING + rightInset;
-  const availableWidth = CAROUSEL_WIDTH - 2 * HORIZONTAL_PADDING - rightInset;
-  const fontSize = BODY_FONT_SIZE;
+  const isShort = !!input.isShort;
+  const effectiveRightInset = isShort ? Math.max(0, rightInset - SHORT_RIGHT_INSET_REDUCTION) : rightInset;
+  const rightOffset = HORIZONTAL_PADDING + effectiveRightInset;
+  const availableWidth = CAROUSEL_WIDTH - 2 * HORIZONTAL_PADDING - effectiveRightInset;
+  const fontSize = isShort ? SHORT_BODY_FONT_SIZE : BODY_FONT_SIZE;
   const progress = Math.min(1, Math.max(0, input.pageIndex / input.pageCount));
   const filledWidth = Math.round(PROGRESS_BAR_WIDTH * progress);
 
@@ -154,7 +164,7 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
       },
       // כותרת (תמונת פרופיל + שם) ותגיות — רק בעמוד הראשון, בדיוק כמו כותרת פוסט בפייסבוק
       // row-reverse (לא direction:"rtl") — ראו הערה ב-rtlText.ts על חוסר העקביות של satori
-      ...(input.pageIndex === 1
+      ...(input.pageIndex === 1 && !isShort
         ? [
             h(
               "div",

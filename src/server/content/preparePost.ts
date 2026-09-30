@@ -103,6 +103,8 @@ export interface CreatePostInput {
   splitMode?: SplitMode;
   /** אנימציית החשיפה בריל: "word" (מילה-מילה, ברירת מחדל) או "letter" (אות-אות). */
   revealMode?: RevealMode;
+  /** פוסט "קצר" (מעט מלל) — קרוסלה בלי לוגו פרופיל ובפונט גדול, ריל בפונט גדול, ובשניהם התגית למעלה ומימין. */
+  isShort?: boolean;
   /** תבנית רקע לקרוסלה, נבחרת מתוך הרקעים שהועלו בהגדרות — null/לא סופק = רקע לבן. */
   carouselBackgroundPath?: string | null;
   /** תבנית רקע לריל, נבחרת מתוך הרקעים שהועלו בהגדרות — null/לא סופק = צבע רקע אוטומטי. */
@@ -161,6 +163,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
       hashtags: JSON.stringify(sharedHashtags),
       splitMode,
       revealMode,
+      isShort: !!input.isShort,
       aiTheme: effectiveTheme,
       aiFormat: input.aiFormat && input.aiFormat !== "regular" ? input.aiFormat : null,
       folderPath: postFolderPath,
@@ -214,6 +217,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, input.carouselBackgroundPath ?? null),
           ...getCarouselTextPosition(profile.carouselBackgroundImagePaths, input.carouselBackgroundPath ?? null),
           coverBackgroundImageDataUri,
+          isShort: !!input.isShort,
           storage,
         });
         await prisma.platformContent.create({
@@ -246,6 +250,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           signal: input.signal,
           onProgress: input.onProgress,
           narration: input.reelNarration,
+          isShort: !!input.isShort,
         });
         await prisma.platformContent.create({
           data: {
@@ -308,6 +313,8 @@ export async function updatePostRawText(
     reelNarration?: ReelNarration | null;
     /** משנה את אנימציית הריל (מילה/אות/מילה-במרכז) גם לריל שכבר נוצר — לא סופק = משאירים את הקיים. נשמר על הפוסט לרינדורים הבאים. */
     revealMode?: RevealMode;
+    /** משנה את סוג הפוסט ל"קצר"/רגיל גם לפוסט שכבר נוצר — לא סופק = משאירים את הקיים. נשמר על הפוסט לרינדורים הבאים. */
+    isShort?: boolean;
   }
 ) {
   const storage = getStorageService();
@@ -322,10 +329,11 @@ export async function updatePostRawText(
   const privacyFlags = scanForIdentifyingDetails(cleanText);
   const splitMode = post.splitMode as SplitMode;
   const revealMode = (options?.revealMode ?? post.revealMode) as RevealMode;
+  const isShort = options?.isShort ?? post.isShort;
 
   await prisma.post.update({
     where: { id: postId },
-    data: { rawText: newRawText, privacyFlags: JSON.stringify(privacyFlags), revealMode },
+    data: { rawText: newRawText, privacyFlags: JSON.stringify(privacyFlags), revealMode, isShort },
   });
   await storage.saveTextFile(post.folderPath, "טקסט-מקור.txt", newRawText);
 
@@ -369,6 +377,7 @@ export async function updatePostRawText(
         isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, backgroundPath),
         ...getCarouselTextPosition(profile.carouselBackgroundImagePaths, backgroundPath),
         coverBackgroundImageDataUri,
+        isShort,
         storage,
       });
       await prisma.platformContent.update({
@@ -403,6 +412,7 @@ export async function updatePostRawText(
         signal: options?.signal,
         onProgress: options?.onProgress,
         narration,
+        isShort,
       });
       await prisma.platformContent.update({
         where: { id: content.id },
@@ -488,6 +498,7 @@ export async function addTargetToPost(
       folderPath: subfolder,
       displayName: profile.displayName,
       profileImageDataUri,
+      isShort: post.isShort,
       storage,
     });
     await prisma.platformContent.create({
@@ -519,6 +530,7 @@ export async function addTargetToPost(
       signal: options?.signal,
       onProgress: options?.onProgress,
       narration: options?.reelNarration,
+      isShort: post.isShort,
     });
     await prisma.platformContent.create({
       data: {

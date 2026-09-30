@@ -22,6 +22,7 @@ interface DraftShape {
   manualHashtags: string;
   aiTheme: string | null;
   postFormat: "regular" | "letter" | "tip";
+  isShort: boolean;
   carouselBackgroundPath: string | null;
   reelBackgroundPath: string | null;
   coverBackgroundPath: string | null;
@@ -56,6 +57,7 @@ export default function NewPostPage() {
   const [manualHashtags, setManualHashtags] = useState(() => loadDraft().manualHashtags ?? "");
   const [aiTheme, setAiTheme] = useState<string | null>(() => loadDraft().aiTheme ?? null);
   const [postFormat, setPostFormat] = useState<"regular" | "letter" | "tip">(() => loadDraft().postFormat ?? "regular");
+  const [isShort, setIsShort] = useState(() => loadDraft().isShort ?? false);
   const [aiThemeOptions, setAiThemeOptions] = useState<string[]>([]);
   const [carouselBackgroundPath, setCarouselBackgroundPath] = useState<string | null>(
     () => loadDraft().carouselBackgroundPath ?? null
@@ -104,6 +106,7 @@ export default function NewPostPage() {
       manualHashtags,
       aiTheme,
       postFormat,
+      isShort,
       carouselBackgroundPath,
       reelBackgroundPath,
       coverBackgroundPath,
@@ -116,6 +119,7 @@ export default function NewPostPage() {
     manualHashtags,
     aiTheme,
     postFormat,
+    isShort,
     carouselBackgroundPath,
     reelBackgroundPath,
     coverBackgroundPath,
@@ -247,6 +251,7 @@ export default function NewPostPage() {
           manualHashtags: manualHashtags.trim() ? manualHashtags.trim().split(/\s+/) : null,
           aiTheme,
           aiFormat: postFormat,
+          isShort,
           carouselBackgroundPath,
           reelBackgroundPath,
           coverBackgroundPath,
@@ -550,6 +555,18 @@ export default function NewPostPage() {
               {opt.label}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setIsShort((v) => !v)}
+            aria-pressed={isShort}
+            className={`rounded-full px-3 py-1.5 text-sm transition-colors ${
+              isShort
+                ? "bg-brand-pink/30 text-brand-maroon"
+                : "border border-brand-pink/40 text-brand-maroon/60 hover:bg-brand-pink/10"
+            }`}
+          >
+            קצר
+          </button>
         </div>
       </div>
 

@@ -16,6 +16,7 @@ const createPostSchema = z.object({
   coverBackgroundPath: z.string().nullable().optional(),
   manualHashtags: z.array(z.string()).optional().nullable(),
   aiTheme: z.string().nullable().optional(),
+  isShort: z.boolean().optional(),
   aiFormat: z.enum(["regular", "letter", "tip"]).optional(),
   notionUrl: z.string().nullable().optional(),
   notionTag: z.string().nullable().optional(),
