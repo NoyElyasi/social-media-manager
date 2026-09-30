@@ -23,6 +23,7 @@ const BODY_LINE_GAP = 20;
 // ימינה יותר בהפחתת SHORT_RIGHT_INSET_REDUCTION מהשוליים הרגילים.
 const SHORT_BODY_FONT_SIZE = MIN_FONT_SIZE_CAROUSEL + 34;
 const SHORT_RIGHT_INSET_REDUCTION = 40;
+const SHORT_BODY_FONT_WEIGHT = 700;
 const SHORT_DARK_TEXT_COLOR = "#FEF9F4";
 // פוסט קצר תמיד נכנס לעמוד אחד: הפונט קטן בהדרגה מ-SHORT_BODY_FONT_SIZE עד שהטקסט נכנס בגובה הפנוי (אך לא מתחת לרצפה).
 const SHORT_MIN_FIT_FONT_SIZE = 26;
@@ -270,7 +271,7 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
           : []),
         ...renderPreparedLines(prepareRtlWordLines(input.bodyText, fontSize, availableWidth), {
           fontSize,
-          fontWeight: 400,
+          fontWeight: isShort ? SHORT_BODY_FONT_WEIGHT : 400,
           color: isShort && input.isDarkBackground ? SHORT_DARK_TEXT_COLOR : FB_TEXT_COLOR,
           justifyContent: "flex-end",
         })
