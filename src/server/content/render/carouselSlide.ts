@@ -22,6 +22,11 @@ const BODY_LINE_GAP = 20;
 // ימינה יותר בהפחתת SHORT_RIGHT_INSET_REDUCTION מהשוליים הרגילים.
 const SHORT_BODY_FONT_SIZE = MIN_FONT_SIZE_CAROUSEL + 34;
 const SHORT_RIGHT_INSET_REDUCTION = 40;
+// פוסט קצר תמיד נכנס לעמוד אחד: הפונט קטן בהדרגה מ-SHORT_BODY_FONT_SIZE עד שהטקסט נכנס בגובה הפנוי (אך לא מתחת לרצפה).
+const SHORT_MIN_FIT_FONT_SIZE = 26;
+const SHORT_FIT_LINE_HEIGHT = 1.45;
+const SHORT_FIT_BOTTOM_MARGIN = 60;
+const SHORT_FIT_FOOTER_RESERVE = 150;
 
 // מיקום קבוע (לא יחסי לגובה התוכן) לתחילת הכותרת/טקסט — לפי בקשה מפורשת
 // "המיקום משתנה כל עמוד, אני רוצה שיהיה קבוע" (הגרסה הקודמת השתמשה ב-flex
@@ -107,6 +112,33 @@ function avatarNode(displayName: string, profileImageDataUri: string | null | un
   );
 }
 
+function estimateBodyHeight(
+  input: CarouselSlideInput,
+  fontSize: number,
+  availableWidth: number
+): number {
+  const lineBoxes: number[] = [];
+  const pushLines = (lines: (string[] | null)[], size: number) => {
+    for (const line of lines) lineBoxes.push(line === null ? Math.round(size * 0.6) : size * SHORT_FIT_LINE_HEIGHT);
+  };
+  if (input.hashtags.length > 0 && input.pageIndex === 1) {
+    pushLines(prepareRtlWordLines(input.hashtags.join(" "), fontSize - 2, availableWidth), fontSize - 2);
+    lineBoxes.push(12);
+  }
+  pushLines(prepareRtlWordLines(input.bodyText, fontSize, availableWidth), fontSize);
+  return lineBoxes.reduce((sum, h) => sum + h, 0) + Math.max(0, lineBoxes.length - 1) * BODY_LINE_GAP;
+}
+
+function fitShortFontSize(input: CarouselSlideInput, topOffset: number, availableWidth: number): number {
+  const showsFooter = input.pageCount > 1 && !input.hideProgressBar;
+  const availableHeight =
+    CAROUSEL_HEIGHT - topOffset - (showsFooter ? SHORT_FIT_FOOTER_RESERVE : SHORT_FIT_BOTTOM_MARGIN);
+  for (let size = SHORT_BODY_FONT_SIZE; size > SHORT_MIN_FIT_FONT_SIZE; size -= 2) {
+    if (estimateBodyHeight(input, size, availableWidth) <= availableHeight) return size;
+  }
+  return SHORT_MIN_FIT_FONT_SIZE;
+}
+
 export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
   const topOffset = input.textTopOffset ?? CONTENT_TOP_OFFSET;
   const rightInset = input.textRightInset ?? CONTENT_RIGHT_INSET;
@@ -114,7 +146,7 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
   const effectiveRightInset = isShort ? Math.max(0, rightInset - SHORT_RIGHT_INSET_REDUCTION) : rightInset;
   const rightOffset = HORIZONTAL_PADDING + effectiveRightInset;
   const availableWidth = CAROUSEL_WIDTH - 2 * HORIZONTAL_PADDING - effectiveRightInset;
-  const fontSize = isShort ? SHORT_BODY_FONT_SIZE : BODY_FONT_SIZE;
+  const fontSize = isShort ? fitShortFontSize(input, topOffset, availableWidth) : BODY_FONT_SIZE;
   const progress = Math.min(1, Math.max(0, input.pageIndex / input.pageCount));
   const filledWidth = Math.round(PROGRESS_BAR_WIDTH * progress);
 
