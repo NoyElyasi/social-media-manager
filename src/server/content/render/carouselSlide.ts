@@ -26,6 +26,8 @@ const SHORT_RIGHT_INSET_REDUCTION = 40;
 const SHORT_DARK_TEXT_COLOR = "#FEF9F4";
 // פוסט קצר תמיד נכנס לעמוד אחד: הפונט קטן בהדרגה מ-SHORT_BODY_FONT_SIZE עד שהטקסט נכנס בגובה הפנוי (אך לא מתחת לרצפה).
 const SHORT_MIN_FIT_FONT_SIZE = 26;
+// בפוסט קצר שואפים ל-5–6 מילים בשורה: הפונט הגדול ביותר שבו ממוצע המילים בשורה מלאה הוא לפחות 5 (ובכל מקרה בלי לחרוג מהעמוד).
+const SHORT_MIN_AVG_WORDS_PER_LINE = 5;
 const SHORT_FIT_LINE_HEIGHT = 1.45;
 const SHORT_FIT_BOTTOM_MARGIN = 60;
 const SHORT_FIT_FOOTER_RESERVE = 150;
@@ -136,12 +138,26 @@ function estimateBodyHeight(
   return lineBoxes.reduce((sum, h) => sum + h, 0) + Math.max(0, lineBoxes.length - 1) * BODY_LINE_GAP;
 }
 
+function averageWordsPerFullLine(lines: (string[] | null)[]): number | null {
+  let words = 0;
+  let count = 0;
+  lines.forEach((line, i) => {
+    const isLastOfParagraph = i === lines.length - 1 || lines[i + 1] === null;
+    if (line === null || isLastOfParagraph) return;
+    words += line.length;
+    count++;
+  });
+  return count === 0 ? null : words / count;
+}
+
 function fitShortFontSize(input: CarouselSlideInput, topOffset: number, availableWidth: number): number {
   const showsFooter = input.pageCount > 1 && !input.hideProgressBar;
   const availableHeight =
     CAROUSEL_HEIGHT - topOffset - (showsFooter ? SHORT_FIT_FOOTER_RESERVE : SHORT_FIT_BOTTOM_MARGIN);
   for (let size = SHORT_BODY_FONT_SIZE; size > SHORT_MIN_FIT_FONT_SIZE; size -= 2) {
-    if (estimateBodyHeight(input, size, availableWidth) <= availableHeight) return size;
+    if (estimateBodyHeight(input, size, availableWidth) > availableHeight) continue;
+    const avgWords = averageWordsPerFullLine(prepareRtlWordLines(input.bodyText, size, availableWidth));
+    if (avgWords === null || avgWords >= SHORT_MIN_AVG_WORDS_PER_LINE) return size;
   }
   return SHORT_MIN_FIT_FONT_SIZE;
 }
