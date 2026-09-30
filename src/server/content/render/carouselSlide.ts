@@ -1,5 +1,6 @@
 import { h, type SatoriNode } from "./h";
 import { MIN_FONT_SIZE_CAROUSEL } from "../accessibility";
+import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
 import { prepareRtlWordLines, buildWordRowNode, renderPreparedLines } from "./rtlText";
 
 export const CAROUSEL_WIDTH = 1080;
@@ -113,6 +114,10 @@ function avatarNode(displayName: string, profileImageDataUri: string | null | un
   );
 }
 
+function shownHashtags(input: CarouselSlideInput): string[] {
+  return input.isShort ? input.hashtags.filter((tag) => tag !== ALWAYS_FIRST_HASHTAG) : input.hashtags;
+}
+
 function estimateBodyHeight(
   input: CarouselSlideInput,
   fontSize: number,
@@ -122,8 +127,9 @@ function estimateBodyHeight(
   const pushLines = (lines: (string[] | null)[], size: number) => {
     for (const line of lines) lineBoxes.push(line === null ? Math.round(size * 0.6) : size * SHORT_FIT_LINE_HEIGHT);
   };
-  if (input.hashtags.length > 0 && input.pageIndex === 1) {
-    pushLines(prepareRtlWordLines(input.hashtags.join(" "), fontSize - 2, availableWidth), fontSize - 2);
+  const hashtags = shownHashtags(input);
+  if (hashtags.length > 0 && input.pageIndex === 1) {
+    pushLines(prepareRtlWordLines(hashtags.join(" "), fontSize - 2, availableWidth), fontSize - 2);
     lineBoxes.push(12);
   }
   pushLines(prepareRtlWordLines(input.bodyText, fontSize, availableWidth), fontSize);
@@ -147,6 +153,7 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
   const effectiveRightInset = isShort ? Math.max(0, rightInset - SHORT_RIGHT_INSET_REDUCTION) : rightInset;
   const rightOffset = HORIZONTAL_PADDING + effectiveRightInset;
   const availableWidth = CAROUSEL_WIDTH - 2 * HORIZONTAL_PADDING - effectiveRightInset;
+  const hashtags = shownHashtags(input);
   const fontSize = isShort ? fitShortFontSize(input, topOffset, availableWidth) : BODY_FONT_SIZE;
   const progress = Math.min(1, Math.max(0, input.pageIndex / input.pageCount));
   const filledWidth = Math.round(PROGRESS_BAR_WIDTH * progress);
@@ -231,10 +238,10 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
             gap: BODY_LINE_GAP,
           },
         },
-        ...(input.hashtags.length > 0 && input.pageIndex === 1
+        ...(hashtags.length > 0 && input.pageIndex === 1
           ? [
               ...renderPreparedLines(
-                prepareRtlWordLines(input.hashtags.join(" "), fontSize - 2, availableWidth),
+                prepareRtlWordLines(hashtags.join(" "), fontSize - 2, availableWidth),
                 {
                   fontSize: fontSize - 2,
                   fontWeight: 400,
