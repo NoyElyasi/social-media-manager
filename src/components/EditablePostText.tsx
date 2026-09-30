@@ -27,6 +27,7 @@ export default function EditablePostText({
   notionUrl,
   initialRevealMode,
   initialIsShort,
+  initialHideProgressBar,
 }: {
   postId: string;
   initialRawText: string;
@@ -45,6 +46,7 @@ export default function EditablePostText({
   initialRevealMode: "word" | "letter" | "word-center";
   /** פוסט "קצר" (מעט מלל) — קרוסלה בלי לוגו פרופיל ובפונט גדול, ריל בפונט גדול, תגית למעלה ומימין. */
   initialIsShort: boolean;
+  initialHideProgressBar: boolean;
 }) {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -65,6 +67,7 @@ export default function EditablePostText({
   const [coverBackgroundPath, setCoverBackgroundPath] = useState<string | null>(initialCoverBackgroundPath);
   const [revealMode, setRevealMode] = useState<"word" | "letter" | "word-center">(initialRevealMode);
   const [isShort, setIsShort] = useState(initialIsShort);
+  const [hideProgressBar, setHideProgressBar] = useState(initialHideProgressBar);
   const [updateCarousel, setUpdateCarousel] = useState(true);
   const [updateReel, setUpdateReel] = useState(true);
   // undefined = לא נגעה בהקלטה בעריכה הזו — משתמשים מחדש בהקלטה הקיימת
@@ -146,6 +149,7 @@ export default function EditablePostText({
         body: JSON.stringify({
           rawText,
           isShort,
+          hideProgressBar,
           ...(hasCarousel
             ? {
                 carouselBackgroundPath,
@@ -276,6 +280,11 @@ export default function EditablePostText({
       <label className="flex items-center gap-1.5 text-xs">
         <input type="checkbox" checked={isShort} onChange={(e) => setIsShort(e.target.checked)} />
         פוסט קצר
+        <span className="text-neutral-400">(ייכנס לתוקף בלחיצה על &quot;שמור טקסט&quot;)</span>
+      </label>
+      <label className="flex items-center gap-1.5 text-xs">
+        <input type="checkbox" checked={hideProgressBar} onChange={(e) => setHideProgressBar(e.target.checked)} />
+        בלי בר מתמלא בקרוסלה
         <span className="text-neutral-400">(ייכנס לתוקף בלחיצה על &quot;שמור טקסט&quot;)</span>
       </label>
       {hasCarousel && hasReel && (

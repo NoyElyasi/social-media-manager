@@ -36,6 +36,7 @@ const updatePostSchema = z.object({
     .optional(),
   revealMode: z.enum(["word", "letter", "word-center"]).optional(),
   isShort: z.boolean().optional(),
+  hideProgressBar: z.boolean().optional(),
 });
 
 /**
@@ -80,6 +81,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           reelNarration: parsed.data.reelNarration,
           revealMode: parsed.data.revealMode,
           isShort: parsed.data.isShort,
+          hideProgressBar: parsed.data.hideProgressBar,
         });
         send({ type: "done", post });
       } catch (err) {

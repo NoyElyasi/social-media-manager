@@ -74,6 +74,7 @@ export interface CarouselSlideInput {
   textRightInset?: number | null;
   /** פוסט "קצר" — ראו SHORT_BODY_FONT_SIZE. */
   isShort?: boolean;
+  hideProgressBar?: boolean;
 }
 
 function avatarNode(displayName: string, profileImageDataUri: string | null | undefined) {
@@ -215,6 +216,7 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
       )
     ),
     input.pageCount > 1 &&
+    !input.hideProgressBar &&
     h(
       "div",
       {

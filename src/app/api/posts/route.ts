@@ -17,6 +17,7 @@ const createPostSchema = z.object({
   manualHashtags: z.array(z.string()).optional().nullable(),
   aiTheme: z.string().nullable().optional(),
   isShort: z.boolean().optional(),
+  hideProgressBar: z.boolean().optional(),
   aiFormat: z.enum(["regular", "letter", "tip"]).optional(),
   notionUrl: z.string().nullable().optional(),
   notionTag: z.string().nullable().optional(),

@@ -23,6 +23,7 @@ interface DraftShape {
   aiTheme: string | null;
   postFormat: "regular" | "letter" | "tip";
   isShort: boolean;
+  hideProgressBar: boolean;
   carouselBackgroundPath: string | null;
   reelBackgroundPath: string | null;
   coverBackgroundPath: string | null;
@@ -58,6 +59,7 @@ export default function NewPostPage() {
   const [aiTheme, setAiTheme] = useState<string | null>(() => loadDraft().aiTheme ?? null);
   const [postFormat, setPostFormat] = useState<"regular" | "letter" | "tip">(() => loadDraft().postFormat ?? "regular");
   const [isShort, setIsShort] = useState(() => loadDraft().isShort ?? false);
+  const [hideProgressBar, setHideProgressBar] = useState(() => loadDraft().hideProgressBar ?? false);
   const [aiThemeOptions, setAiThemeOptions] = useState<string[]>([]);
   const [carouselBackgroundPath, setCarouselBackgroundPath] = useState<string | null>(
     () => loadDraft().carouselBackgroundPath ?? null
@@ -107,6 +109,7 @@ export default function NewPostPage() {
       aiTheme,
       postFormat,
       isShort,
+      hideProgressBar,
       carouselBackgroundPath,
       reelBackgroundPath,
       coverBackgroundPath,
@@ -120,6 +123,7 @@ export default function NewPostPage() {
     aiTheme,
     postFormat,
     isShort,
+    hideProgressBar,
     carouselBackgroundPath,
     reelBackgroundPath,
     coverBackgroundPath,
@@ -252,6 +256,7 @@ export default function NewPostPage() {
           aiTheme,
           aiFormat: postFormat,
           isShort,
+          hideProgressBar,
           carouselBackgroundPath,
           reelBackgroundPath,
           coverBackgroundPath,
@@ -590,6 +595,13 @@ export default function NewPostPage() {
           </label>
         </div>
       </div>
+
+      {showCarouselOptions && (
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={hideProgressBar} onChange={(e) => setHideProgressBar(e.target.checked)} />
+          בלי בר מתמלא בקרוסלה (מונה עמודים + פס התקדמות)
+        </label>
+      )}
 
       {/* 4. אפשרויות לקרוסלה בלבד */}
       {showCarouselOptions && (carouselBackgrounds.length > 0 || coverBackgrounds.length > 0) && (

@@ -105,6 +105,8 @@ export interface CreatePostInput {
   revealMode?: RevealMode;
   /** פוסט "קצר" (מעט מלל) — קרוסלה בלי לוגו פרופיל ובפונט גדול, ריל בפונט גדול, ובשניהם התגית למעלה ומימין. */
   isShort?: boolean;
+  /** מבטל את הבר המתמלא (מונה עמודים + פס התקדמות) בתחתית הקרוסלה. */
+  hideProgressBar?: boolean;
   /** תבנית רקע לקרוסלה, נבחרת מתוך הרקעים שהועלו בהגדרות — null/לא סופק = רקע לבן. */
   carouselBackgroundPath?: string | null;
   /** תבנית רקע לריל, נבחרת מתוך הרקעים שהועלו בהגדרות — null/לא סופק = צבע רקע אוטומטי. */
@@ -164,6 +166,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
       splitMode,
       revealMode,
       isShort: !!input.isShort,
+      hideProgressBar: !!input.hideProgressBar,
       aiTheme: effectiveTheme,
       aiFormat: input.aiFormat && input.aiFormat !== "regular" ? input.aiFormat : null,
       folderPath: postFolderPath,
@@ -218,6 +221,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           ...getCarouselTextPosition(profile.carouselBackgroundImagePaths, input.carouselBackgroundPath ?? null),
           coverBackgroundImageDataUri,
           isShort: !!input.isShort,
+          hideProgressBar: !!input.hideProgressBar,
           storage,
         });
         await prisma.platformContent.create({
@@ -315,6 +319,8 @@ export async function updatePostRawText(
     revealMode?: RevealMode;
     /** משנה את סוג הפוסט ל"קצר"/רגיל גם לפוסט שכבר נוצר — לא סופק = משאירים את הקיים. נשמר על הפוסט לרינדורים הבאים. */
     isShort?: boolean;
+    /** מבטל/מחזיר את הבר המתמלא (מונה עמודים + פס התקדמות) בתחתית הקרוסלה — לא סופק = משאירים את הקיים. */
+    hideProgressBar?: boolean;
   }
 ) {
   const storage = getStorageService();
@@ -330,10 +336,11 @@ export async function updatePostRawText(
   const splitMode = post.splitMode as SplitMode;
   const revealMode = (options?.revealMode ?? post.revealMode) as RevealMode;
   const isShort = options?.isShort ?? post.isShort;
+  const hideProgressBar = options?.hideProgressBar ?? post.hideProgressBar;
 
   await prisma.post.update({
     where: { id: postId },
-    data: { rawText: newRawText, privacyFlags: JSON.stringify(privacyFlags), revealMode, isShort },
+    data: { rawText: newRawText, privacyFlags: JSON.stringify(privacyFlags), revealMode, isShort, hideProgressBar },
   });
   await storage.saveTextFile(post.folderPath, "טקסט-מקור.txt", newRawText);
 
@@ -378,6 +385,7 @@ export async function updatePostRawText(
         ...getCarouselTextPosition(profile.carouselBackgroundImagePaths, backgroundPath),
         coverBackgroundImageDataUri,
         isShort,
+        hideProgressBar,
         storage,
       });
       await prisma.platformContent.update({
@@ -499,6 +507,7 @@ export async function addTargetToPost(
       displayName: profile.displayName,
       profileImageDataUri,
       isShort: post.isShort,
+      hideProgressBar: post.hideProgressBar,
       storage,
     });
     await prisma.platformContent.create({
