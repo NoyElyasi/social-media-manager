@@ -235,7 +235,12 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
           ? [
               ...renderPreparedLines(
                 prepareRtlWordLines(input.hashtags.join(" "), fontSize - 2, availableWidth),
-                { fontSize: fontSize - 2, fontWeight: 400, color: FB_LINK_COLOR, justifyContent: "flex-end" }
+                {
+                  fontSize: fontSize - 2,
+                  fontWeight: 400,
+                  color: isShort && input.isDarkBackground ? SHORT_DARK_TEXT_COLOR : FB_LINK_COLOR,
+                  justifyContent: "flex-end",
+                }
               ),
               h("div", { style: { display: "flex", height: 12 } }),
             ]
