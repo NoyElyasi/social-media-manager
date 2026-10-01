@@ -68,8 +68,8 @@ const patchSchema = z.object({
   category: z.string().optional(),
   textTopOffset: z.number().nullable().optional(),
   textRightInset: z.number().nullable().optional(),
-  // הפורמט (רגיל/טיפ/מכתב) שמסמנים/מבטלים לתבנית הזו — עם isDefault, ראו setDefaultBackgroundPathForFormat.
-  defaultFormat: z.enum(["regular", "tip", "letter"]).optional(),
+  // הפורמט (רגיל/טיפ/מכתב/קצר) שמסמנים/מבטלים לתבנית הזו — עם isDefault, ראו setDefaultBackgroundPathForFormat.
+  defaultFormat: z.enum(["regular", "tip", "letter", "short"]).optional(),
   isDefault: z.boolean().optional(),
 });
 
@@ -83,7 +83,7 @@ export async function PATCH(req: NextRequest) {
 
   let darkPaths: string[] | undefined;
   let entries: Awaited<ReturnType<typeof setBackgroundCategory>> | undefined;
-  let defaultPaths: Partial<Record<"regular" | "tip" | "letter", string>> | undefined;
+  let defaultPaths: Partial<Record<"regular" | "tip" | "letter" | "short", string>> | undefined;
 
   if (parsed.data.isDark !== undefined) {
     darkPaths = await setCarouselBackgroundDark(parsed.data.path, parsed.data.isDark);

@@ -7,6 +7,7 @@ import type { BackgroundItem } from "./BackgroundGallery";
 // כמו "מכתב ביום" גם היא "מכתב" (התאמת "מכיל", לא שוויון מדויק).
 const LETTER_KEYWORD = "מכתב";
 const TIP_KEYWORD = "טיפ";
+const SHORT_KEYWORD = "קצר";
 
 function matchesKeyword(category: string | undefined, keyword: string): boolean {
   return (category ?? "").includes(keyword);
@@ -21,7 +22,7 @@ type FilterState = { mode: "all" } | { mode: "regular" } | { mode: "exact"; valu
  * בחירת פילטר היא בפועל גם הדרך לסווג את הפוסט לפי הסקין שלו, כי היא
  * מציגה רק את הרקעים הרלוונטיים לסוג הזה.
  *
- * formatFilter (סוג הפוסט שנבחר — regular/letter/tip) מסנכרן את הפילטר
+ * formatFilter (סוג הפוסט שנבחר — regular/letter/tip/short) מסנכרן את הפילטר
  * אוטומטית — "כאילו בחרתי גם שם" (לפי בקשה מפורשת): letter/tip מסננים לפי
  * קטגוריה שמכילה "מכתב"/"טיפ" בהתאמה, ו-regular מציג רק קטגוריות שאינן
  * "מכתב" ואינן "טיפ" (הטאב "רגיל"). עדיין אפשר לבחור פילטר אחר ידנית אחרי
@@ -38,7 +39,7 @@ export default function BackgroundPicker({
   selected: string | null;
   onSelect: (path: string | null) => void;
   noneLabel: string;
-  formatFilter?: "regular" | "letter" | "tip";
+  formatFilter?: "regular" | "letter" | "tip" | "short";
 }) {
   const [filter, setFilter] = useState<FilterState>({ mode: "all" });
 
@@ -46,6 +47,7 @@ export default function BackgroundPicker({
     Promise.resolve().then(() => {
       if (formatFilter === "letter") setFilter({ mode: "contains", value: LETTER_KEYWORD });
       else if (formatFilter === "tip") setFilter({ mode: "contains", value: TIP_KEYWORD });
+      else if (formatFilter === "short") setFilter({ mode: "contains", value: SHORT_KEYWORD });
       else if (formatFilter === "regular") setFilter({ mode: "regular" });
     });
   }, [formatFilter]);
@@ -60,7 +62,12 @@ export default function BackgroundPicker({
       case "all":
         return items;
       case "regular":
-        return items.filter((i) => !matchesKeyword(i.category, LETTER_KEYWORD) && !matchesKeyword(i.category, TIP_KEYWORD));
+        return items.filter(
+          (i) =>
+            !matchesKeyword(i.category, LETTER_KEYWORD) &&
+            !matchesKeyword(i.category, TIP_KEYWORD) &&
+            !matchesKeyword(i.category, SHORT_KEYWORD)
+        );
       case "exact":
         return items.filter((i) => (i.category?.trim() || "") === filter.value);
       case "contains":

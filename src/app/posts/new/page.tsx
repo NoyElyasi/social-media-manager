@@ -352,9 +352,10 @@ export default function NewPostPage() {
   async function applyNotionTypeValue(typeValues: string[], knownThemeOptions: string[]) {
     if (typeValues.includes("טיפ")) setPostFormat("tip");
     if (typeValues.includes("מכתב")) setPostFormat("letter");
+    if (typeValues.includes("קצר")) setIsShort(true);
     if (typeValues.includes("ישן")) setNotionOldFlag(true);
 
-    const theme = typeValues.map((v) => v.trim()).find((v) => v && v !== "טיפ" && v !== "מכתב" && v !== "ישן");
+    const theme = typeValues.map((v) => v.trim()).find((v) => v && v !== "טיפ" && v !== "מכתב" && v !== "קצר" && v !== "ישן");
     if (!theme) return;
 
     setAiTheme(theme);
@@ -615,7 +616,7 @@ export default function NewPostPage() {
                 selected={carouselBackgroundPath}
                 onSelect={setCarouselBackgroundPath}
                 noneLabel="ללא (רקע לבן)"
-                formatFilter={postFormat}
+                formatFilter={isShort ? "short" : postFormat}
               />
             </div>
           )}
@@ -627,7 +628,7 @@ export default function NewPostPage() {
                 selected={coverBackgroundPath}
                 onSelect={setCoverBackgroundPath}
                 noneLabel="ללא עמוד שער"
-                formatFilter={postFormat}
+                formatFilter={isShort ? "short" : postFormat}
               />
             </div>
           )}
@@ -678,7 +679,7 @@ export default function NewPostPage() {
                 selected={reelBackgroundPath}
                 onSelect={setReelBackgroundPath}
                 noneLabel="ללא תבנית (רקע אוטומטי)"
-                formatFilter={postFormat}
+                formatFilter={isShort ? "short" : postFormat}
               />
             </div>
           )}

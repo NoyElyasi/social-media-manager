@@ -81,8 +81,8 @@ const DEFAULT_BACKGROUNDS_FIELD: Record<
 };
 
 /** פורמט הפוסט (aiFormat, "regular"/"tip"/"letter") — כל אחד יכול לקבל רקע ברירת מחדל נפרד לכל סוג (ריל/קרוסלה/שער). */
-export type PostFormatKey = "regular" | "tip" | "letter";
-export const POST_FORMAT_ORDER: PostFormatKey[] = ["regular", "tip", "letter"];
+export type PostFormatKey = "regular" | "tip" | "letter" | "short";
+export const POST_FORMAT_ORDER: PostFormatKey[] = ["regular", "tip", "letter", "short"];
 
 /** מפרשת את מפת ברירות המחדל השמורה — {format: path}, בלי ערך = אין ברירת מחדל לפורמט הזה. */
 export function parseDefaultBackgroundPaths(json: string): Partial<Record<PostFormatKey, string>> {
@@ -181,9 +181,14 @@ export async function setDefaultBackgroundPathForFormat(
   return next;
 }
 
-/** ברירת המחדל לפורמט נתון (מהJSON שכבר נקרא, ראו ProfileSettings) — null/undefined format מתייחס כ"regular". */
-export function pickDefaultBackgroundPath(json: string, format: PostFormatKey | null | undefined): string | null {
-  return parseDefaultBackgroundPaths(json)[format ?? "regular"] ?? null;
+/** ברירת המחדל לפורמט נתון (מהJSON שכבר נקרא, ראו ProfileSettings) — null/undefined format מתייחס כ"regular". פוסט קצר משתמש בברירת המחדל של "קצר" אם הוגדרה, אחרת בזו של הפורמט שלו. */
+export function pickDefaultBackgroundPath(
+  json: string,
+  format: PostFormatKey | null | undefined,
+  isShort = false
+): string | null {
+  const defaults = parseDefaultBackgroundPaths(json);
+  return (isShort ? defaults.short : undefined) ?? defaults[format ?? "regular"] ?? null;
 }
 
 /** משנה את הקטגוריה של תבנית רקע קיימת (למשל אם טעו בהקלדה בהעלאה, או רוצים לשייך מחדש). */

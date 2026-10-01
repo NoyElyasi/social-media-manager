@@ -30,10 +30,10 @@ const UNCATEGORIZED_LABEL = "כללי";
  * קטגוריה ("סקין") היא תג חופשי שנוצר תוך כדי העלאה — לא רשימה סגורה
  * שמנוהלת בנפרד, לפי בקשה מפורשת "ליצור קטגוריות כל פעם שיש קטגוריה חדשה".
  */
-type PostFormatKey = "regular" | "tip" | "letter";
-const FORMAT_ORDER: PostFormatKey[] = ["regular", "tip", "letter"];
-const FORMAT_LABELS: Record<PostFormatKey, string> = { regular: "רגיל", tip: "טיפ", letter: "מכתב" };
-const FORMAT_ABBR: Record<PostFormatKey, string> = { regular: "ר", tip: "ט", letter: "מ" };
+type PostFormatKey = "regular" | "tip" | "letter" | "short";
+const FORMAT_ORDER: PostFormatKey[] = ["regular", "tip", "letter", "short"];
+const FORMAT_LABELS: Record<PostFormatKey, string> = { regular: "רגיל", tip: "טיפ", letter: "מכתב", short: "קצר" };
+const FORMAT_ABBR: Record<PostFormatKey, string> = { regular: "ר", tip: "ט", letter: "מ", short: "ק" };
 
 export default function BackgroundGallery({
   kind,

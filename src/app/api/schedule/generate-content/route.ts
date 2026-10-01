@@ -12,10 +12,10 @@ const bodySchema = z.object({ weekStart: z.string() });
 
 // כמו parseNotionType ב-weeklySchedule.ts — משוכפל בכוונה (לא מיוצא משם, ראו
 // קונבנציית השכפול המכוונת בפרויקט הזה).
-function parseNotionType(typeValues: string[]): { format: "letter" | "tip" | null; theme: string | null } {
+function parseNotionType(typeValues: string[]): { format: "letter" | "tip" | null; isShort: boolean; theme: string | null } {
   const format = typeValues.includes("טיפ") ? "tip" : typeValues.includes("מכתב") ? "letter" : null;
-  const theme = typeValues.map((v) => v.trim()).find((v) => v && v !== "טיפ" && v !== "מכתב" && v !== "ישן") ?? null;
-  return { format, theme };
+  const theme = typeValues.map((v) => v.trim()).find((v) => v && v !== "טיפ" && v !== "מכתב" && v !== "קצר" && v !== "ישן") ?? null;
+  return { format, isShort: typeValues.includes("קצר"), theme };
 }
 
 /** רושמת נושא חדש (מנושיין) לרשימת הנושאים בהגדרות, אם הוא עדיין לא שם — כמו applyNotionTypeValue ב-posts/new. */
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
                 continue;
               }
               const segment = segmentResult.segment;
-              const { format, theme } = parseNotionType(segment.typeValues);
+              const { format, isShort, theme } = parseNotionType(segment.typeValues);
               await registerThemeIfNew(theme);
               const manualHashtags = segment.tagValues.map((t) => (t.startsWith("#") ? t : `#${t}`));
               const post = await createAndPreparePost({
@@ -108,9 +108,10 @@ export async function POST(req: NextRequest) {
                 manualHashtags,
                 aiTheme: theme,
                 aiFormat: format ?? undefined,
+              isShort,
                 notionUrl: segment.pageUrl,
                 notionTag: candidateTag,
-                reelBackgroundPath: pickDefaultBackgroundPath(profile.defaultReelBackgroundPathsJson, format),
+                reelBackgroundPath: pickDefaultBackgroundPath(profile.defaultReelBackgroundPathsJson, format, isShort),
                 signal: req.signal,
               });
               const newContent = post.platformContents.find((pc) => pc.type === "instagram_reel");
@@ -127,13 +128,13 @@ export async function POST(req: NextRequest) {
               });
               continue;
             }
-            const existingPost = await prisma.post.findUniqueOrThrow({ where: { id: postId }, select: { aiFormat: true } });
+            const existingPost = await prisma.post.findUniqueOrThrow({ where: { id: postId }, select: { aiFormat: true, isShort: true } });
             let updatedPost;
             let reelAlreadyExisted = false;
             try {
               updatedPost = await addTargetToPost(postId, "instagram_reel", {
                 signal: req.signal,
-                reelBackgroundPath: pickDefaultBackgroundPath(profile.defaultReelBackgroundPathsJson, existingPost.aiFormat as "tip" | "letter" | null),
+                reelBackgroundPath: pickDefaultBackgroundPath(profile.defaultReelBackgroundPathsJson, existingPost.aiFormat as "tip" | "letter" | null, existingPost.isShort),
               });
             } catch (targetErr) {
               // לא כשל אמיתי: יש כאן עדיין תוכן שלא קושר לשיבוץ הזה — אם כבר
@@ -167,7 +168,7 @@ export async function POST(req: NextRequest) {
               continue;
             }
             const segment = result.segment;
-            const { format, theme } = parseNotionType(segment.typeValues);
+            const { format, isShort, theme } = parseNotionType(segment.typeValues);
             await registerThemeIfNew(theme);
             const selectedTargets: SelectedTarget[] = [slot.recommendedType ?? "instagram_carousel"];
             const manualHashtags = segment.tagValues.map((t) => (t.startsWith("#") ? t : `#${t}`));
@@ -177,10 +178,11 @@ export async function POST(req: NextRequest) {
               manualHashtags,
               aiTheme: theme,
               aiFormat: format ?? undefined,
+              isShort,
               notionUrl: segment.pageUrl,
               notionTag: slot.recommendedNotionSegment.tag,
-              carouselBackgroundPath: pickDefaultBackgroundPath(profile.defaultCarouselBackgroundPathsJson, format),
-              coverBackgroundPath: pickDefaultBackgroundPath(profile.defaultCoverBackgroundPathsJson, format),
+              carouselBackgroundPath: pickDefaultBackgroundPath(profile.defaultCarouselBackgroundPathsJson, format, isShort),
+              coverBackgroundPath: pickDefaultBackgroundPath(profile.defaultCoverBackgroundPathsJson, format, isShort),
               signal: req.signal,
             });
             const newContent = post.platformContents.find((pc) => selectedTargets.includes(pc.type as SelectedTarget));
