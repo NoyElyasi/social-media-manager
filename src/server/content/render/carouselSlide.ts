@@ -27,7 +27,7 @@ const SHORT_RIGHT_INSET_REDUCTION = 40;
 const SHORT_HASHTAG_FONT_SIZE = 28;
 const SHORT_HASHTAG_GAP = 35;
 const SHORT_HASHTAG_TOP_SHIFT = 35;
-const SHORT_BODY_FONT_WEIGHT = 700;
+const SHORT_BODY_FONT_WEIGHT = 400;
 const SHORT_PARAGRAPH_GAP_RATIO = 0.7;
 const SHORT_DARK_TEXT_COLOR = "#FEF9F4";
 // פוסט קצר תמיד נכנס לעמוד אחד: הפונט קטן בהדרגה מ-SHORT_BODY_FONT_SIZE עד שהטקסט נכנס בגובה הפנוי (אך לא מתחת לרצפה).
