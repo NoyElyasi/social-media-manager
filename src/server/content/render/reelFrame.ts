@@ -55,10 +55,17 @@ interface ReelTextPosition {
   /** מרחק התגית מעל הכתובית (ריל רגיל / ריל קצר), בפיקסלים. */
   hashtagGap?: number | null;
   hashtagGapShort?: number | null;
+  /** תגית בצבע בהיר (ברירת מחדל: כמו isDarkBackground). */
+  lightHashtag?: boolean;
 }
 
 function scaledFontSize(base: number, percent: number | null | undefined): number {
   return percent ? Math.round((base * percent) / 100) : base;
+}
+
+function hashtagColor(input: ReelTextPosition & { isDarkBackground?: boolean; backgroundImageDataUri?: string | null }, textColor: string): string {
+  if (!input.backgroundImageDataUri) return textColor;
+  return (input.lightHashtag ?? input.isDarkBackground) ? TEMPLATE_TEXT_COLOR_DARK : TEMPLATE_TEXT_COLOR;
 }
 
 function buildHashtagNode(
@@ -157,7 +164,7 @@ export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
         height: REEL_HEIGHT,
         style: { position: "absolute", top: 0, left: 0, width: REEL_WIDTH, height: REEL_HEIGHT, objectFit: "cover" },
       }),
-    buildHashtagNode(input.hashtags, textColor, !!input.isShort, input),
+    buildHashtagNode(input.hashtags, hashtagColor(input, textColor), !!input.isShort, input),
     h(
       "div",
       {
@@ -224,7 +231,7 @@ export function buildWordCenterFrameNode(input: WordCenterFrameInput): SatoriNod
         height: REEL_HEIGHT,
         style: { position: "absolute", top: 0, left: 0, width: REEL_WIDTH, height: REEL_HEIGHT, objectFit: "cover" },
       }),
-    buildHashtagNode(input.hashtags, textColor, !!input.isShort, input),
+    buildHashtagNode(input.hashtags, hashtagColor(input, textColor), !!input.isShort, input),
     input.word &&
       h(
         "div",

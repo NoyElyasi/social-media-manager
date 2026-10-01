@@ -66,6 +66,7 @@ const patchSchema = z.object({
   path: z.string().min(1),
   lightBar: z.boolean().optional(),
   lightText: z.boolean().optional(),
+  lightHashtag: z.boolean().optional(),
   category: z.string().optional(),
   textTopOffset: z.number().nullable().optional(),
   textRightInset: z.number().nullable().optional(),
@@ -88,10 +89,15 @@ export async function PATCH(req: NextRequest) {
   let entries: Awaited<ReturnType<typeof setBackgroundCategory>> | undefined;
   let defaultPaths: Partial<Record<"regular" | "tip" | "letter" | "short", string>> | undefined;
 
-  if (parsed.data.lightBar !== undefined || parsed.data.lightText !== undefined) {
+  if (
+    parsed.data.lightBar !== undefined ||
+    parsed.data.lightText !== undefined ||
+    parsed.data.lightHashtag !== undefined
+  ) {
     entries = await setBackgroundLightness(parsed.data.kind, parsed.data.path, {
       lightBar: parsed.data.lightBar,
       lightText: parsed.data.lightText,
+      lightHashtag: parsed.data.lightHashtag,
     });
   }
   if (parsed.data.category !== undefined) {

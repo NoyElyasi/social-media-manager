@@ -110,6 +110,7 @@ export interface PrepareReelParams {
   textFontPercent?: number | null;
   hashtagGap?: number | null;
   hashtagGapShort?: number | null;
+  lightHashtag?: boolean;
 }
 
 async function renderCaptionFrames(
@@ -133,7 +134,7 @@ async function renderCaptionFrames(
   leadInSeconds: number,
   isShort: boolean,
   isDarkBackground: boolean,
-  textPosition: { textTopOffset?: number | null; textRightInset?: number | null; textFontPercent?: number | null; hashtagGap?: number | null; hashtagGapShort?: number | null }
+  textPosition: { textTopOffset?: number | null; textRightInset?: number | null; textFontPercent?: number | null; hashtagGap?: number | null; hashtagGapShort?: number | null; lightHashtag?: boolean }
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
@@ -238,7 +239,7 @@ async function renderWordCenterFrames(
   leadInSeconds: number,
   isShort: boolean,
   isDarkBackground: boolean,
-  textPosition: { textTopOffset?: number | null; textRightInset?: number | null; textFontPercent?: number | null; hashtagGap?: number | null; hashtagGapShort?: number | null }
+  textPosition: { textTopOffset?: number | null; textRightInset?: number | null; textFontPercent?: number | null; hashtagGap?: number | null; hashtagGapShort?: number | null; lightHashtag?: boolean }
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
@@ -684,6 +685,7 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
               textFontPercent: params.textFontPercent,
               hashtagGap: params.hashtagGap,
               hashtagGapShort: params.hashtagGapShort,
+              lightHashtag: params.lightHashtag,
             }
           )
         : await renderCaptionFrames(
@@ -706,6 +708,7 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
               textFontPercent: params.textFontPercent,
               hashtagGap: params.hashtagGap,
               hashtagGapShort: params.hashtagGapShort,
+              lightHashtag: params.lightHashtag,
             }
           );
     if (params.signal?.aborted) throw new ReelCancelledError();

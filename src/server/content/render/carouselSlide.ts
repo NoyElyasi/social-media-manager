@@ -93,6 +93,10 @@ export interface CarouselSlideInput {
   hideProgressBar?: boolean;
   /** טקסט ותגית בצבע בהיר (תבנית שסומנה "טקסט בהיר"). */
   lightText?: boolean;
+  /** תגית בצבע בהיר (ברירת מחדל: כמו lightText). */
+  lightHashtag?: boolean;
+  /** טקסט הגוף בבולד. */
+  isBold?: boolean;
   /** מרחק התגית מהטקסט בפוסט קצר, בפיקסלים (ברירת מחדל SHORT_HASHTAG_GAP). */
   hashtagGap?: number | null;
 }
@@ -272,7 +276,7 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
                   ...renderPreparedLines(prepareRtlWordLines(hashtags.join(" "), SHORT_HASHTAG_FONT_SIZE, availableWidth), {
                     fontSize: SHORT_HASHTAG_FONT_SIZE,
                     fontWeight: 400,
-                    color: input.lightText ? SHORT_DARK_TEXT_COLOR : FB_LINK_COLOR,
+                    color: (input.lightHashtag ?? input.lightText) ? SHORT_DARK_TEXT_COLOR : FB_LINK_COLOR,
                     justifyContent: "flex-end",
                   }),
                   h("div", { style: { display: "flex", height: input.hashtagGap ?? SHORT_HASHTAG_GAP } }),
@@ -284,7 +288,7 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
                 : []),
               ...renderPreparedLines(lines, {
                 fontSize,
-                fontWeight: SHORT_BODY_FONT_WEIGHT,
+                fontWeight: input.isBold ? 700 : SHORT_BODY_FONT_WEIGHT,
                 color: input.lightText ? SHORT_DARK_TEXT_COLOR : FB_TEXT_COLOR,
                 justifyContent: "flex-end",
               }),
@@ -305,7 +309,7 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
                   ...renderPreparedLines(prepareRtlWordLines(hashtags.join(" "), fontSize - 2, availableWidth), {
                     fontSize: fontSize - 2,
                     fontWeight: 400,
-                    color: input.lightText ? SHORT_DARK_TEXT_COLOR : FB_LINK_COLOR,
+                    color: (input.lightHashtag ?? input.lightText) ? SHORT_DARK_TEXT_COLOR : FB_LINK_COLOR,
                     justifyContent: "flex-end",
                   }),
                   h("div", { style: { display: "flex", height: 12 } }),
@@ -313,7 +317,7 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
               : []),
             ...renderPreparedLines(prepareRtlWordLines(input.bodyText, fontSize, availableWidth), {
               fontSize,
-              fontWeight: 400,
+              fontWeight: input.isBold ? 700 : 400,
               color: input.lightText ? SHORT_DARK_TEXT_COLOR : FB_TEXT_COLOR,
               justifyContent: "flex-end",
             })

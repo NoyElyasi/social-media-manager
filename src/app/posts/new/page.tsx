@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SELECTABLE_TARGETS, ALWAYS_FIRST_HASHTAG, type SelectedTarget } from "@/lib/labels";
 import { readNdjsonStream, estimateRemainingSeconds } from "@/lib/ndjsonStream";
+import PostTypeSelector, { postTypeOf, splitPostType, type PostType } from "@/components/PostTypeSelector";
 import ReelProgress from "@/components/ReelProgress";
 import HashtagBadge from "@/components/HashtagBadge";
 import BackgroundPicker from "@/components/BackgroundPicker";
@@ -24,6 +25,7 @@ interface DraftShape {
   postFormat: "regular" | "letter" | "tip";
   isShort: boolean;
   hideProgressBar: boolean;
+  isBold: boolean;
   carouselBackgroundPath: string | null;
   reelBackgroundPath: string | null;
   coverBackgroundPath: string | null;
@@ -60,6 +62,7 @@ export default function NewPostPage() {
   const [postFormat, setPostFormat] = useState<"regular" | "letter" | "tip">(() => loadDraft().postFormat ?? "regular");
   const [isShort, setIsShort] = useState(() => loadDraft().isShort ?? false);
   const [hideProgressBar, setHideProgressBar] = useState(() => loadDraft().hideProgressBar ?? false);
+  const [isBold, setIsBold] = useState(() => loadDraft().isBold ?? false);
   const [aiThemeOptions, setAiThemeOptions] = useState<string[]>([]);
   const [carouselBackgroundPath, setCarouselBackgroundPath] = useState<string | null>(
     () => loadDraft().carouselBackgroundPath ?? null
@@ -110,6 +113,7 @@ export default function NewPostPage() {
       postFormat,
       isShort,
       hideProgressBar,
+      isBold,
       carouselBackgroundPath,
       reelBackgroundPath,
       coverBackgroundPath,
@@ -124,6 +128,7 @@ export default function NewPostPage() {
     postFormat,
     isShort,
     hideProgressBar,
+    isBold,
     carouselBackgroundPath,
     reelBackgroundPath,
     coverBackgroundPath,
@@ -257,6 +262,7 @@ export default function NewPostPage() {
           aiFormat: postFormat,
           isShort,
           hideProgressBar,
+          isBold,
           carouselBackgroundPath,
           reelBackgroundPath,
           coverBackgroundPath,
@@ -539,41 +545,15 @@ export default function NewPostPage() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="font-medium text-sm">סוג הפוסט (אופציונלי)</label>
-        <div className="flex gap-2">
-          {(
-            [
-              { value: "regular", label: "רגיל" },
-              { value: "letter", label: "✉️ מכתב" },
-              { value: "tip", label: "💡 טיפ" },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setPostFormat(opt.value)}
-              className={`rounded-full px-3 py-1.5 text-sm transition-colors ${
-                postFormat === opt.value
-                  ? "bg-brand-pink/30 text-brand-maroon"
-                  : "border border-brand-pink/40 text-brand-maroon/60 hover:bg-brand-pink/10"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setIsShort((v) => !v)}
-            aria-pressed={isShort}
-            className={`rounded-full px-3 py-1.5 text-sm transition-colors ${
-              isShort
-                ? "bg-brand-pink/30 text-brand-maroon"
-                : "border border-brand-pink/40 text-brand-maroon/60 hover:bg-brand-pink/10"
-            }`}
-          >
-            קצר
-          </button>
-        </div>
+        <label className="font-medium text-sm">סוג הפוסט</label>
+        <PostTypeSelector
+          value={postTypeOf(postFormat, isShort)}
+          onChange={(type: PostType) => {
+            const next = splitPostType(type);
+            setPostFormat(next.aiFormat);
+            setIsShort(next.isShort);
+          }}
+        />
       </div>
 
       {/* 2. בחירת הפלט — קובע אילו קטגוריות אפשרויות יופיעו מכאן ואילך */}
@@ -598,10 +578,19 @@ export default function NewPostPage() {
       </div>
 
       {showCarouselOptions && (
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={hideProgressBar} onChange={(e) => setHideProgressBar(e.target.checked)} />
-          בלי בר מתמלא בקרוסלה (מונה עמודים + פס התקדמות)
-        </label>
+        <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3">
+          <label className="font-medium text-sm">עיצוב הקרוסלה</label>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={isBold} onChange={(e) => setIsBold(e.target.checked)} />
+              טקסט בולד
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={hideProgressBar} onChange={(e) => setHideProgressBar(e.target.checked)} />
+              בלי בר מתמלא (מונה עמודים + פס התקדמות)
+            </label>
+          </div>
+        </div>
       )}
 
       {/* 4. אפשרויות לקרוסלה בלבד */}

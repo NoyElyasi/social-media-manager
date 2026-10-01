@@ -86,6 +86,8 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
             notionUrl={post.notionUrl}
             initialRevealMode={post.revealMode as "word" | "letter" | "word-center"}
             initialIsShort={post.isShort}
+            initialAiFormat={post.aiFormat}
+            initialIsBold={post.isBold}
             initialHideProgressBar={post.hideProgressBar}
             initialHashtags={JSON.parse(post.hashtags || "[]")}
           />

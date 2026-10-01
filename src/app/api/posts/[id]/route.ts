@@ -38,6 +38,8 @@ const updatePostSchema = z.object({
   hashtags: z.array(z.string()).optional(),
   isShort: z.boolean().optional(),
   hideProgressBar: z.boolean().optional(),
+  isBold: z.boolean().optional(),
+  aiFormat: z.enum(["regular", "letter", "tip"]).optional(),
 });
 
 /**
@@ -84,6 +86,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           revealMode: parsed.data.revealMode,
           isShort: parsed.data.isShort,
           hideProgressBar: parsed.data.hideProgressBar,
+          isBold: parsed.data.isBold,
+          aiFormat: parsed.data.aiFormat,
         });
         send({ type: "done", post });
       } catch (err) {

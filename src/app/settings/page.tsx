@@ -63,6 +63,7 @@ export default async function SettingsPage() {
                 textTopOffset: e.textTopOffset,
                 textRightInset: e.textRightInset,
                 hashtagGap: e.hashtagGap,
+                lightHashtag: e.lightHashtag,
                 lightBar: e.lightBar ?? darkCarouselBackgroundPaths.includes(e.path),
                 lightText: e.lightText ?? darkCarouselBackgroundPaths.includes(e.path),
               }))}
@@ -81,6 +82,7 @@ export default async function SettingsPage() {
                 textTopOffset: e.textTopOffset,
                 textRightInset: e.textRightInset,
                 hashtagGap: e.hashtagGap,
+                lightHashtag: e.lightHashtag,
                 hashtagGapShort: e.hashtagGapShort,
                 lightBar: e.lightBar ?? darkCarouselBackgroundPaths.includes(e.path),
                 lightText: e.lightText ?? darkCarouselBackgroundPaths.includes(e.path),

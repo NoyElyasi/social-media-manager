@@ -38,9 +38,11 @@ function findBackgroundEntry(entriesJson: string, backgroundPath: string | null)
 function getCarouselStyle(profile: { carouselBackgroundImagePaths: string; darkCarouselBackgroundPaths: string }, backgroundPath: string | null, isShort: boolean) {
   const entry = findBackgroundEntry(profile.carouselBackgroundImagePaths, backgroundPath);
   const legacyDark = isInLegacyDarkList(profile.darkCarouselBackgroundPaths, backgroundPath);
+  const lightText = isShort ? (entry?.lightText ?? legacyDark) : entry?.lightText === true;
   return {
     isDarkBackground: entry?.lightBar ?? legacyDark,
-    lightText: isShort ? (entry?.lightText ?? legacyDark) : entry?.lightText === true,
+    lightText,
+    lightHashtag: entry?.lightHashtag ?? lightText,
     textTopOffset: entry?.textTopOffset ?? null,
     textRightInset: entry?.textRightInset ?? null,
     hashtagGap: entry?.hashtagGap ?? null,
@@ -51,8 +53,10 @@ function getCarouselStyle(profile: { carouselBackgroundImagePaths: string; darkC
 function getReelStyle(profile: { reelBackgroundImagePaths: string; darkCarouselBackgroundPaths: string }, backgroundPath: string | null) {
   const entry = findBackgroundEntry(profile.reelBackgroundImagePaths, backgroundPath);
   const legacyDark = isInLegacyDarkList(profile.darkCarouselBackgroundPaths, backgroundPath);
+  const lightText = entry?.lightText ?? legacyDark;
   return {
-    isDarkBackground: entry?.lightText ?? legacyDark,
+    isDarkBackground: lightText,
+    lightHashtag: entry?.lightHashtag ?? lightText,
     textTopOffset: entry?.textTopOffset ?? null,
     textRightInset: entry?.textRightInset ?? null,
     textFontPercent: entry?.textFontPercent ?? null,
@@ -128,6 +132,8 @@ export interface CreatePostInput {
   isShort?: boolean;
   /** מבטל את הבר המתמלא (מונה עמודים + פס התקדמות) בתחתית הקרוסלה. */
   hideProgressBar?: boolean;
+  /** טקסט בולד בקרוסלה. */
+  isBold?: boolean;
   /** תבנית רקע לקרוסלה, נבחרת מתוך הרקעים שהועלו בהגדרות — null/לא סופק = רקע לבן. */
   carouselBackgroundPath?: string | null;
   /** תבנית רקע לריל, נבחרת מתוך הרקעים שהועלו בהגדרות — null/לא סופק = צבע רקע אוטומטי. */
@@ -188,6 +194,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
       revealMode,
       isShort: !!input.isShort,
       hideProgressBar: !!input.hideProgressBar,
+      isBold: !!input.isBold,
       aiTheme: effectiveTheme,
       aiFormat: input.aiFormat && input.aiFormat !== "regular" ? input.aiFormat : null,
       folderPath: postFolderPath,
@@ -242,6 +249,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           coverBackgroundImageDataUri,
           isShort: !!input.isShort,
           hideProgressBar: !!input.hideProgressBar,
+          isBold: !!input.isBold,
           storage,
         });
         await prisma.platformContent.create({
@@ -342,6 +350,10 @@ export async function updatePostRawText(
     isShort?: boolean;
     /** מבטל/מחזיר את הבר המתמלא (מונה עמודים + פס התקדמות) בתחתית הקרוסלה — לא סופק = משאירים את הקיים. */
     hideProgressBar?: boolean;
+    /** טקסט בולד בקרוסלה — לא סופק = משאירים את הקיים. */
+    isBold?: boolean;
+    /** משנה את סוג הפוסט (רגיל/מכתב/טיפ) — "regular" נשמר כ-null. לא סופק = משאירים. */
+    aiFormat?: "regular" | "letter" | "tip";
   }
 ) {
   const storage = getStorageService();
@@ -358,10 +370,16 @@ export async function updatePostRawText(
   const revealMode = (options?.revealMode ?? post.revealMode) as RevealMode;
   const isShort = options?.isShort ?? post.isShort;
   const hideProgressBar = options?.hideProgressBar ?? post.hideProgressBar;
+  const isBold = options?.isBold ?? post.isBold;
 
   await prisma.post.update({
     where: { id: postId },
-    data: { rawText: newRawText, privacyFlags: JSON.stringify(privacyFlags), revealMode, isShort, hideProgressBar },
+    data: { rawText: newRawText, privacyFlags: JSON.stringify(privacyFlags), revealMode,
+      isShort,
+      hideProgressBar,
+      isBold,
+      ...(options?.aiFormat !== undefined ? { aiFormat: options.aiFormat === "regular" ? null : options.aiFormat } : {}),
+    },
   });
   await storage.saveTextFile(post.folderPath, "טקסט-מקור.txt", newRawText);
 
@@ -406,6 +424,7 @@ export async function updatePostRawText(
         coverBackgroundImageDataUri,
         isShort,
         hideProgressBar,
+        isBold,
         storage,
       });
       await prisma.platformContent.update({
@@ -529,6 +548,7 @@ export async function addTargetToPost(
       profileImageDataUri,
       isShort: post.isShort,
       hideProgressBar: post.hideProgressBar,
+      isBold: post.isBold,
       storage,
     });
     await prisma.platformContent.create({

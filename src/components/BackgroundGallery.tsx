@@ -27,6 +27,8 @@ export interface BackgroundItem {
   /** בר התקדמות/מספור עמודים בהירים (קרוסלה) וטקסט בהיר (קרוסלה/ריל) — לתבניות עם מסגרת/רקע כהים. */
   lightBar?: boolean;
   lightText?: boolean;
+  /** תגית בהירה (ברירת מחדל: כמו הטקסט). */
+  lightHashtag?: boolean;
 }
 
 // ערכי ברירת המחדל של הרינדור — מוצגים בשדות כשלא הוגדר כלום, כדי שיהיה ברור כמה להוסיף/להחסיר.
@@ -84,9 +86,9 @@ export default function BackgroundGallery({
   );
   const visibleItems = activeFilter === null ? items : items.filter((i) => (i.category?.trim() || "") === activeFilter);
 
-  async function toggleLight(item: BackgroundItem, field: "lightBar" | "lightText") {
+  async function toggleLight(item: BackgroundItem, field: "lightBar" | "lightText" | "lightHashtag") {
     setError(null);
-    const value = !item[field];
+    const value = field === "lightHashtag" ? !(item.lightHashtag ?? !!item.lightText) : !item[field];
     const res = await fetch("/api/settings/backgrounds", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -351,13 +353,23 @@ export default function BackgroundGallery({
                       </label>
                     )}
                     {kind !== "cover" && (
-                      <label className="flex items-center gap-2 text-sm">
-                        <input type="checkbox" checked={!!item.lightText} onChange={() => toggleLight(item, "lightText")} />
-                        הטקסט בהיר
-                      </label>
+                      <>
+                        <label className="flex items-center gap-2 text-sm">
+                          <input type="checkbox" checked={!!item.lightText} onChange={() => toggleLight(item, "lightText")} />
+                          הטקסט בהיר
+                        </label>
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={item.lightHashtag ?? !!item.lightText}
+                            onChange={() => toggleLight(item, "lightHashtag")}
+                          />
+                          התגית בהירה
+                        </label>
+                      </>
                     )}
                     <p className="text-[11px] text-neutral-500">
-                      סמני כשהרקע כהה: בר ההתקדמות ומספור העמודים (קרוסלה) והטקסט והתגית נצבעים בהיר.
+                      בר, טקסט ותגית נקבעים בנפרד — סמני בהיר רק למה שעל רקע כהה. (ברירת מחדל לתגית: כמו הטקסט.)
                     </p>
                   </div>
                 </div>

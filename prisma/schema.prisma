@@ -32,6 +32,7 @@ model Post {
   // כדי שרינדורים חדשים (עדכון טקסט, הוספת יעד) ימשיכו באותו עיצוב.
   isShort         Boolean  @default(false)
   hideProgressBar Boolean  @default(false)
+  isBold          Boolean  @default(false)
   folderPath      String // נתיב תיקיית הפוסט באחסון (מקומי היום, Google Drive בעתיד)
   privacyFlags    String // JSON array of PrivacyFlag
   createdAt       DateTime @default(now())

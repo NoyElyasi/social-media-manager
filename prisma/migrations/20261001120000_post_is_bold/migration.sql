@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Post" ADD COLUMN "isBold" BOOLEAN NOT NULL DEFAULT false;

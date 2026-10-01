@@ -18,6 +18,7 @@ const createPostSchema = z.object({
   aiTheme: z.string().nullable().optional(),
   isShort: z.boolean().optional(),
   hideProgressBar: z.boolean().optional(),
+  isBold: z.boolean().optional(),
   aiFormat: z.enum(["regular", "letter", "tip"]).optional(),
   notionUrl: z.string().nullable().optional(),
   notionTag: z.string().nullable().optional(),

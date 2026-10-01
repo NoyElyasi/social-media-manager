@@ -8,6 +8,7 @@ import BackgroundPicker from "@/components/BackgroundPicker";
 import type { BackgroundItem } from "@/components/BackgroundGallery";
 import { buildFileUrlFromPath } from "@/lib/files";
 import NarrationInput, { type CapturedNarration } from "@/components/NarrationInput";
+import PostTypeSelector, { postTypeOf, splitPostType, type PostType } from "@/components/PostTypeSelector";
 import HashtagBadge from "@/components/HashtagBadge";
 import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
 
@@ -29,6 +30,8 @@ export default function EditablePostText({
   notionUrl,
   initialRevealMode,
   initialIsShort,
+  initialAiFormat,
+  initialIsBold,
   initialHideProgressBar,
   initialHashtags,
 }: {
@@ -49,6 +52,8 @@ export default function EditablePostText({
   initialRevealMode: "word" | "letter" | "word-center";
   /** פוסט "קצר" (מעט מלל) — קרוסלה בלי לוגו פרופיל ובפונט גדול, ריל בפונט גדול, תגית למעלה ומימין. */
   initialIsShort: boolean;
+  initialAiFormat: string | null;
+  initialIsBold: boolean;
   initialHideProgressBar: boolean;
   initialHashtags: string[];
 }) {
@@ -70,7 +75,8 @@ export default function EditablePostText({
   const [reelBackgroundPath, setReelBackgroundPath] = useState<string | null>(initialReelBackgroundPath);
   const [coverBackgroundPath, setCoverBackgroundPath] = useState<string | null>(initialCoverBackgroundPath);
   const [revealMode, setRevealMode] = useState<"word" | "letter" | "word-center">(initialRevealMode);
-  const [isShort, setIsShort] = useState(initialIsShort);
+  const [postType, setPostType] = useState<PostType>(postTypeOf(initialAiFormat, initialIsShort));
+  const [isBold, setIsBold] = useState(initialIsBold);
   const [hideProgressBar, setHideProgressBar] = useState(initialHideProgressBar);
   const [hashtagsInput, setHashtagsInput] = useState(initialHashtags.join(" "));
   const [updateCarousel, setUpdateCarousel] = useState(true);
@@ -154,7 +160,8 @@ export default function EditablePostText({
         body: JSON.stringify({
           rawText,
           hashtags: hashtagsInput.split(/\s+/).filter(Boolean),
-          isShort,
+          ...splitPostType(postType),
+          isBold,
           hideProgressBar,
           ...(hasCarousel
             ? {
@@ -296,16 +303,25 @@ export default function EditablePostText({
           </button>
         </div>
       )}
-      <label className="flex items-center gap-1.5 text-xs">
-        <input type="checkbox" checked={isShort} onChange={(e) => setIsShort(e.target.checked)} />
-        פוסט קצר
-        <span className="text-neutral-400">(ייכנס לתוקף בלחיצה על &quot;שמור טקסט&quot;)</span>
-      </label>
-      <label className="flex items-center gap-1.5 text-xs">
-        <input type="checkbox" checked={hideProgressBar} onChange={(e) => setHideProgressBar(e.target.checked)} />
-        בלי בר מתמלא בקרוסלה
-        <span className="text-neutral-400">(ייכנס לתוקף בלחיצה על &quot;שמור טקסט&quot;)</span>
-      </label>
+      <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/30 bg-white/60 p-3">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium">סוג הפוסט</span>
+          <PostTypeSelector value={postType} onChange={setPostType} />
+        </div>
+        {hasCarousel && (
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs">
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={isBold} onChange={(e) => setIsBold(e.target.checked)} />
+              טקסט בולד בקרוסלה
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={hideProgressBar} onChange={(e) => setHideProgressBar(e.target.checked)} />
+              בלי בר מתמלא בקרוסלה
+            </label>
+          </div>
+        )}
+        <span className="text-[11px] text-neutral-400">שינויים בסוג ובעיצוב ייכנסו לתוקף בלחיצה על &quot;שמור טקסט&quot;</span>
+      </div>
       {hasCarousel && hasReel && (
         <div className="flex items-center gap-4 text-xs">
           <span className="text-neutral-500">עדכן ברענון:</span>

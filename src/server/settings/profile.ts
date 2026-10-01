@@ -115,6 +115,8 @@ export interface BackgroundEntry {
    * undefined = נופלים לסימון הישן ברשימת darkCarouselBackgroundPaths. */
   lightBar?: boolean;
   lightText?: boolean;
+  /** תגית בהירה — ברירת מחדל כמו lightText. */
+  lightHashtag?: boolean;
 }
 
 /** מפרשת את הרשימה השמורה — תומכת גם בפורמט הישן (מערך של נתיבים כמחרוזות בלבד), לפני שהתבנית קיבלה קטגוריה. */
@@ -247,7 +249,7 @@ export async function setBackgroundTextPosition(
 export async function setBackgroundLightness(
   kind: BackgroundKind,
   filePath: string,
-  flags: { lightBar?: boolean; lightText?: boolean }
+  flags: { lightBar?: boolean; lightText?: boolean; lightHashtag?: boolean }
 ): Promise<BackgroundEntry[]> {
   const profile = await getProfileSettings();
   const field = BACKGROUND_FIELD[kind];
@@ -258,6 +260,7 @@ export async function setBackgroundLightness(
           ...e,
           lightBar: flags.lightBar ?? e.lightBar ?? inDarkList,
           lightText: flags.lightText ?? e.lightText ?? inDarkList,
+          ...(flags.lightHashtag !== undefined ? { lightHashtag: flags.lightHashtag } : {}),
         }
       : e
   );
