@@ -23,12 +23,15 @@ const BODY_LINE_GAP = 20;
 // ימינה יותר בהפחתת SHORT_RIGHT_INSET_REDUCTION מהשוליים הרגילים.
 const SHORT_BODY_FONT_SIZE = MIN_FONT_SIZE_CAROUSEL + 34;
 const SHORT_RIGHT_INSET_REDUCTION = 40;
-const SHORT_BODY_FONT_WEIGHT = 700;
+// תגית קטנה ורחוקה מהטקסט, ופסקאות עם רווח ביניהן אבל שורות צפופות בתוך פסקה (לפי הדוגמה שסופקה).
+const SHORT_HASHTAG_FONT_SIZE = 28;
+const SHORT_HASHTAG_GAP = 70;
+const SHORT_PARAGRAPH_GAP_RATIO = 0.7;
 const SHORT_DARK_TEXT_COLOR = "#FEF9F4";
 // פוסט קצר תמיד נכנס לעמוד אחד: הפונט קטן בהדרגה מ-SHORT_BODY_FONT_SIZE עד שהטקסט נכנס בגובה הפנוי (אך לא מתחת לרצפה).
 const SHORT_MIN_FIT_FONT_SIZE = 26;
 // בפוסט קצר שואפים ל-5–6 מילים בשורה: הפונט הגדול ביותר שבו ממוצע המילים בשורה מלאה הוא לפחות 5 (ובכל מקרה בלי לחרוג מהעמוד).
-const SHORT_MIN_AVG_WORDS_PER_LINE = 5;
+const SHORT_MIN_AVG_WORDS_PER_LINE = 6;
 const SHORT_FIT_LINE_HEIGHT = 1.45;
 const SHORT_FIT_BOTTOM_MARGIN = 60;
 const SHORT_FIT_FOOTER_RESERVE = 150;
@@ -121,33 +124,38 @@ function shownHashtags(input: CarouselSlideInput): string[] {
   return input.isShort ? input.hashtags.filter((tag) => tag !== ALWAYS_FIRST_HASHTAG) : input.hashtags;
 }
 
-function estimateBodyHeight(
-  input: CarouselSlideInput,
-  fontSize: number,
-  availableWidth: number
-): number {
-  const lineBoxes: number[] = [];
-  const pushLines = (lines: (string[] | null)[], size: number) => {
-    for (const line of lines) lineBoxes.push(line === null ? Math.round(size * 0.6) : size * SHORT_FIT_LINE_HEIGHT);
-  };
-  const hashtags = shownHashtags(input);
-  if (hashtags.length > 0 && input.pageIndex === 1) {
-    pushLines(prepareRtlWordLines(hashtags.join(" "), fontSize - 2, availableWidth), fontSize - 2);
-    lineBoxes.push(12);
-  }
-  pushLines(prepareRtlWordLines(input.bodyText, fontSize, availableWidth), fontSize);
-  return lineBoxes.reduce((sum, h) => sum + h, 0) + Math.max(0, lineBoxes.length - 1) * BODY_LINE_GAP;
+function shortParagraphLines(bodyText: string, fontSize: number, availableWidth: number): string[][][] {
+  return bodyText
+    .split("\n")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => prepareRtlWordLines(p, fontSize, availableWidth).filter((l): l is string[] => l !== null))
+    .filter((lines) => lines.length > 0);
 }
 
-function averageWordsPerFullLine(lines: (string[] | null)[]): number | null {
+function estimateBodyHeight(input: CarouselSlideInput, fontSize: number, availableWidth: number): number {
+  let height = 0;
+  const hashtags = shownHashtags(input);
+  if (hashtags.length > 0 && input.pageIndex === 1) {
+    const tagLines = prepareRtlWordLines(hashtags.join(" "), SHORT_HASHTAG_FONT_SIZE, availableWidth).length;
+    height += tagLines * SHORT_HASHTAG_FONT_SIZE * SHORT_FIT_LINE_HEIGHT + SHORT_HASHTAG_GAP;
+  }
+  const paragraphs = shortParagraphLines(input.bodyText, fontSize, availableWidth);
+  const lineCount = paragraphs.reduce((sum, lines) => sum + lines.length, 0);
+  height += lineCount * fontSize * SHORT_FIT_LINE_HEIGHT;
+  height += Math.max(0, paragraphs.length - 1) * Math.round(fontSize * SHORT_PARAGRAPH_GAP_RATIO);
+  return height;
+}
+
+function averageWordsPerFullLine(paragraphs: string[][][]): number | null {
   let words = 0;
   let count = 0;
-  lines.forEach((line, i) => {
-    const isLastOfParagraph = i === lines.length - 1 || lines[i + 1] === null;
-    if (line === null || isLastOfParagraph) return;
-    words += line.length;
-    count++;
-  });
+  for (const lines of paragraphs) {
+    for (const line of lines.slice(0, -1)) {
+      words += line.length;
+      count++;
+    }
+  }
   return count === 0 ? null : words / count;
 }
 
@@ -157,7 +165,7 @@ function fitShortFontSize(input: CarouselSlideInput, topOffset: number, availabl
     CAROUSEL_HEIGHT - topOffset - (showsFooter ? SHORT_FIT_FOOTER_RESERVE : SHORT_FIT_BOTTOM_MARGIN);
   for (let size = SHORT_BODY_FONT_SIZE; size > SHORT_MIN_FIT_FONT_SIZE; size -= 2) {
     if (estimateBodyHeight(input, size, availableWidth) > availableHeight) continue;
-    const avgWords = averageWordsPerFullLine(prepareRtlWordLines(input.bodyText, size, availableWidth));
+    const avgWords = averageWordsPerFullLine(shortParagraphLines(input.bodyText, size, availableWidth));
     if (avgWords === null || avgWords >= SHORT_MIN_AVG_WORDS_PER_LINE) return size;
   }
   return SHORT_MIN_FIT_FONT_SIZE;
@@ -245,37 +253,61 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
           ]
         : []),
       // גוף הפוסט: התגיות שנבחרו (רק בעמוד הראשון), ולאחריהן הטקסט
-      h(
-        "div",
-        {
-          style: {
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-end",
-            gap: BODY_LINE_GAP,
-          },
-        },
-        ...(hashtags.length > 0 && input.pageIndex === 1
-          ? [
-              ...renderPreparedLines(
-                prepareRtlWordLines(hashtags.join(" "), fontSize - 2, availableWidth),
-                {
-                  fontSize: fontSize - 2,
-                  fontWeight: 400,
-                  color: isShort && input.isDarkBackground ? SHORT_DARK_TEXT_COLOR : FB_LINK_COLOR,
-                  justifyContent: "flex-end",
-                }
-              ),
-              h("div", { style: { display: "flex", height: 12 } }),
-            ]
-          : []),
-        ...renderPreparedLines(prepareRtlWordLines(input.bodyText, fontSize, availableWidth), {
-          fontSize,
-          fontWeight: isShort ? SHORT_BODY_FONT_WEIGHT : 400,
-          color: isShort && input.isDarkBackground ? SHORT_DARK_TEXT_COLOR : FB_TEXT_COLOR,
-          justifyContent: "flex-end",
-        })
-      )
+      isShort
+        ? h(
+            "div",
+            { style: { display: "flex", flexDirection: "column", alignItems: "flex-end" } },
+            ...(hashtags.length > 0 && input.pageIndex === 1
+              ? [
+                  ...renderPreparedLines(prepareRtlWordLines(hashtags.join(" "), SHORT_HASHTAG_FONT_SIZE, availableWidth), {
+                    fontSize: SHORT_HASHTAG_FONT_SIZE,
+                    fontWeight: 400,
+                    color: input.isDarkBackground ? SHORT_DARK_TEXT_COLOR : FB_LINK_COLOR,
+                    justifyContent: "flex-end",
+                  }),
+                  h("div", { style: { display: "flex", height: SHORT_HASHTAG_GAP } }),
+                ]
+              : []),
+            ...shortParagraphLines(input.bodyText, fontSize, availableWidth).flatMap((lines, i) => [
+              ...(i > 0
+                ? [h("div", { style: { display: "flex", height: Math.round(fontSize * SHORT_PARAGRAPH_GAP_RATIO) } })]
+                : []),
+              ...renderPreparedLines(lines, {
+                fontSize,
+                fontWeight: 400,
+                color: input.isDarkBackground ? SHORT_DARK_TEXT_COLOR : FB_TEXT_COLOR,
+                justifyContent: "flex-end",
+              }),
+            ])
+          )
+        : h(
+            "div",
+            {
+              style: {
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-end",
+                gap: BODY_LINE_GAP,
+              },
+            },
+            ...(hashtags.length > 0 && input.pageIndex === 1
+              ? [
+                  ...renderPreparedLines(prepareRtlWordLines(hashtags.join(" "), fontSize - 2, availableWidth), {
+                    fontSize: fontSize - 2,
+                    fontWeight: 400,
+                    color: FB_LINK_COLOR,
+                    justifyContent: "flex-end",
+                  }),
+                  h("div", { style: { display: "flex", height: 12 } }),
+                ]
+              : []),
+            ...renderPreparedLines(prepareRtlWordLines(input.bodyText, fontSize, availableWidth), {
+              fontSize,
+              fontWeight: 400,
+              color: FB_TEXT_COLOR,
+              justifyContent: "flex-end",
+            })
+          )
     ),
     input.pageCount > 1 &&
     !input.hideProgressBar &&
