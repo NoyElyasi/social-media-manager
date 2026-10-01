@@ -72,7 +72,13 @@ export default async function SettingsPage() {
               kind="reel"
               title="תבניות רקע לריל"
               hint="אפשר להעלות כמה תבניות ולבחור מבינהן בזמן יצירת פוסט. בלי בחירה — נבחר צבע רקע אוטומטי."
-              initial={reelBackgroundEntries.map((e) => ({ path: e.path, url: buildFileUrlFromPath(e.path), category: e.category }))}
+              initial={reelBackgroundEntries.map((e) => ({
+                path: e.path,
+                url: buildFileUrlFromPath(e.path),
+                category: e.category,
+                textTopOffset: e.textTopOffset,
+                textRightInset: e.textRightInset,
+              }))}
               initialDarkPaths={darkCarouselBackgroundPaths}
               initialDefaultPaths={parseDefaultBackgroundPaths(profile.defaultReelBackgroundPathsJson)}
             />

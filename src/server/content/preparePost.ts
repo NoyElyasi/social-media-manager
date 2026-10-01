@@ -31,6 +31,7 @@ function isDarkCarouselBackground(darkCarouselBackgroundPathsJson: string, backg
 }
 
 /** מיקום טקסט מותאם לתבנית הרקע הנבחרת (ראו setBackgroundTextPosition) — {null,null} אם אין תבנית/כיוונון. */
+/** מיקום טקסט מותאם לתבנית (קרוסלה או ריל, לפי רשימת התבניות שמועברת). */
 function getCarouselTextPosition(
   carouselBackgroundImagePathsJson: string,
   backgroundPath: string | null
@@ -256,6 +257,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           narration: input.reelNarration,
           isShort: !!input.isShort,
           isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, input.reelBackgroundPath ?? null),
+          ...getCarouselTextPosition(profile.reelBackgroundImagePaths, input.reelBackgroundPath ?? null),
         });
         await prisma.platformContent.create({
           data: {
@@ -423,6 +425,7 @@ export async function updatePostRawText(
         narration,
         isShort,
         isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, backgroundPath),
+        ...getCarouselTextPosition(profile.reelBackgroundImagePaths, backgroundPath),
       });
       await prisma.platformContent.update({
         where: { id: content.id },
@@ -543,6 +546,7 @@ export async function addTargetToPost(
       narration: options?.reelNarration,
       isShort: post.isShort,
       isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, options?.reelBackgroundPath ?? null),
+      ...getCarouselTextPosition(profile.reelBackgroundImagePaths, options?.reelBackgroundPath ?? null),
     });
     await prisma.platformContent.create({
       data: {

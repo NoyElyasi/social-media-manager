@@ -328,7 +328,7 @@ export default function BackgroundGallery({
                 🌙 תבנית כהה
               </button>
             )}
-            {kind === "carousel" &&
+            {(kind === "carousel" || kind === "reel") &&
               (editingPositionPath === item.path ? (
                 <div className="flex flex-col items-center gap-1 rounded-md border border-brand-pink/40 bg-white p-1.5">
                   <label className="flex items-center gap-1 text-[10px] text-brand-maroon/70">

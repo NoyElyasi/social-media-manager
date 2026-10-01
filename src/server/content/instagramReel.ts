@@ -104,6 +104,9 @@ export interface PrepareReelParams {
   isShort?: boolean;
   /** תבנית הרקע מסומנת "כהה" בהגדרות — טקסט בהיר. */
   isDarkBackground?: boolean;
+  /** מיקום טקסט מותאם לתבנית (ראו setBackgroundTextPosition) — null/חסר = ברירת המחדל. */
+  textTopOffset?: number | null;
+  textRightInset?: number | null;
 }
 
 async function renderCaptionFrames(
@@ -126,7 +129,8 @@ async function renderCaptionFrames(
   // הזה, כדי שהמילה הראשונה על המסך לא תופיע לפני שבאמת אמרו אותה בהקלטה.
   leadInSeconds: number,
   isShort: boolean,
-  isDarkBackground: boolean
+  isDarkBackground: boolean,
+  textPosition: { textTopOffset?: number | null; textRightInset?: number | null }
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
@@ -143,7 +147,7 @@ async function renderCaptionFrames(
   async function addFrame(fullText: string, revealedUnitCount: number, duration: number): Promise<void> {
     if (signal?.aborted) throw new ReelCancelledError();
     const svg = await renderNodeToSvg(
-      buildReelFrameNode({ fullText, revealedUnitCount, revealMode, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags, isShort, isDarkBackground }),
+      buildReelFrameNode({ fullText, revealedUnitCount, revealMode, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags, isShort, isDarkBackground, ...textPosition }),
       REEL_WIDTH,
       REEL_HEIGHT
     );
@@ -230,7 +234,8 @@ async function renderWordCenterFrames(
   narrationTotalSeconds: number | null,
   leadInSeconds: number,
   isShort: boolean,
-  isDarkBackground: boolean
+  isDarkBackground: boolean,
+  textPosition: { textTopOffset?: number | null; textRightInset?: number | null }
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
@@ -240,7 +245,7 @@ async function renderWordCenterFrames(
   async function addFrame(word: string, duration: number): Promise<void> {
     if (signal?.aborted) throw new ReelCancelledError();
     const svg = await renderNodeToSvg(
-      buildWordCenterFrameNode({ word, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags, isShort, isDarkBackground }),
+      buildWordCenterFrameNode({ word, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags, isShort, isDarkBackground, ...textPosition }),
       REEL_WIDTH,
       REEL_HEIGHT
     );
@@ -669,7 +674,8 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
             narrationTotalSeconds,
             wordTimestamps?.[0] ?? 0,
             isShort,
-            !!params.isDarkBackground
+            !!params.isDarkBackground,
+            { textTopOffset: params.textTopOffset, textRightInset: params.textRightInset }
           )
         : await renderCaptionFrames(
             captions,
@@ -684,7 +690,8 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
             narrationTotalSeconds,
             wordTimestamps?.[0] ?? 0,
             isShort,
-            !!params.isDarkBackground
+            !!params.isDarkBackground,
+            { textTopOffset: params.textTopOffset, textRightInset: params.textRightInset }
           );
     if (params.signal?.aborted) throw new ReelCancelledError();
     const silentPath = path.join(workDir, "reel-silent.mp4");

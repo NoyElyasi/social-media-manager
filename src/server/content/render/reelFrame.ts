@@ -44,7 +44,21 @@ const SHORT_WORD_CENTER_FONT_SIZE = 170;
 const SHORT_HASHTAG_FONT_SIZE = 58;
 const SHORT_HASHTAG_TOP_OFFSET = 470;
 
-function buildHashtagNode(hashtags: string[], textColor: string, isShort: boolean): SatoriNode | false {
+interface ReelTextPosition {
+  /** גובה תחילת הכתובית (ברירת מחדל CAPTION_TOP_OFFSET) — מוגדר פר תבנית בהגדרות. */
+  textTopOffset?: number | null;
+  /** מרחק הכתובית מהשוליים הימניים (ברירת מחדל CAPTION_RIGHT_INSET). */
+  textRightInset?: number | null;
+}
+
+function buildHashtagNode(
+  hashtags: string[],
+  textColor: string,
+  isShort: boolean,
+  position: ReelTextPosition
+): SatoriNode | false {
+  const captionTop = position.textTopOffset ?? CAPTION_TOP_OFFSET;
+  const captionRightOffset = HORIZONTAL_PADDING + (position.textRightInset ?? CAPTION_RIGHT_INSET);
   if (hashtags.length === 0) return false;
   const fontSize = isShort ? SHORT_HASHTAG_FONT_SIZE : HASHTAG_FONT_SIZE;
   return h(
@@ -55,7 +69,9 @@ function buildHashtagNode(hashtags: string[], textColor: string, isShort: boolea
         position: "absolute",
         flexDirection: "column",
         alignItems: "flex-end",
-        ...(isShort ? { top: SHORT_HASHTAG_TOP_OFFSET, right: HORIZONTAL_PADDING } : { bottom: HASHTAG_BOTTOM_OFFSET, right: CAPTION_RIGHT_OFFSET }),
+        ...(isShort
+          ? { top: SHORT_HASHTAG_TOP_OFFSET + (captionTop - CAPTION_TOP_OFFSET), right: HORIZONTAL_PADDING }
+          : { bottom: REEL_HEIGHT - captionTop + HASHTAG_GAP_ABOVE_CAPTION, right: captionRightOffset }),
       },
     },
     ...renderPreparedLines(prepareRtlWordLines(hashtags.join(" "), fontSize, REEL_WIDTH - 2 * HORIZONTAL_PADDING), {
@@ -67,7 +83,7 @@ function buildHashtagNode(hashtags: string[], textColor: string, isShort: boolea
   );
 }
 
-export interface ReelFrameInput {
+export interface ReelFrameInput extends ReelTextPosition {
   /** הטקסט המלא של הכתובית הנוכחית — קבוע לאורך כל אנימציית הכתיבה שלה, כדי
    * שהפריסה/מיקום השורות תמיד יחושבו על הטקסט השלם (ראו revealedUnitCount). */
   fullText: string;
@@ -102,6 +118,7 @@ export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
       : TEMPLATE_TEXT_COLOR
     : pickAccessibleTextColor(input.backgroundHex).color;
   const captionFontSize = input.isShort ? SHORT_REEL_FONT_SIZE : REEL_FONT_SIZE;
+  const captionRightInset = input.textRightInset ?? CAPTION_RIGHT_INSET;
 
   return h(
     "div",
@@ -124,7 +141,7 @@ export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
         height: REEL_HEIGHT,
         style: { position: "absolute", top: 0, left: 0, width: REEL_WIDTH, height: REEL_HEIGHT, objectFit: "cover" },
       }),
-    buildHashtagNode(input.hashtags, textColor, !!input.isShort),
+    buildHashtagNode(input.hashtags, textColor, !!input.isShort, input),
     h(
       "div",
       {
@@ -134,12 +151,12 @@ export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
           flexDirection: "column",
           alignItems: "flex-end",
           gap: REEL_LINE_GAP,
-          top: CAPTION_TOP_OFFSET,
-          right: CAPTION_RIGHT_OFFSET,
+          top: input.textTopOffset ?? CAPTION_TOP_OFFSET,
+          right: HORIZONTAL_PADDING + captionRightInset,
         },
       },
       ...renderPreparedLines(
-        prepareRtlWordLines(input.fullText, captionFontSize, REEL_WIDTH - 2 * HORIZONTAL_PADDING - CAPTION_RIGHT_INSET),
+        prepareRtlWordLines(input.fullText, captionFontSize, REEL_WIDTH - 2 * HORIZONTAL_PADDING - captionRightInset),
         { fontSize: captionFontSize, fontWeight: 700, color: textColor, justifyContent: "flex-end" },
         { count: input.revealedUnitCount, granularity: input.revealMode }
       )
@@ -147,7 +164,7 @@ export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
   );
 }
 
-export interface WordCenterFrameInput {
+export interface WordCenterFrameInput extends ReelTextPosition {
   /** מילה בודדת להצגה במרכז המסך, או "" למסגרת ריקה (למשל שקט לפני ההתחלה). */
   word: string;
   backgroundHex: string;
@@ -191,7 +208,7 @@ export function buildWordCenterFrameNode(input: WordCenterFrameInput): SatoriNod
         height: REEL_HEIGHT,
         style: { position: "absolute", top: 0, left: 0, width: REEL_WIDTH, height: REEL_HEIGHT, objectFit: "cover" },
       }),
-    buildHashtagNode(input.hashtags, textColor, !!input.isShort),
+    buildHashtagNode(input.hashtags, textColor, !!input.isShort, input),
     input.word &&
       h(
         "div",
@@ -199,7 +216,7 @@ export function buildWordCenterFrameNode(input: WordCenterFrameInput): SatoriNod
           style: {
             display: "flex",
             position: "absolute",
-            top: 0,
+            top: (input.textTopOffset ?? CAPTION_TOP_OFFSET) - CAPTION_TOP_OFFSET,
             left: 0,
             width: REEL_WIDTH,
             height: REEL_HEIGHT,
