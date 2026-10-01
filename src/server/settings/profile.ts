@@ -108,6 +108,13 @@ export interface BackgroundEntry {
   textRightInset?: number | null;
   /** גודל טקסט באחוזים מברירת המחדל (100 = כרגיל) — לריל בלבד. */
   textFontPercent?: number | null;
+  /** מרחק התגית מהטקסט בפיקסלים: בקרוסלה — פוסט קצר; בריל — ריל רגיל (hashtagGapShort לריל קצר). */
+  hashtagGap?: number | null;
+  hashtagGapShort?: number | null;
+  /** פירוק הסימון הישן "כהה" לשניים: בר/מספור העמודים בהירים (קרוסלה), וטקסט בהיר (קרוסלה/ריל).
+   * undefined = נופלים לסימון הישן ברשימת darkCarouselBackgroundPaths. */
+  lightBar?: boolean;
+  lightText?: boolean;
 }
 
 /** מפרשת את הרשימה השמורה — תומכת גם בפורמט הישן (מערך של נתיבים כמחרוזות בלבד), לפני שהתבנית קיבלה קטגוריה. */
@@ -210,7 +217,13 @@ export async function setBackgroundCategory(
 export async function setBackgroundTextPosition(
   kind: BackgroundKind,
   filePath: string,
-  position: { topOffset: number | null; rightInset: number | null; fontPercent?: number | null }
+  position: {
+    topOffset: number | null;
+    rightInset: number | null;
+    fontPercent?: number | null;
+    hashtagGap?: number | null;
+    hashtagGapShort?: number | null;
+  }
 ): Promise<BackgroundEntry[]> {
   const profile = await getProfileSettings();
   const field = BACKGROUND_FIELD[kind];
@@ -221,6 +234,8 @@ export async function setBackgroundTextPosition(
           textTopOffset: position.topOffset,
           textRightInset: position.rightInset,
           ...(position.fontPercent !== undefined ? { textFontPercent: position.fontPercent } : {}),
+          ...(position.hashtagGap !== undefined ? { hashtagGap: position.hashtagGap } : {}),
+          ...(position.hashtagGapShort !== undefined ? { hashtagGapShort: position.hashtagGapShort } : {}),
         }
       : e
   );
@@ -228,14 +243,24 @@ export async function setBackgroundTextPosition(
   return entries;
 }
 
-/** מסמנת/מבטלת סימון תבנית רקע (קרוסלה או ריל) כ"כהה". נתיבי הקרוסלה והריל נפרדים ולכן חולקים רשימה אחת. */
-export async function setCarouselBackgroundDark(filePath: string, isDark: boolean): Promise<string[]> {
+/** מסמנת תבנית רקע כ"בר בהיר" (קרוסלה: מספור עמודים + פס התקדמות) ו/או "טקסט בהיר" (קרוסלה/ריל) — שני סימונים נפרדים. */
+export async function setBackgroundLightness(
+  kind: BackgroundKind,
+  filePath: string,
+  flags: { lightBar?: boolean; lightText?: boolean }
+): Promise<BackgroundEntry[]> {
   const profile = await getProfileSettings();
-  const current: string[] = JSON.parse(profile.darkCarouselBackgroundPaths || "[]");
-  const next = isDark ? [...new Set([...current, filePath])] : current.filter((p) => p !== filePath);
-  await prisma.profileSettings.update({
-    where: { id: "default" },
-    data: { darkCarouselBackgroundPaths: JSON.stringify(next) },
-  });
-  return next;
+  const field = BACKGROUND_FIELD[kind];
+  const inDarkList = (JSON.parse(profile.darkCarouselBackgroundPaths || "[]") as string[]).includes(filePath);
+  const entries = parseBackgroundEntries(profile[field]).map((e) =>
+    e.path === filePath
+      ? {
+          ...e,
+          lightBar: flags.lightBar ?? e.lightBar ?? inDarkList,
+          lightText: flags.lightText ?? e.lightText ?? inDarkList,
+        }
+      : e
+  );
+  await prisma.profileSettings.update({ where: { id: "default" }, data: { [field]: JSON.stringify(entries) } });
+  return entries;
 }

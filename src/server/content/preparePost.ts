@@ -19,39 +19,46 @@ import type { StorageService } from "../storage/types";
 
 export type { SelectedTarget };
 
-/** בודקת אם תבנית רקע (קרוסלה או ריל) נבחרת מסומנת "כהה" בהגדרות (ראו setCarouselBackgroundDark). */
-function isDarkCarouselBackground(darkCarouselBackgroundPathsJson: string, backgroundPath: string | null): boolean {
+/** האם התבנית ברשימת "כהה" הישנה (לפני הפיצול ל"בר בהיר"/"טקסט בהיר") — משמש ברירת מחדל כשלא הוגדר סימון מפורש. */
+function isInLegacyDarkList(darkPathsJson: string, backgroundPath: string | null): boolean {
   if (!backgroundPath) return false;
   try {
-    const darkPaths: string[] = JSON.parse(darkCarouselBackgroundPathsJson || "[]");
-    return darkPaths.includes(backgroundPath);
+    return (JSON.parse(darkPathsJson || "[]") as string[]).includes(backgroundPath);
   } catch {
     return false;
   }
 }
 
-/** מיקום טקסט מותאם לתבנית הרקע הנבחרת (ראו setBackgroundTextPosition) — {null,null} אם אין תבנית/כיוונון. */
-/** מיקום וגודל טקסט מותאמים לתבנית ריל (הגדרות הרקעים). */
-function getReelTextStyle(
-  reelBackgroundImagePathsJson: string,
-  backgroundPath: string | null
-): { textTopOffset: number | null; textRightInset: number | null; textFontPercent: number | null } {
-  if (!backgroundPath) return { textTopOffset: null, textRightInset: null, textFontPercent: null };
-  const entry = parseBackgroundEntries(reelBackgroundImagePathsJson).find((e) => e.path === backgroundPath);
+function findBackgroundEntry(entriesJson: string, backgroundPath: string | null) {
+  if (!backgroundPath) return undefined;
+  return parseBackgroundEntries(entriesJson).find((e) => e.path === backgroundPath);
+}
+
+/** צבעים ומיקום טקסט שהוגדרו לתבנית קרוסלה (הגדרות הרקעים). טקסט בהיר בפוסט רגיל רק אם סומן במפורש (תבניות כהות ישנות נשארות כמו שהיו). */
+function getCarouselStyle(profile: { carouselBackgroundImagePaths: string; darkCarouselBackgroundPaths: string }, backgroundPath: string | null, isShort: boolean) {
+  const entry = findBackgroundEntry(profile.carouselBackgroundImagePaths, backgroundPath);
+  const legacyDark = isInLegacyDarkList(profile.darkCarouselBackgroundPaths, backgroundPath);
   return {
+    isDarkBackground: entry?.lightBar ?? legacyDark,
+    lightText: isShort ? (entry?.lightText ?? legacyDark) : entry?.lightText === true,
     textTopOffset: entry?.textTopOffset ?? null,
     textRightInset: entry?.textRightInset ?? null,
-    textFontPercent: entry?.textFontPercent ?? null,
+    hashtagGap: entry?.hashtagGap ?? null,
   };
 }
 
-function getCarouselTextPosition(
-  carouselBackgroundImagePathsJson: string,
-  backgroundPath: string | null
-): { textTopOffset: number | null; textRightInset: number | null } {
-  if (!backgroundPath) return { textTopOffset: null, textRightInset: null };
-  const entry = parseBackgroundEntries(carouselBackgroundImagePathsJson).find((e) => e.path === backgroundPath);
-  return { textTopOffset: entry?.textTopOffset ?? null, textRightInset: entry?.textRightInset ?? null };
+/** צבע ומיקום/גודל טקסט שהוגדרו לתבנית ריל (הגדרות הרקעים). */
+function getReelStyle(profile: { reelBackgroundImagePaths: string; darkCarouselBackgroundPaths: string }, backgroundPath: string | null) {
+  const entry = findBackgroundEntry(profile.reelBackgroundImagePaths, backgroundPath);
+  const legacyDark = isInLegacyDarkList(profile.darkCarouselBackgroundPaths, backgroundPath);
+  return {
+    isDarkBackground: entry?.lightText ?? legacyDark,
+    textTopOffset: entry?.textTopOffset ?? null,
+    textRightInset: entry?.textRightInset ?? null,
+    textFontPercent: entry?.textFontPercent ?? null,
+    hashtagGap: entry?.hashtagGap ?? null,
+    hashtagGapShort: entry?.hashtagGapShort ?? null,
+  };
 }
 
 /**
@@ -231,8 +238,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           displayName: profile.displayName,
           profileImageDataUri,
           backgroundImageDataUri: carouselBackgroundImageDataUri,
-          isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, input.carouselBackgroundPath ?? null),
-          ...getCarouselTextPosition(profile.carouselBackgroundImagePaths, input.carouselBackgroundPath ?? null),
+          ...getCarouselStyle(profile, input.carouselBackgroundPath ?? null, !!input.isShort),
           coverBackgroundImageDataUri,
           isShort: !!input.isShort,
           hideProgressBar: !!input.hideProgressBar,
@@ -269,8 +275,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           onProgress: input.onProgress,
           narration: input.reelNarration,
           isShort: !!input.isShort,
-          isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, input.reelBackgroundPath ?? null),
-          ...getReelTextStyle(profile.reelBackgroundImagePaths, input.reelBackgroundPath ?? null),
+          ...getReelStyle(profile, input.reelBackgroundPath ?? null),
         });
         await prisma.platformContent.create({
           data: {
@@ -397,8 +402,7 @@ export async function updatePostRawText(
         displayName: profile.displayName,
         profileImageDataUri,
         backgroundImageDataUri,
-        isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, backgroundPath),
-        ...getCarouselTextPosition(profile.carouselBackgroundImagePaths, backgroundPath),
+        ...getCarouselStyle(profile, backgroundPath, isShort),
         coverBackgroundImageDataUri,
         isShort,
         hideProgressBar,
@@ -437,8 +441,7 @@ export async function updatePostRawText(
         onProgress: options?.onProgress,
         narration,
         isShort,
-        isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, backgroundPath),
-        ...getReelTextStyle(profile.reelBackgroundImagePaths, backgroundPath),
+        ...getReelStyle(profile, backgroundPath),
       });
       await prisma.platformContent.update({
         where: { id: content.id },
@@ -558,8 +561,7 @@ export async function addTargetToPost(
       onProgress: options?.onProgress,
       narration: options?.reelNarration,
       isShort: post.isShort,
-      isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, options?.reelBackgroundPath ?? null),
-      ...getReelTextStyle(profile.reelBackgroundImagePaths, options?.reelBackgroundPath ?? null),
+      ...getReelStyle(profile, options?.reelBackgroundPath ?? null),
     });
     await prisma.platformContent.create({
       data: {

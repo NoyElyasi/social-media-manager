@@ -25,6 +25,8 @@ const CAPTION_TOP_OFFSET = 700;
 // top) כדי שאם יש כמה תגיות והשורה מתפצלת לשתי שורות, היא תגדל למעלה
 // ותישאר צמודה לכתובית, במקום לדחוף את הכתובית.
 const HASHTAG_GAP_ABOVE_CAPTION = 36;
+// בריל קצר התגית גבוהה יותר מעל הכתובית (ברירת מחדל מקבילה ל-470 מלמעלה כשהכתובית ב-700).
+const SHORT_HASHTAG_GAP_ABOVE_CAPTION = 150;
 const HASHTAG_BOTTOM_OFFSET = REEL_HEIGHT - CAPTION_TOP_OFFSET + HASHTAG_GAP_ABOVE_CAPTION;
 
 // צבע טקסט קבוע לשימוש מעל תבנית הרקע (תמונה) — לא מחושב מהרקע (זו תמונה,
@@ -42,7 +44,6 @@ const WORD_CENTER_FONT_SIZE = 130;
 const SHORT_REEL_FONT_SIZE = MIN_FONT_SIZE_REEL + 40;
 const SHORT_WORD_CENTER_FONT_SIZE = 140;
 const SHORT_HASHTAG_FONT_SIZE = 58;
-const SHORT_HASHTAG_TOP_OFFSET = 470;
 
 interface ReelTextPosition {
   /** גובה תחילת הכתובית (ברירת מחדל CAPTION_TOP_OFFSET) — מוגדר פר תבנית בהגדרות. */
@@ -51,6 +52,9 @@ interface ReelTextPosition {
   textRightInset?: number | null;
   /** גודל טקסט באחוזים מברירת המחדל (100 = כרגיל). */
   textFontPercent?: number | null;
+  /** מרחק התגית מעל הכתובית (ריל רגיל / ריל קצר), בפיקסלים. */
+  hashtagGap?: number | null;
+  hashtagGapShort?: number | null;
 }
 
 function scaledFontSize(base: number, percent: number | null | undefined): number {
@@ -76,8 +80,14 @@ function buildHashtagNode(
         flexDirection: "column",
         alignItems: "flex-end",
         ...(isShort
-          ? { top: SHORT_HASHTAG_TOP_OFFSET + (captionTop - CAPTION_TOP_OFFSET), right: HORIZONTAL_PADDING }
-          : { bottom: REEL_HEIGHT - captionTop + HASHTAG_GAP_ABOVE_CAPTION, right: captionRightOffset }),
+          ? {
+              bottom: REEL_HEIGHT - captionTop + (position.hashtagGapShort ?? SHORT_HASHTAG_GAP_ABOVE_CAPTION),
+              right: HORIZONTAL_PADDING,
+            }
+          : {
+              bottom: REEL_HEIGHT - captionTop + (position.hashtagGap ?? HASHTAG_GAP_ABOVE_CAPTION),
+              right: captionRightOffset,
+            }),
       },
     },
     ...renderPreparedLines(prepareRtlWordLines(hashtags.join(" "), fontSize, REEL_WIDTH - 2 * HORIZONTAL_PADDING), {

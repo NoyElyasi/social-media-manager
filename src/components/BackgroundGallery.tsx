@@ -21,7 +21,20 @@ export interface BackgroundItem {
   textRightInset?: number | null;
   /** גודל טקסט באחוזים (100 = כרגיל) — ריל בלבד. */
   textFontPercent?: number | null;
+  /** מרחק התגית מהטקסט — קרוסלה: פוסט קצר; ריל: ריל רגיל (ריל קצר: hashtagGapShort). */
+  hashtagGap?: number | null;
+  hashtagGapShort?: number | null;
+  /** בר התקדמות/מספור עמודים בהירים (קרוסלה) וטקסט בהיר (קרוסלה/ריל) — לתבניות עם מסגרת/רקע כהים. */
+  lightBar?: boolean;
+  lightText?: boolean;
 }
+
+// ערכי ברירת המחדל של הרינדור — מוצגים בשדות כשלא הוגדר כלום, כדי שיהיה ברור כמה להוסיף/להחסיר.
+const TEXT_DEFAULTS = {
+  reel: { top: 700, right: 70, font: 100, gap: 36, gapShort: 150 },
+  carousel: { top: 340, right: 100, font: 100, gap: 35, gapShort: 35 },
+  cover: { top: 0, right: 0, font: 100, gap: 0, gapShort: 0 },
+} as const;
 
 const UNCATEGORIZED_LABEL = "כללי";
 
@@ -42,21 +55,17 @@ export default function BackgroundGallery({
   title,
   hint,
   initial,
-  initialDarkPaths,
   initialDefaultPaths,
 }: {
   kind: "reel" | "carousel" | "cover";
   title: string;
   hint: string;
   initial: BackgroundItem[];
-  /** רלוונטי רק ל-kind="carousel" — אילו נתיבים מסומנים כתבנית כהה (ראו setCarouselBackgroundDark). */
-  initialDarkPaths?: string[];
   /** מפת ברירת המחדל לכל פורמט (רגיל/טיפ/מכתב) לסוג הזה — ראו setDefaultBackgroundPathForFormat. */
   initialDefaultPaths?: Partial<Record<PostFormatKey, string>>;
 }) {
   const router = useRouter();
   const [items, setItems] = useState(initial);
-  const [darkPaths, setDarkPaths] = useState(new Set(initialDarkPaths ?? []));
   const [defaultPaths, setDefaultPaths] = useState(initialDefaultPaths ?? {});
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [uploadCategory, setUploadCategory] = useState("");
@@ -65,6 +74,8 @@ export default function BackgroundGallery({
   const [posTop, setPosTop] = useState("");
   const [posRight, setPosRight] = useState("");
   const [posFont, setPosFont] = useState("");
+  const [posGap, setPosGap] = useState("");
+  const [posGapShort, setPosGapShort] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const existingCategories = useMemo(
@@ -73,24 +84,19 @@ export default function BackgroundGallery({
   );
   const visibleItems = activeFilter === null ? items : items.filter((i) => (i.category?.trim() || "") === activeFilter);
 
-  async function toggleDark(item: BackgroundItem) {
+  async function toggleLight(item: BackgroundItem, field: "lightBar" | "lightText") {
     setError(null);
-    const isDark = !darkPaths.has(item.path);
+    const value = !item[field];
     const res = await fetch("/api/settings/backgrounds", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind, path: item.path, isDark }),
+      body: JSON.stringify({ kind, path: item.path, [field]: value }),
     });
     if (!res.ok) {
       setError("שגיאה בסימון התבנית — נסו שוב");
       return;
     }
-    setDarkPaths((prev) => {
-      const next = new Set(prev);
-      if (isDark) next.add(item.path);
-      else next.delete(item.path);
-      return next;
-    });
+    setItems((prev) => prev.map((i) => (i.path === item.path ? { ...i, [field]: value } : i)));
     router.refresh();
   }
 
@@ -140,49 +146,50 @@ export default function BackgroundGallery({
   }
 
   function openSettings(item: BackgroundItem) {
+    const d = TEXT_DEFAULTS[kind];
     setError(null);
     setSettingsPath(item.path);
-    setPosTop(item.textTopOffset?.toString() ?? "");
-    setPosRight(item.textRightInset?.toString() ?? "");
-    setPosFont(item.textFontPercent?.toString() ?? "");
+    setPosTop(String(item.textTopOffset ?? d.top));
+    setPosRight(String(item.textRightInset ?? d.right));
+    setPosFont(String(item.textFontPercent ?? d.font));
+    setPosGap(String(item.hashtagGap ?? d.gap));
+    setPosGapShort(String(item.hashtagGapShort ?? d.gapShort));
   }
 
   async function saveTextStyle(item: BackgroundItem) {
     setError(null);
-    const toNumber = (v: string) => (v.trim() === "" ? null : Number(v));
-    const parsedTop = toNumber(posTop);
-    const parsedRight = toNumber(posRight);
-    const parsedFont = toNumber(posFont);
-    if ([parsedTop, parsedRight, parsedFont].some((n) => n !== null && Number.isNaN(n))) {
+    const d = TEXT_DEFAULTS[kind];
+    // ערך זהה לברירת המחדל נשמר כ"לא הוגדר" (null), כך ששינוי עתידי בברירות המחדל ימשיך לחול על התבנית.
+    const toStored = (v: string, def: number) => {
+      if (v.trim() === "") return null;
+      const n = Number(v);
+      if (Number.isNaN(n)) return NaN;
+      return n === def ? null : n;
+    };
+    const parsedTop = toStored(posTop, d.top);
+    const parsedRight = toStored(posRight, d.right);
+    const parsedFont = toStored(posFont, d.font);
+    const parsedGap = toStored(posGap, d.gap);
+    const parsedGapShort = toStored(posGapShort, d.gapShort);
+    if ([parsedTop, parsedRight, parsedFont, parsedGap, parsedGapShort].some((n) => n !== null && Number.isNaN(n))) {
       setError("יש להזין מספרים בלבד");
       return;
     }
+    const extra = {
+      ...(kind === "reel" ? { textFontPercent: parsedFont, hashtagGapShort: parsedGapShort } : {}),
+      hashtagGap: parsedGap,
+    };
     const res = await fetch("/api/settings/backgrounds", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        kind,
-        path: item.path,
-        textTopOffset: parsedTop,
-        textRightInset: parsedRight,
-        ...(kind === "reel" ? { textFontPercent: parsedFont } : {}),
-      }),
+      body: JSON.stringify({ kind, path: item.path, textTopOffset: parsedTop, textRightInset: parsedRight, ...extra }),
     });
     if (!res.ok) {
       setError("שגיאה בשמירת מיקום/גודל הטקסט — נסו שוב");
       return;
     }
     setItems((prev) =>
-      prev.map((i) =>
-        i.path === item.path
-          ? {
-              ...i,
-              textTopOffset: parsedTop,
-              textRightInset: parsedRight,
-              ...(kind === "reel" ? { textFontPercent: parsedFont } : {}),
-            }
-          : i
-      )
+      prev.map((i) => (i.path === item.path ? { ...i, textTopOffset: parsedTop, textRightInset: parsedRight, ...extra } : i))
     );
     router.refresh();
   }
@@ -275,7 +282,11 @@ export default function BackgroundGallery({
         {visibleItems.map((item) => {
           const defaultFormats = currentDefaultFormats(item);
           const hasTextStyle =
-            item.textTopOffset != null || item.textRightInset != null || item.textFontPercent != null;
+            item.textTopOffset != null ||
+            item.textRightInset != null ||
+            item.textFontPercent != null ||
+            item.hashtagGap != null ||
+            item.hashtagGapShort != null;
           return (
             <div key={item.path} className="flex w-24 flex-col items-center gap-1">
               <button
@@ -287,7 +298,7 @@ export default function BackgroundGallery({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={item.url} alt="" className="h-full w-full object-cover" />
                 <span className="absolute inset-x-0 bottom-0 flex flex-wrap justify-center gap-0.5 bg-white/80 px-0.5 py-0.5 text-[10px]">
-                  {darkPaths.has(item.path) && <span title="תבנית כהה">🌙</span>}
+                  {(item.lightBar || item.lightText) && <span title="צבעים בהירים (בר/טקסט)">🌙</span>}
                   {defaultFormats.length > 0 && (
                     <span title="ברירת מחדל">⭐{defaultFormats.map((f) => FORMAT_ABBR[f]).join("")}</span>
                   )}
@@ -333,22 +344,20 @@ export default function BackgroundGallery({
                       list={`bg-categories-${kind}`}
                       className="rounded-md border border-brand-pink/40 px-2 py-1 text-sm"
                     />
-                    {kind !== "cover" && (
+                    {kind === "carousel" && (
                       <label className="mt-1 flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={darkPaths.has(item.path)}
-                          onChange={() => toggleDark(item)}
-                        />
-                        🌙 תבנית כהה
+                        <input type="checkbox" checked={!!item.lightBar} onChange={() => toggleLight(item, "lightBar")} />
+                        בר ההתקדמות בהיר
+                      </label>
+                    )}
+                    {kind !== "cover" && (
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={!!item.lightText} onChange={() => toggleLight(item, "lightText")} />
+                        הטקסט בהיר
                       </label>
                     )}
                     <p className="text-[11px] text-neutral-500">
-                      {kind === "reel"
-                        ? "תבנית כהה: הטקסט והתגית בריל יוצגו בצבע בהיר."
-                        : kind === "carousel"
-                          ? "תבנית כהה: מספור העמודים, פס ההתקדמות והטקסט בפוסט קצר יוצגו בצבע בהיר."
-                          : ""}
+                      סמני כשהרקע כהה: בר ההתקדמות ומספור העמודים (קרוסלה) והטקסט והתגית נצבעים בהיר.
                     </p>
                   </div>
                 </div>
@@ -371,20 +380,30 @@ export default function BackgroundGallery({
 
                 {kind !== "cover" && (
                   <div className="flex flex-col gap-2 rounded-lg bg-brand-pink/10 p-3">
-                    <span className="text-xs font-medium">מיקום וגודל הטקסט (ריק = ברירת מחדל)</span>
+                    <span className="text-xs font-medium">מיקום וגודל הטקסט (בשדות מופיעה ברירת המחדל — שני אותה כדי להוסיף/להחסיר)</span>
                     <div className="flex flex-wrap gap-4">
                       <label className="flex flex-col items-center gap-1 text-[11px] text-brand-maroon/70">
                         גובה (מלמעלה)
-                        <input type="number" value={posTop} onChange={(e) => setPosTop(e.target.value)} placeholder={kind === "reel" ? "700" : "340"} className={inputClass} />
+                        <input type="number" value={posTop} onChange={(e) => setPosTop(e.target.value)} className={inputClass} />
                       </label>
                       <label className="flex flex-col items-center gap-1 text-[11px] text-brand-maroon/70">
                         מרחק מהימין
-                        <input type="number" value={posRight} onChange={(e) => setPosRight(e.target.value)} placeholder={kind === "reel" ? "70" : "100"} className={inputClass} />
+                        <input type="number" value={posRight} onChange={(e) => setPosRight(e.target.value)} className={inputClass} />
                       </label>
                       {kind === "reel" && (
                         <label className="flex flex-col items-center gap-1 text-[11px] text-brand-maroon/70">
                           גודל טקסט (%)
-                          <input type="number" value={posFont} onChange={(e) => setPosFont(e.target.value)} placeholder="100" className={inputClass} />
+                          <input type="number" value={posFont} onChange={(e) => setPosFont(e.target.value)} className={inputClass} />
+                        </label>
+                      )}
+                      <label className="flex flex-col items-center gap-1 text-[11px] text-brand-maroon/70">
+                        {kind === "reel" ? "תגית מעל הטקסט (רגיל)" : "תגית מהטקסט (קצר)"}
+                        <input type="number" value={posGap} onChange={(e) => setPosGap(e.target.value)} className={inputClass} />
+                      </label>
+                      {kind === "reel" && (
+                        <label className="flex flex-col items-center gap-1 text-[11px] text-brand-maroon/70">
+                          תגית מעל הטקסט (קצר)
+                          <input type="number" value={posGapShort} onChange={(e) => setPosGapShort(e.target.value)} className={inputClass} />
                         </label>
                       )}
                     </div>

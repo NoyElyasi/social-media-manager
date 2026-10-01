@@ -5,7 +5,7 @@ import { z, flattenError } from "zod";
 import {
   addBackgroundImagePath,
   removeBackgroundImagePath,
-  setCarouselBackgroundDark,
+  setBackgroundLightness,
   setBackgroundCategory,
   setBackgroundTextPosition,
   setDefaultBackgroundPathForFormat,
@@ -64,11 +64,14 @@ export async function DELETE(req: NextRequest) {
 const patchSchema = z.object({
   kind: z.enum(["reel", "carousel", "cover"]),
   path: z.string().min(1),
-  isDark: z.boolean().optional(),
+  lightBar: z.boolean().optional(),
+  lightText: z.boolean().optional(),
   category: z.string().optional(),
   textTopOffset: z.number().nullable().optional(),
   textRightInset: z.number().nullable().optional(),
   textFontPercent: z.number().min(30).max(200).nullable().optional(),
+  hashtagGap: z.number().nullable().optional(),
+  hashtagGapShort: z.number().nullable().optional(),
   // הפורמט (רגיל/טיפ/מכתב/קצר) שמסמנים/מבטלים לתבנית הזו — עם isDefault, ראו setDefaultBackgroundPathForFormat.
   defaultFormat: z.enum(["regular", "tip", "letter", "short"]).optional(),
   isDefault: z.boolean().optional(),
@@ -82,12 +85,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: flattenError(parsed.error) }, { status: 400 });
   }
 
-  let darkPaths: string[] | undefined;
   let entries: Awaited<ReturnType<typeof setBackgroundCategory>> | undefined;
   let defaultPaths: Partial<Record<"regular" | "tip" | "letter" | "short", string>> | undefined;
 
-  if (parsed.data.isDark !== undefined) {
-    darkPaths = await setCarouselBackgroundDark(parsed.data.path, parsed.data.isDark);
+  if (parsed.data.lightBar !== undefined || parsed.data.lightText !== undefined) {
+    entries = await setBackgroundLightness(parsed.data.kind, parsed.data.path, {
+      lightBar: parsed.data.lightBar,
+      lightText: parsed.data.lightText,
+    });
   }
   if (parsed.data.category !== undefined) {
     entries = await setBackgroundCategory(parsed.data.kind, parsed.data.path, parsed.data.category.trim());
@@ -95,17 +100,21 @@ export async function PATCH(req: NextRequest) {
   if (
     parsed.data.textTopOffset !== undefined ||
     parsed.data.textRightInset !== undefined ||
-    parsed.data.textFontPercent !== undefined
+    parsed.data.textFontPercent !== undefined ||
+    parsed.data.hashtagGap !== undefined ||
+    parsed.data.hashtagGapShort !== undefined
   ) {
     entries = await setBackgroundTextPosition(parsed.data.kind, parsed.data.path, {
       topOffset: parsed.data.textTopOffset ?? null,
       rightInset: parsed.data.textRightInset ?? null,
       fontPercent: parsed.data.textFontPercent,
+      hashtagGap: parsed.data.hashtagGap,
+      hashtagGapShort: parsed.data.hashtagGapShort,
     });
   }
   if (parsed.data.defaultFormat !== undefined && parsed.data.isDefault !== undefined) {
     defaultPaths = await setDefaultBackgroundPathForFormat(parsed.data.kind, parsed.data.defaultFormat, parsed.data.isDefault ? parsed.data.path : null);
   }
 
-  return NextResponse.json({ darkPaths, entries, defaultPaths });
+  return NextResponse.json({ entries, defaultPaths });
 }

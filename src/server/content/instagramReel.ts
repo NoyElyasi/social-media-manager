@@ -108,6 +108,8 @@ export interface PrepareReelParams {
   textTopOffset?: number | null;
   textRightInset?: number | null;
   textFontPercent?: number | null;
+  hashtagGap?: number | null;
+  hashtagGapShort?: number | null;
 }
 
 async function renderCaptionFrames(
@@ -131,7 +133,7 @@ async function renderCaptionFrames(
   leadInSeconds: number,
   isShort: boolean,
   isDarkBackground: boolean,
-  textPosition: { textTopOffset?: number | null; textRightInset?: number | null; textFontPercent?: number | null }
+  textPosition: { textTopOffset?: number | null; textRightInset?: number | null; textFontPercent?: number | null; hashtagGap?: number | null; hashtagGapShort?: number | null }
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
@@ -236,7 +238,7 @@ async function renderWordCenterFrames(
   leadInSeconds: number,
   isShort: boolean,
   isDarkBackground: boolean,
-  textPosition: { textTopOffset?: number | null; textRightInset?: number | null; textFontPercent?: number | null }
+  textPosition: { textTopOffset?: number | null; textRightInset?: number | null; textFontPercent?: number | null; hashtagGap?: number | null; hashtagGapShort?: number | null }
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
@@ -680,6 +682,8 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
               textTopOffset: params.textTopOffset,
               textRightInset: params.textRightInset,
               textFontPercent: params.textFontPercent,
+              hashtagGap: params.hashtagGap,
+              hashtagGapShort: params.hashtagGapShort,
             }
           )
         : await renderCaptionFrames(
@@ -700,6 +704,8 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
               textTopOffset: params.textTopOffset,
               textRightInset: params.textRightInset,
               textFontPercent: params.textFontPercent,
+              hashtagGap: params.hashtagGap,
+              hashtagGapShort: params.hashtagGapShort,
             }
           );
     if (params.signal?.aborted) throw new ReelCancelledError();

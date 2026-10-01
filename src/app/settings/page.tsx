@@ -62,8 +62,10 @@ export default async function SettingsPage() {
                 category: e.category,
                 textTopOffset: e.textTopOffset,
                 textRightInset: e.textRightInset,
+                hashtagGap: e.hashtagGap,
+                lightBar: e.lightBar ?? darkCarouselBackgroundPaths.includes(e.path),
+                lightText: e.lightText ?? darkCarouselBackgroundPaths.includes(e.path),
               }))}
-              initialDarkPaths={darkCarouselBackgroundPaths}
               initialDefaultPaths={parseDefaultBackgroundPaths(profile.defaultCarouselBackgroundPathsJson)}
             />
           </div>
@@ -78,9 +80,12 @@ export default async function SettingsPage() {
                 category: e.category,
                 textTopOffset: e.textTopOffset,
                 textRightInset: e.textRightInset,
+                hashtagGap: e.hashtagGap,
+                hashtagGapShort: e.hashtagGapShort,
+                lightBar: e.lightBar ?? darkCarouselBackgroundPaths.includes(e.path),
+                lightText: e.lightText ?? darkCarouselBackgroundPaths.includes(e.path),
                 textFontPercent: e.textFontPercent,
               }))}
-              initialDarkPaths={darkCarouselBackgroundPaths}
               initialDefaultPaths={parseDefaultBackgroundPaths(profile.defaultReelBackgroundPathsJson)}
             />
           </div>
