@@ -102,6 +102,8 @@ export interface PrepareReelParams {
   narration?: ReelNarration | null;
   /** פוסט "קצר" — פונט גדול יותר ותגית גבוהה וימינית יותר (ראו reelFrame.ts). */
   isShort?: boolean;
+  /** תבנית הרקע מסומנת "כהה" בהגדרות — טקסט בהיר. */
+  isDarkBackground?: boolean;
 }
 
 async function renderCaptionFrames(
@@ -123,7 +125,8 @@ async function renderCaptionFrames(
   // זמן להתחיל להקריא"), אז מוסיפים מסגרת פותחת "ריקה" (בלי טקסט חשוף) באורך
   // הזה, כדי שהמילה הראשונה על המסך לא תופיע לפני שבאמת אמרו אותה בהקלטה.
   leadInSeconds: number,
-  isShort: boolean
+  isShort: boolean,
+  isDarkBackground: boolean
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
@@ -140,7 +143,7 @@ async function renderCaptionFrames(
   async function addFrame(fullText: string, revealedUnitCount: number, duration: number): Promise<void> {
     if (signal?.aborted) throw new ReelCancelledError();
     const svg = await renderNodeToSvg(
-      buildReelFrameNode({ fullText, revealedUnitCount, revealMode, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags, isShort }),
+      buildReelFrameNode({ fullText, revealedUnitCount, revealMode, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags, isShort, isDarkBackground }),
       REEL_WIDTH,
       REEL_HEIGHT
     );
@@ -226,7 +229,8 @@ async function renderWordCenterFrames(
   wordTimestamps: number[] | null,
   narrationTotalSeconds: number | null,
   leadInSeconds: number,
-  isShort: boolean
+  isShort: boolean,
+  isDarkBackground: boolean
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
@@ -236,7 +240,7 @@ async function renderWordCenterFrames(
   async function addFrame(word: string, duration: number): Promise<void> {
     if (signal?.aborted) throw new ReelCancelledError();
     const svg = await renderNodeToSvg(
-      buildWordCenterFrameNode({ word, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags, isShort }),
+      buildWordCenterFrameNode({ word, backgroundHex, backgroundImageDataUri, hashtags: displayHashtags, isShort, isDarkBackground }),
       REEL_WIDTH,
       REEL_HEIGHT
     );
@@ -664,7 +668,8 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
             wordTimestamps,
             narrationTotalSeconds,
             wordTimestamps?.[0] ?? 0,
-            isShort
+            isShort,
+            !!params.isDarkBackground
           )
         : await renderCaptionFrames(
             captions,
@@ -678,7 +683,8 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
             wordTimestamps,
             narrationTotalSeconds,
             wordTimestamps?.[0] ?? 0,
-            isShort
+            isShort,
+            !!params.isDarkBackground
           );
     if (params.signal?.aborted) throw new ReelCancelledError();
     const silentPath = path.join(workDir, "reel-silent.mp4");

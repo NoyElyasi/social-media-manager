@@ -30,6 +30,7 @@ const HASHTAG_BOTTOM_OFFSET = REEL_HEIGHT - CAPTION_TOP_OFFSET + HASHTAG_GAP_ABO
 // צבע טקסט קבוע לשימוש מעל תבנית הרקע (תמונה) — לא מחושב מהרקע (זו תמונה,
 // לא צבע אחיד), נבחר ידנית כדי להתאים לפלטת המותג הבהירה (קרם/ורוד).
 const TEMPLATE_TEXT_COLOR = "#4A1420";
+const TEMPLATE_TEXT_COLOR_DARK = "#FEF9F4";
 
 // גדול משמעותית מגודל הכתובית הרגילה (REEL_FONT_SIZE) — במצב "מילה
 // במרכז" יש מילה אחת בודדת על המסך בכל רגע, אז אפשר וכדאי שתהיה גדולה
@@ -81,6 +82,8 @@ export interface ReelFrameInput {
   hashtags: string[];
   /** פוסט "קצר" — פונט גדול יותר ותגית גבוהה וימינית יותר. */
   isShort?: boolean;
+  /** התבנית מסומנת "כהה" בהגדרות — הטקסט והתגית יוצגו בצבע בהיר. */
+  isDarkBackground?: boolean;
 }
 
 /**
@@ -93,7 +96,11 @@ export interface ReelFrameInput {
  */
 export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
   const hasTemplate = !!input.backgroundImageDataUri;
-  const textColor = hasTemplate ? TEMPLATE_TEXT_COLOR : pickAccessibleTextColor(input.backgroundHex).color;
+  const textColor = hasTemplate
+    ? input.isDarkBackground
+      ? TEMPLATE_TEXT_COLOR_DARK
+      : TEMPLATE_TEXT_COLOR
+    : pickAccessibleTextColor(input.backgroundHex).color;
   const captionFontSize = input.isShort ? SHORT_REEL_FONT_SIZE : REEL_FONT_SIZE;
 
   return h(
@@ -147,6 +154,7 @@ export interface WordCenterFrameInput {
   backgroundImageDataUri?: string | null;
   hashtags: string[];
   isShort?: boolean;
+  isDarkBackground?: boolean;
 }
 
 /**
@@ -157,7 +165,11 @@ export interface WordCenterFrameInput {
  */
 export function buildWordCenterFrameNode(input: WordCenterFrameInput): SatoriNode {
   const hasTemplate = !!input.backgroundImageDataUri;
-  const textColor = hasTemplate ? TEMPLATE_TEXT_COLOR : pickAccessibleTextColor(input.backgroundHex).color;
+  const textColor = hasTemplate
+    ? input.isDarkBackground
+      ? TEMPLATE_TEXT_COLOR_DARK
+      : TEMPLATE_TEXT_COLOR
+    : pickAccessibleTextColor(input.backgroundHex).color;
 
   return h(
     "div",

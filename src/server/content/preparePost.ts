@@ -19,7 +19,7 @@ import type { StorageService } from "../storage/types";
 
 export type { SelectedTarget };
 
-/** בודקת אם תבנית רקע קרוסלה נבחרת מסומנת "כהה" בהגדרות (ראו setCarouselBackgroundDark). */
+/** בודקת אם תבנית רקע (קרוסלה או ריל) נבחרת מסומנת "כהה" בהגדרות (ראו setCarouselBackgroundDark). */
 function isDarkCarouselBackground(darkCarouselBackgroundPathsJson: string, backgroundPath: string | null): boolean {
   if (!backgroundPath) return false;
   try {
@@ -255,6 +255,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           onProgress: input.onProgress,
           narration: input.reelNarration,
           isShort: !!input.isShort,
+          isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, input.reelBackgroundPath ?? null),
         });
         await prisma.platformContent.create({
           data: {
@@ -421,6 +422,7 @@ export async function updatePostRawText(
         onProgress: options?.onProgress,
         narration,
         isShort,
+        isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, backgroundPath),
       });
       await prisma.platformContent.update({
         where: { id: content.id },
@@ -540,6 +542,7 @@ export async function addTargetToPost(
       onProgress: options?.onProgress,
       narration: options?.reelNarration,
       isShort: post.isShort,
+      isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, options?.reelBackgroundPath ?? null),
     });
     await prisma.platformContent.create({
       data: {

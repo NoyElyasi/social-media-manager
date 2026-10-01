@@ -141,7 +141,7 @@ export async function removeBackgroundImagePath(kind: BackgroundKind, filePath: 
   const data: Record<string, string | null> = { [field]: JSON.stringify(entries) };
 
   // גם מנקים סימון "כהה" ישן אם היה — כדי שלא יישאר נתיב-רפאים ברשימה הזו.
-  if (kind === "carousel") {
+  if (kind === "carousel" || kind === "reel") {
     const darkPaths: string[] = JSON.parse(profile.darkCarouselBackgroundPaths || "[]").filter(
       (p: string) => p !== filePath
     );
@@ -214,7 +214,7 @@ export async function setBackgroundTextPosition(
   return entries;
 }
 
-/** מסמנת/מבטלת סימון תבנית רקע קרוסלה כ"כהה" — קובע את גוון פס ההתקדמות/מספור העמודים בתחתית העמוד. */
+/** מסמנת/מבטלת סימון תבנית רקע (קרוסלה או ריל) כ"כהה". נתיבי הקרוסלה והריל נפרדים ולכן חולקים רשימה אחת. */
 export async function setCarouselBackgroundDark(filePath: string, isDark: boolean): Promise<string[]> {
   const profile = await getProfileSettings();
   const current: string[] = JSON.parse(profile.darkCarouselBackgroundPaths || "[]");

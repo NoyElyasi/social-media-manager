@@ -310,11 +310,15 @@ export default function BackgroundGallery({
                 {item.category?.trim() || UNCATEGORIZED_LABEL}
               </button>
             )}
-            {kind === "carousel" && (
+            {(kind === "carousel" || kind === "reel") && (
               <button
                 type="button"
                 onClick={() => toggleDark(item)}
-                title="תבנית כהה — פס ההתקדמות/מספור העמודים יוצג בגוונים בהירים כדי שלא יבלע ברקע"
+                title={
+                  kind === "reel"
+                    ? "תבנית כהה — הטקסט בריל יוצג בצבע בהיר כדי שלא יבלע ברקע"
+                    : "תבנית כהה — פס ההתקדמות/מספור העמודים והטקסט בפוסט קצר יוצגו בגוונים בהירים כדי שלא יבלעו ברקע"
+                }
                 className={`rounded-full px-2 py-0.5 text-[11px] border ${
                   darkPaths.has(item.path)
                     ? "border-brand-maroon bg-brand-maroon text-white"
