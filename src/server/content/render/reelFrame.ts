@@ -39,8 +39,8 @@ const WORD_CENTER_FONT_SIZE = 130;
 
 // פוסט "קצר" (מעט מלל): פונט גדול יותר, והתגית גבוהה וימינית יותר — מוצבת
 // במיקום קבוע מתחת לסטיקרים שבתבנית (ולא צמודה לכתובית), ויושרת לשולי המסך הימניים.
-const SHORT_REEL_FONT_SIZE = MIN_FONT_SIZE_REEL + 56;
-const SHORT_WORD_CENTER_FONT_SIZE = 170;
+const SHORT_REEL_FONT_SIZE = MIN_FONT_SIZE_REEL + 40;
+const SHORT_WORD_CENTER_FONT_SIZE = 140;
 const SHORT_HASHTAG_FONT_SIZE = 58;
 const SHORT_HASHTAG_TOP_OFFSET = 470;
 
@@ -49,6 +49,12 @@ interface ReelTextPosition {
   textTopOffset?: number | null;
   /** מרחק הכתובית מהשוליים הימניים (ברירת מחדל CAPTION_RIGHT_INSET). */
   textRightInset?: number | null;
+  /** גודל טקסט באחוזים מברירת המחדל (100 = כרגיל). */
+  textFontPercent?: number | null;
+}
+
+function scaledFontSize(base: number, percent: number | null | undefined): number {
+  return percent ? Math.round((base * percent) / 100) : base;
 }
 
 function buildHashtagNode(
@@ -117,7 +123,7 @@ export function buildReelFrameNode(input: ReelFrameInput): SatoriNode {
       ? TEMPLATE_TEXT_COLOR_DARK
       : TEMPLATE_TEXT_COLOR
     : pickAccessibleTextColor(input.backgroundHex).color;
-  const captionFontSize = input.isShort ? SHORT_REEL_FONT_SIZE : REEL_FONT_SIZE;
+  const captionFontSize = scaledFontSize(input.isShort ? SHORT_REEL_FONT_SIZE : REEL_FONT_SIZE, input.textFontPercent);
   const captionRightInset = input.textRightInset ?? CAPTION_RIGHT_INSET;
 
   return h(
@@ -230,7 +236,7 @@ export function buildWordCenterFrameNode(input: WordCenterFrameInput): SatoriNod
         // צמודים למילה (למשל "שלום.") יפוצלו לריצה נפרדת ויוצגו *אחרי*
         // המילה, בדיוק כמו בשאר מצבי הכתיבה (ראו rtlText.ts) — לא לפני, כמו
         // שקורה כשמעבירים לסאטורי מחרוזת RTL גולמית עם פיסוק בסופה.
-        buildWordRowNode([input.word], { fontSize: input.isShort ? SHORT_WORD_CENTER_FONT_SIZE : WORD_CENTER_FONT_SIZE, fontWeight: 700, color: textColor })
+        buildWordRowNode([input.word], { fontSize: scaledFontSize(input.isShort ? SHORT_WORD_CENTER_FONT_SIZE : WORD_CENTER_FONT_SIZE, input.textFontPercent), fontWeight: 700, color: textColor })
       )
   );
 }

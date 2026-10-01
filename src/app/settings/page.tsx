@@ -78,6 +78,7 @@ export default async function SettingsPage() {
                 category: e.category,
                 textTopOffset: e.textTopOffset,
                 textRightInset: e.textRightInset,
+                textFontPercent: e.textFontPercent,
               }))}
               initialDarkPaths={darkCarouselBackgroundPaths}
               initialDefaultPaths={parseDefaultBackgroundPaths(profile.defaultReelBackgroundPathsJson)}

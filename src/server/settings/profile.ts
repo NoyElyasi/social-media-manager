@@ -106,6 +106,8 @@ export interface BackgroundEntry {
    * בפרט. undefined/null = ברירת המחדל (לא כל תבנית צריכה כיוונון). */
   textTopOffset?: number | null;
   textRightInset?: number | null;
+  /** גודל טקסט באחוזים מברירת המחדל (100 = כרגיל) — לריל בלבד. */
+  textFontPercent?: number | null;
 }
 
 /** מפרשת את הרשימה השמורה — תומכת גם בפורמט הישן (מערך של נתיבים כמחרוזות בלבד), לפני שהתבנית קיבלה קטגוריה. */
@@ -208,12 +210,19 @@ export async function setBackgroundCategory(
 export async function setBackgroundTextPosition(
   kind: BackgroundKind,
   filePath: string,
-  position: { topOffset: number | null; rightInset: number | null }
+  position: { topOffset: number | null; rightInset: number | null; fontPercent?: number | null }
 ): Promise<BackgroundEntry[]> {
   const profile = await getProfileSettings();
   const field = BACKGROUND_FIELD[kind];
   const entries = parseBackgroundEntries(profile[field]).map((e) =>
-    e.path === filePath ? { ...e, textTopOffset: position.topOffset, textRightInset: position.rightInset } : e
+    e.path === filePath
+      ? {
+          ...e,
+          textTopOffset: position.topOffset,
+          textRightInset: position.rightInset,
+          ...(position.fontPercent !== undefined ? { textFontPercent: position.fontPercent } : {}),
+        }
+      : e
   );
   await prisma.profileSettings.update({ where: { id: "default" }, data: { [field]: JSON.stringify(entries) } });
   return entries;

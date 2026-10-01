@@ -19,6 +19,8 @@ export interface BackgroundItem {
   /** מיקום טקסט מותאם לתבנית הזו (קרוסלה בלבד) — ראו setBackgroundTextPosition. null/undefined = ברירת המחדל. */
   textTopOffset?: number | null;
   textRightInset?: number | null;
+  /** גודל טקסט באחוזים (100 = כרגיל) — ריל בלבד. */
+  textFontPercent?: number | null;
 }
 
 const UNCATEGORIZED_LABEL = "כללי";
@@ -56,12 +58,13 @@ export default function BackgroundGallery({
   const [items, setItems] = useState(initial);
   const [darkPaths, setDarkPaths] = useState(new Set(initialDarkPaths ?? []));
   const [defaultPaths, setDefaultPaths] = useState(initialDefaultPaths ?? {});
-  const [defaultPickerPath, setDefaultPickerPath] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [uploadCategory, setUploadCategory] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  const [editingPath, setEditingPath] = useState<string | null>(null);
-  const [editingPositionPath, setEditingPositionPath] = useState<string | null>(null);
+  const [settingsPath, setSettingsPath] = useState<string | null>(null);
+  const [posTop, setPosTop] = useState("");
+  const [posRight, setPosRight] = useState("");
+  const [posFont, setPosFont] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const existingCategories = useMemo(
@@ -121,7 +124,6 @@ export default function BackgroundGallery({
 
   async function saveCategory(item: BackgroundItem, category: string) {
     setError(null);
-    setEditingPath(null);
     const trimmed = category.trim();
     if (trimmed === (item.category?.trim() || "")) return;
     const res = await fetch("/api/settings/backgrounds", {
@@ -137,29 +139,50 @@ export default function BackgroundGallery({
     router.refresh();
   }
 
-  async function saveTextPosition(item: BackgroundItem, topOffset: string, rightInset: string) {
+  function openSettings(item: BackgroundItem) {
     setError(null);
-    setEditingPositionPath(null);
-    const parsedTop = topOffset.trim() === "" ? null : Number(topOffset);
-    const parsedRight = rightInset.trim() === "" ? null : Number(rightInset);
-    if (
-      (parsedTop !== null && Number.isNaN(parsedTop)) ||
-      (parsedRight !== null && Number.isNaN(parsedRight))
-    ) {
-      setError("מיקום טקסט לא תקין — יש להזין מספרים");
+    setSettingsPath(item.path);
+    setPosTop(item.textTopOffset?.toString() ?? "");
+    setPosRight(item.textRightInset?.toString() ?? "");
+    setPosFont(item.textFontPercent?.toString() ?? "");
+  }
+
+  async function saveTextStyle(item: BackgroundItem) {
+    setError(null);
+    const toNumber = (v: string) => (v.trim() === "" ? null : Number(v));
+    const parsedTop = toNumber(posTop);
+    const parsedRight = toNumber(posRight);
+    const parsedFont = toNumber(posFont);
+    if ([parsedTop, parsedRight, parsedFont].some((n) => n !== null && Number.isNaN(n))) {
+      setError("יש להזין מספרים בלבד");
       return;
     }
     const res = await fetch("/api/settings/backgrounds", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind, path: item.path, textTopOffset: parsedTop, textRightInset: parsedRight }),
+      body: JSON.stringify({
+        kind,
+        path: item.path,
+        textTopOffset: parsedTop,
+        textRightInset: parsedRight,
+        ...(kind === "reel" ? { textFontPercent: parsedFont } : {}),
+      }),
     });
     if (!res.ok) {
-      setError("שגיאה בעדכון מיקום הטקסט — נסו שוב");
+      setError("שגיאה בשמירת מיקום/גודל הטקסט — נסו שוב");
       return;
     }
     setItems((prev) =>
-      prev.map((i) => (i.path === item.path ? { ...i, textTopOffset: parsedTop, textRightInset: parsedRight } : i))
+      prev.map((i) =>
+        i.path === item.path
+          ? {
+              ...i,
+              textTopOffset: parsedTop,
+              textRightInset: parsedRight,
+              ...(kind === "reel" ? { textFontPercent: parsedFont } : {}),
+            }
+          : i
+      )
     );
     router.refresh();
   }
@@ -249,143 +272,157 @@ export default function BackgroundGallery({
       )}
 
       <div className="flex flex-wrap gap-3">
-        {visibleItems.map((item) => (
-          <div key={item.path} className="relative flex flex-col items-center gap-1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={item.url} alt="" className="h-32 w-24 rounded-md object-cover border border-brand-pink/40" />
-            <button
-              type="button"
-              onClick={() => handleDelete(item)}
-              title="הסירי מהרשימה"
-              className="absolute -top-2 -left-2 h-6 w-6 rounded-full bg-white border border-brand-pink/40 text-xs text-red-600 hover:bg-red-50"
-            >
-              ✕
-            </button>
-            <button
-              type="button"
-              onClick={() => setDefaultPickerPath((p) => (p === item.path ? null : item.path))}
-              title="ברירת מחדל — אפשר לבחור כמה פורמטים בבת אחת"
-              className={`absolute -top-2 -right-2 h-6 w-6 rounded-full border text-[10px] font-bold flex items-center justify-center ${
-                currentDefaultFormats(item).length > 0
-                  ? "border-amber-500 bg-amber-100 text-amber-800"
-                  : "bg-white border-brand-pink/40 text-brand-maroon/50 hover:bg-brand-pink/10"
-              }`}
-            >
-              {currentDefaultFormats(item).length > 0 ? `⭐${currentDefaultFormats(item).map((f) => FORMAT_ABBR[f]).join("")}` : "☆"}
-            </button>
-            {defaultPickerPath === item.path && (
-              <div className="absolute top-5 -right-2 z-10 flex flex-col gap-1 rounded-md border border-amber-400 bg-white p-1.5 shadow-md">
-                {FORMAT_ORDER.map((format) => (
-                  <label key={format} className="flex items-center gap-1.5 text-[11px] text-brand-maroon whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      checked={defaultPaths[format] === item.path}
-                      onChange={() => toggleDefaultForFormat(item, format)}
-                    />
-                    {FORMAT_LABELS[format]}
-                  </label>
-                ))}
-              </div>
-            )}
-            {editingPath === item.path ? (
-              <input
-                type="text"
-                autoFocus
-                defaultValue={item.category ?? ""}
-                onBlur={(e) => saveCategory(item, e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                  if (e.key === "Escape") setEditingPath(null);
-                }}
-                placeholder="קטגוריה/סקין..."
-                className="w-24 rounded-full border border-brand-pink/40 px-2 py-0.5 text-[11px] text-center"
-              />
-            ) : (
+        {visibleItems.map((item) => {
+          const defaultFormats = currentDefaultFormats(item);
+          const hasTextStyle =
+            item.textTopOffset != null || item.textRightInset != null || item.textFontPercent != null;
+          return (
+            <div key={item.path} className="flex w-24 flex-col items-center gap-1">
               <button
                 type="button"
-                onClick={() => setEditingPath(item.path)}
-                title="לחצי לשנות קטגוריה/סקין"
-                className="rounded-full border border-brand-pink/40 bg-white px-2 py-0.5 text-[11px] text-brand-maroon/60 hover:bg-brand-pink/10"
+                onClick={() => openSettings(item)}
+                title="לחצי להגדרות התבנית"
+                className="relative h-32 w-24 overflow-hidden rounded-md border border-brand-pink/40 hover:ring-2 hover:ring-brand-pink"
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={item.url} alt="" className="h-full w-full object-cover" />
+                <span className="absolute inset-x-0 bottom-0 flex flex-wrap justify-center gap-0.5 bg-white/80 px-0.5 py-0.5 text-[10px]">
+                  {darkPaths.has(item.path) && <span title="תבנית כהה">🌙</span>}
+                  {defaultFormats.length > 0 && (
+                    <span title="ברירת מחדל">⭐{defaultFormats.map((f) => FORMAT_ABBR[f]).join("")}</span>
+                  )}
+                  {hasTextStyle && <span title="מיקום/גודל טקסט מותאם">↕</span>}
+                </span>
+              </button>
+              <span className="max-w-full truncate text-[11px] text-brand-maroon/60">
                 {item.category?.trim() || UNCATEGORIZED_LABEL}
-              </button>
-            )}
-            {(kind === "carousel" || kind === "reel") && (
-              <button
-                type="button"
-                onClick={() => toggleDark(item)}
-                title={
-                  kind === "reel"
-                    ? "תבנית כהה — הטקסט בריל יוצג בצבע בהיר כדי שלא יבלע ברקע"
-                    : "תבנית כהה — פס ההתקדמות/מספור העמודים והטקסט בפוסט קצר יוצגו בגוונים בהירים כדי שלא יבלעו ברקע"
-                }
-                className={`rounded-full px-2 py-0.5 text-[11px] border ${
-                  darkPaths.has(item.path)
-                    ? "border-brand-maroon bg-brand-maroon text-white"
-                    : "border-brand-pink/40 bg-white text-brand-maroon/60 hover:bg-brand-pink/10"
-                }`}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {settingsPath !== null &&
+        (() => {
+          const item = items.find((i) => i.path === settingsPath);
+          if (!item) return null;
+          const inputClass = "w-20 rounded border border-brand-pink/40 px-1.5 py-1 text-center text-sm";
+          return (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+              onClick={() => setSettingsPath(null)}
+            >
+              <div
+                className="flex max-h-[90vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-xl bg-white p-5 shadow-xl"
+                onClick={(e) => e.stopPropagation()}
               >
-                🌙 תבנית כהה
-              </button>
-            )}
-            {(kind === "carousel" || kind === "reel") &&
-              (editingPositionPath === item.path ? (
-                <div className="flex flex-col items-center gap-1 rounded-md border border-brand-pink/40 bg-white p-1.5">
-                  <label className="flex items-center gap-1 text-[10px] text-brand-maroon/70">
-                    גובה
+                <div className="flex items-start gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.url} alt="" className="h-28 w-20 rounded-md border border-brand-pink/40 object-cover" />
+                  <div className="flex flex-1 flex-col gap-1">
+                    <label className="text-xs font-medium">קטגוריה / סקין</label>
                     <input
-                      type="number"
-                      autoFocus
-                      defaultValue={item.textTopOffset ?? ""}
-                      placeholder="ברירת מחדל"
-                      className="w-16 rounded border border-brand-pink/40 px-1 py-0.5 text-[11px] text-center"
-                      id={`top-${item.path}`}
+                      type="text"
+                      key={item.path}
+                      defaultValue={item.category ?? ""}
+                      onBlur={(e) => saveCategory(item, e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                        if (e.key === "Escape") setEditingPositionPath(null);
                       }}
+                      placeholder="למשל: מכתב, טיפ, קצר"
+                      list={`bg-categories-${kind}`}
+                      className="rounded-md border border-brand-pink/40 px-2 py-1 text-sm"
                     />
-                  </label>
-                  <label className="flex items-center gap-1 text-[10px] text-brand-maroon/70">
-                    מהימין
-                    <input
-                      type="number"
-                      defaultValue={item.textRightInset ?? ""}
-                      placeholder="ברירת מחדל"
-                      className="w-16 rounded border border-brand-pink/40 px-1 py-0.5 text-[11px] text-center"
-                      id={`right-${item.path}`}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                        if (e.key === "Escape") setEditingPositionPath(null);
-                      }}
-                    />
-                  </label>
+                    {kind !== "cover" && (
+                      <label className="mt-1 flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={darkPaths.has(item.path)}
+                          onChange={() => toggleDark(item)}
+                        />
+                        🌙 תבנית כהה
+                      </label>
+                    )}
+                    <p className="text-[11px] text-neutral-500">
+                      {kind === "reel"
+                        ? "תבנית כהה: הטקסט והתגית בריל יוצגו בצבע בהיר."
+                        : kind === "carousel"
+                          ? "תבנית כהה: מספור העמודים, פס ההתקדמות והטקסט בפוסט קצר יוצגו בצבע בהיר."
+                          : ""}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 rounded-lg bg-brand-pink/10 p-3">
+                  <span className="text-xs font-medium">רקע ברירת מחדל עבור (אפשר כמה)</span>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {FORMAT_ORDER.map((format) => (
+                      <label key={format} className="flex items-center gap-1.5 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={defaultPaths[format] === item.path}
+                          onChange={() => toggleDefaultForFormat(item, format)}
+                        />
+                        {FORMAT_LABELS[format]}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {kind !== "cover" && (
+                  <div className="flex flex-col gap-2 rounded-lg bg-brand-pink/10 p-3">
+                    <span className="text-xs font-medium">מיקום וגודל הטקסט (ריק = ברירת מחדל)</span>
+                    <div className="flex flex-wrap gap-4">
+                      <label className="flex flex-col items-center gap-1 text-[11px] text-brand-maroon/70">
+                        גובה (מלמעלה)
+                        <input type="number" value={posTop} onChange={(e) => setPosTop(e.target.value)} placeholder={kind === "reel" ? "700" : "340"} className={inputClass} />
+                      </label>
+                      <label className="flex flex-col items-center gap-1 text-[11px] text-brand-maroon/70">
+                        מרחק מהימין
+                        <input type="number" value={posRight} onChange={(e) => setPosRight(e.target.value)} placeholder={kind === "reel" ? "70" : "100"} className={inputClass} />
+                      </label>
+                      {kind === "reel" && (
+                        <label className="flex flex-col items-center gap-1 text-[11px] text-brand-maroon/70">
+                          גודל טקסט (%)
+                          <input type="number" value={posFont} onChange={(e) => setPosFont(e.target.value)} placeholder="100" className={inputClass} />
+                        </label>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => saveTextStyle(item)}
+                      className="self-start rounded-full bg-brand-red px-4 py-1 text-sm text-white"
+                    >
+                      שמירה
+                    </button>
+                  </div>
+                )}
+
+                {error && <p className="text-xs text-red-600">{error}</p>}
+
+                <div className="flex items-center justify-between border-t border-brand-pink/30 pt-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      const top = (document.getElementById(`top-${item.path}`) as HTMLInputElement).value;
-                      const right = (document.getElementById(`right-${item.path}`) as HTMLInputElement).value;
-                      void saveTextPosition(item, top, right);
+                    onClick={async () => {
+                      await handleDelete(item);
+                      setSettingsPath(null);
                     }}
-                    className="rounded-full bg-brand-red px-2 py-0.5 text-[10px] text-white"
+                    className="rounded-full border border-red-300 px-3 py-1 text-sm text-red-600 hover:bg-red-50"
                   >
-                    שמירה
+                    🗑️ הסרת התבנית
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsPath(null)}
+                    className="rounded-full border border-brand-pink/40 px-4 py-1 text-sm hover:bg-brand-pink/10"
+                  >
+                    סגירה
                   </button>
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setEditingPositionPath(item.path)}
-                  title="לחצי לכוונן היכן הטקסט מתחיל בתבנית הזו — שימושי כשהטקסט מתנגש בעיטור של הרקע"
-                  className="rounded-full border border-brand-pink/40 bg-white px-2 py-0.5 text-[11px] text-brand-maroon/60 hover:bg-brand-pink/10"
-                >
-                  ↕ מיקום טקסט
-                  {(item.textTopOffset != null || item.textRightInset != null) && " ✓"}
-                </button>
-              ))}
-          </div>
-        ))}
-      </div>
+              </div>
+            </div>
+          );
+        })()}
 
       <div className="flex flex-wrap items-center gap-2">
         <input
@@ -418,7 +455,7 @@ export default function BackgroundGallery({
         </label>
       </div>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {settingsPath === null && error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }

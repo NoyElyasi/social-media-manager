@@ -68,6 +68,7 @@ const patchSchema = z.object({
   category: z.string().optional(),
   textTopOffset: z.number().nullable().optional(),
   textRightInset: z.number().nullable().optional(),
+  textFontPercent: z.number().min(30).max(200).nullable().optional(),
   // הפורמט (רגיל/טיפ/מכתב/קצר) שמסמנים/מבטלים לתבנית הזו — עם isDefault, ראו setDefaultBackgroundPathForFormat.
   defaultFormat: z.enum(["regular", "tip", "letter", "short"]).optional(),
   isDefault: z.boolean().optional(),
@@ -91,10 +92,15 @@ export async function PATCH(req: NextRequest) {
   if (parsed.data.category !== undefined) {
     entries = await setBackgroundCategory(parsed.data.kind, parsed.data.path, parsed.data.category.trim());
   }
-  if (parsed.data.textTopOffset !== undefined || parsed.data.textRightInset !== undefined) {
+  if (
+    parsed.data.textTopOffset !== undefined ||
+    parsed.data.textRightInset !== undefined ||
+    parsed.data.textFontPercent !== undefined
+  ) {
     entries = await setBackgroundTextPosition(parsed.data.kind, parsed.data.path, {
       topOffset: parsed.data.textTopOffset ?? null,
       rightInset: parsed.data.textRightInset ?? null,
+      fontPercent: parsed.data.textFontPercent,
     });
   }
   if (parsed.data.defaultFormat !== undefined && parsed.data.isDefault !== undefined) {

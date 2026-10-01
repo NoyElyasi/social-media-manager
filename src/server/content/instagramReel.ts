@@ -107,6 +107,7 @@ export interface PrepareReelParams {
   /** מיקום טקסט מותאם לתבנית (ראו setBackgroundTextPosition) — null/חסר = ברירת המחדל. */
   textTopOffset?: number | null;
   textRightInset?: number | null;
+  textFontPercent?: number | null;
 }
 
 async function renderCaptionFrames(
@@ -130,7 +131,7 @@ async function renderCaptionFrames(
   leadInSeconds: number,
   isShort: boolean,
   isDarkBackground: boolean,
-  textPosition: { textTopOffset?: number | null; textRightInset?: number | null }
+  textPosition: { textTopOffset?: number | null; textRightInset?: number | null; textFontPercent?: number | null }
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
@@ -235,7 +236,7 @@ async function renderWordCenterFrames(
   leadInSeconds: number,
   isShort: boolean,
   isDarkBackground: boolean,
-  textPosition: { textTopOffset?: number | null; textRightInset?: number | null }
+  textPosition: { textTopOffset?: number | null; textRightInset?: number | null; textFontPercent?: number | null }
 ): Promise<{ framePaths: string[]; durations: number[] }> {
   const framePaths: string[] = [];
   const durations: number[] = [];
@@ -675,7 +676,11 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
             wordTimestamps?.[0] ?? 0,
             isShort,
             !!params.isDarkBackground,
-            { textTopOffset: params.textTopOffset, textRightInset: params.textRightInset }
+            {
+              textTopOffset: params.textTopOffset,
+              textRightInset: params.textRightInset,
+              textFontPercent: params.textFontPercent,
+            }
           )
         : await renderCaptionFrames(
             captions,
@@ -691,7 +696,11 @@ export async function prepareInstagramReel(params: PrepareReelParams): Promise<I
             wordTimestamps?.[0] ?? 0,
             isShort,
             !!params.isDarkBackground,
-            { textTopOffset: params.textTopOffset, textRightInset: params.textRightInset }
+            {
+              textTopOffset: params.textTopOffset,
+              textRightInset: params.textRightInset,
+              textFontPercent: params.textFontPercent,
+            }
           );
     if (params.signal?.aborted) throw new ReelCancelledError();
     const silentPath = path.join(workDir, "reel-silent.mp4");

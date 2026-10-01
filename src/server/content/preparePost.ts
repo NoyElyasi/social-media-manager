@@ -31,7 +31,20 @@ function isDarkCarouselBackground(darkCarouselBackgroundPathsJson: string, backg
 }
 
 /** מיקום טקסט מותאם לתבנית הרקע הנבחרת (ראו setBackgroundTextPosition) — {null,null} אם אין תבנית/כיוונון. */
-/** מיקום טקסט מותאם לתבנית (קרוסלה או ריל, לפי רשימת התבניות שמועברת). */
+/** מיקום וגודל טקסט מותאמים לתבנית ריל (הגדרות הרקעים). */
+function getReelTextStyle(
+  reelBackgroundImagePathsJson: string,
+  backgroundPath: string | null
+): { textTopOffset: number | null; textRightInset: number | null; textFontPercent: number | null } {
+  if (!backgroundPath) return { textTopOffset: null, textRightInset: null, textFontPercent: null };
+  const entry = parseBackgroundEntries(reelBackgroundImagePathsJson).find((e) => e.path === backgroundPath);
+  return {
+    textTopOffset: entry?.textTopOffset ?? null,
+    textRightInset: entry?.textRightInset ?? null,
+    textFontPercent: entry?.textFontPercent ?? null,
+  };
+}
+
 function getCarouselTextPosition(
   carouselBackgroundImagePathsJson: string,
   backgroundPath: string | null
@@ -257,7 +270,7 @@ export async function createAndPreparePost(input: CreatePostInput) {
           narration: input.reelNarration,
           isShort: !!input.isShort,
           isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, input.reelBackgroundPath ?? null),
-          ...getCarouselTextPosition(profile.reelBackgroundImagePaths, input.reelBackgroundPath ?? null),
+          ...getReelTextStyle(profile.reelBackgroundImagePaths, input.reelBackgroundPath ?? null),
         });
         await prisma.platformContent.create({
           data: {
@@ -425,7 +438,7 @@ export async function updatePostRawText(
         narration,
         isShort,
         isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, backgroundPath),
-        ...getCarouselTextPosition(profile.reelBackgroundImagePaths, backgroundPath),
+        ...getReelTextStyle(profile.reelBackgroundImagePaths, backgroundPath),
       });
       await prisma.platformContent.update({
         where: { id: content.id },
@@ -546,7 +559,7 @@ export async function addTargetToPost(
       narration: options?.reelNarration,
       isShort: post.isShort,
       isDarkBackground: isDarkCarouselBackground(profile.darkCarouselBackgroundPaths, options?.reelBackgroundPath ?? null),
-      ...getCarouselTextPosition(profile.reelBackgroundImagePaths, options?.reelBackgroundPath ?? null),
+      ...getReelTextStyle(profile.reelBackgroundImagePaths, options?.reelBackgroundPath ?? null),
     });
     await prisma.platformContent.create({
       data: {
