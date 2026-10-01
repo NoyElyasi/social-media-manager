@@ -406,48 +406,8 @@ export default function NewPostPage() {
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold text-brand-maroon">פוסט חדש</h1>
 
-      {/* מצאי טקסט מפוסט ישן בפייסבוק — פייסבוק הסירו את הקישור הישיר לחיפוש
-          בתוך פרופיל, אז זה פותח את הפרופיל עצמו; החיפוש בתגית (למשל
-          #קוטג) נעשה ידנית משם, באמצעות סימן החיפוש שבתוך הפרופיל. */}
-      <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3 bg-brand-pink/10">
-        <label className="font-medium text-sm">מצאי טקסט מפוסט ישן בפייסבוק</label>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={openFacebookProfile}
-            className="self-start rounded-md border border-brand-pink/40 px-3 py-2 text-sm hover:bg-white"
-          >
-            פתחו את הפרופיל שלי בפייסבוק 🔗
-          </button>
-          <input
-            type="text"
-            value={facebookSearchQuery}
-            onChange={(e) => setFacebookSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                openFacebookGeneralSearch();
-              }
-            }}
-            placeholder="תגית לחיפוש, למשל #קוטג'"
-            className="rounded-md border border-brand-pink/40 px-3 py-2 text-sm bg-white"
-          />
-          <button
-            type="button"
-            onClick={openFacebookGeneralSearch}
-            disabled={!facebookSearchQuery.trim()}
-            className="self-start rounded-md border border-brand-pink/40 px-3 py-2 text-sm hover:bg-white disabled:opacity-50"
-          >
-            חיפוש כללי בפייסבוק לפי תגית 🔍
-          </button>
-        </div>
-        <p className="text-xs text-brand-maroon/60">
-          משם, לחצי על סימן החיפוש שבתוך הפרופיל וחפשי לפי תגית (למשל #קוטג) — פייסבוק לא מאפשרת יותר קישור ישיר
-          לחיפוש בתוך פרופיל. כפתור החיפוש הכללי מחפש בכל פייסבוק (לא רק בפרופיל שלך) את מה שכתוב בתיבה שלמעלה. את
-          הטקסט הרלוונטי מעתיקים ומדביקים בתיבה שמתחת.
-        </p>
-      </div>
-
+      <section className="flex flex-col gap-4 rounded-xl border border-brand-pink/30 bg-brand-card p-4">
+        <h2 className="text-base font-semibold text-brand-maroon">1 · הטקסט</h2>
       {/* 1. הטקסט עצמו */}
       <div className="flex flex-col gap-2">
         <label className="font-medium text-sm">טקסט הפוסט (גולמי)</label>
@@ -497,7 +457,52 @@ export default function NewPostPage() {
         />
       </div>
 
-      <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3 bg-brand-pink/10">
+      <details className="rounded-lg border border-brand-pink/40 bg-brand-pink/10 p-3">
+        <summary className="cursor-pointer text-sm font-medium">📥 ייבוא טקסט קיים (פייסבוק / Notion)</summary>
+        <div className="mt-3 flex flex-col gap-4">
+      {/* מצאי טקסט מפוסט ישן בפייסבוק — פייסבוק הסירו את הקישור הישיר לחיפוש
+          בתוך פרופיל, אז זה פותח את הפרופיל עצמו; החיפוש בתגית (למשל
+          #קוטג) נעשה ידנית משם, באמצעות סימן החיפוש שבתוך הפרופיל. */}
+      <div className="flex flex-col gap-2">
+        <label className="font-medium text-sm">מצאי טקסט מפוסט ישן בפייסבוק</label>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={openFacebookProfile}
+            className="self-start rounded-md border border-brand-pink/40 px-3 py-2 text-sm hover:bg-white"
+          >
+            פתחו את הפרופיל שלי בפייסבוק 🔗
+          </button>
+          <input
+            type="text"
+            value={facebookSearchQuery}
+            onChange={(e) => setFacebookSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                openFacebookGeneralSearch();
+              }
+            }}
+            placeholder="תגית לחיפוש, למשל #קוטג'"
+            className="rounded-md border border-brand-pink/40 px-3 py-2 text-sm bg-white"
+          />
+          <button
+            type="button"
+            onClick={openFacebookGeneralSearch}
+            disabled={!facebookSearchQuery.trim()}
+            className="self-start rounded-md border border-brand-pink/40 px-3 py-2 text-sm hover:bg-white disabled:opacity-50"
+          >
+            חיפוש כללי בפייסבוק לפי תגית 🔍
+          </button>
+        </div>
+        <p className="text-xs text-brand-maroon/60">
+          משם, לחצי על סימן החיפוש שבתוך הפרופיל וחפשי לפי תגית (למשל #קוטג) — פייסבוק לא מאפשרת יותר קישור ישיר
+          לחיפוש בתוך פרופיל. כפתור החיפוש הכללי מחפש בכל פייסבוק (לא רק בפרופיל שלך) את מה שכתוב בתיבה שלמעלה. את
+          הטקסט הרלוונטי מעתיקים ומדביקים בתיבה שמתחת.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2 ">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <span className="text-sm font-medium">ייבוא קטע מ-Notion (לפי התגית הראשונה שלמעלה)</span>
           <button
@@ -526,6 +531,25 @@ export default function NewPostPage() {
         {notionOldFlag && <p className="text-xs text-amber-700">⚠️ מסומן כ&quot;ישן&quot; ב-Notion — קטע ממוחזר</p>}
       </div>
 
+        </div>
+      </details>
+
+      </section>
+
+      <section className="flex flex-col gap-4 rounded-xl border border-brand-pink/30 bg-brand-card p-4">
+        <h2 className="text-base font-semibold text-brand-maroon">2 · סוג ונושא</h2>
+      <div className="flex flex-col gap-2">
+        <label className="font-medium text-sm">סוג הפוסט <span className="font-normal text-brand-maroon/60">— קובע אילו רקעים מוצעים ואיך הפוסט מסווג בדשבורד</span></label>
+        <PostTypeSelector
+          value={postTypeOf(postFormat, isShort)}
+          onChange={(type: PostType) => {
+            const next = splitPostType(type);
+            setPostFormat(next.aiFormat);
+            setIsShort(next.isShort);
+          }}
+        />
+      </div>
+
       <div className="flex flex-col gap-2">
         <label className="font-medium text-sm">
           נושא הפוסט (אופציונלי — לתיוג ולמעקב בדשבורד. בלי בחירה, מזהים אוטומטית מהטקסט)
@@ -544,20 +568,12 @@ export default function NewPostPage() {
         </select>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <label className="font-medium text-sm">סוג הפוסט</label>
-        <PostTypeSelector
-          value={postTypeOf(postFormat, isShort)}
-          onChange={(type: PostType) => {
-            const next = splitPostType(type);
-            setPostFormat(next.aiFormat);
-            setIsShort(next.isShort);
-          }}
-        />
-      </div>
+      </section>
 
+      <section className="flex flex-col gap-4 rounded-xl border border-brand-pink/30 bg-brand-card p-4">
+        <h2 className="text-base font-semibold text-brand-maroon">3 · מה להכין</h2>
       {/* 2. בחירת הפלט — קובע אילו קטגוריות אפשרויות יופיעו מכאן ואילך */}
-      <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3">
+      <div className="flex flex-col gap-2 ">
         <label className="font-medium text-sm">מה הפלט שאת צריכה?</label>
         <div className="flex flex-col gap-2">
           {SELECTABLE_TARGETS.map((target) => (
@@ -577,8 +593,13 @@ export default function NewPostPage() {
         </div>
       </div>
 
+      </section>
+
+      {(showCarouselOptions || showReelOptions) && (
+        <section className="flex flex-col gap-4 rounded-xl border border-brand-pink/30 bg-brand-card p-4">
+        <h2 className="text-base font-semibold text-brand-maroon">4 · עיצוב</h2>
       {showCarouselOptions && (
-        <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/40 p-3">
+        <div className="flex flex-col gap-2 ">
           <label className="font-medium text-sm">עיצוב הקרוסלה</label>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
             <label className="flex items-center gap-2 text-sm">
@@ -595,7 +616,7 @@ export default function NewPostPage() {
 
       {/* 4. אפשרויות לקרוסלה בלבד */}
       {showCarouselOptions && (carouselBackgrounds.length > 0 || coverBackgrounds.length > 0) && (
-        <div className="flex flex-col gap-4 rounded-lg border border-brand-pink/40 p-3">
+        <div className="flex flex-col gap-4 ">
           <h2 className="font-semibold text-sm border-b pb-2">הגדרות לפוסט הקרוסלה</h2>
           {carouselBackgrounds.length > 0 && (
             <div className="flex flex-col gap-2 bg-brand-pink/10 rounded-lg p-2">
@@ -626,7 +647,7 @@ export default function NewPostPage() {
 
       {/* 5. אפשרויות לריל בלבד */}
       {showReelOptions && (
-        <div className="flex flex-col gap-4 rounded-lg border border-brand-pink/40 p-3">
+        <div className="flex flex-col gap-4 ">
           <h2 className="font-semibold text-sm border-b pb-2">הגדרות לריל</h2>
           <div className="flex flex-col gap-2 bg-brand-pink/10 rounded-lg p-2">
             <label className="font-medium text-sm">אנימציית הופעת הטקסט בריל</label>
@@ -674,6 +695,10 @@ export default function NewPostPage() {
           )}
           <NarrationInput key={`${rawText}-${splitMode}`} onCaptured={setReelNarration} />
         </div>
+      )}
+
+      </section>
+
       )}
 
       {progress && startedAt && (

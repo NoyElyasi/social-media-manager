@@ -368,11 +368,12 @@ async function syncMediaItems(
     // שנוצר בכלי, שם יש את הערכים (מחושב ברינדור / מסווג בנפרד). אופציונלי בהחלט.
     const linkedContent = await prisma.platformContent.findFirst({
       where: { instagramMediaId: item.id },
-      select: { durationSeconds: true, post: { select: { aiTheme: true, aiFormat: true, aiTone: true } } },
+      select: { durationSeconds: true, post: { select: { aiTheme: true, aiFormat: true, aiTone: true, isShort: true } } },
     });
     const durationSeconds = linkedContent?.durationSeconds ?? null;
     const aiTheme = linkedContent?.post.aiTheme ?? null;
-    const aiFormat = linkedContent?.post.aiFormat ?? null;
+    // פוסט קצר הוא סוג בפני עצמו (גובר על מכתב/טיפ) — מתויג "short" כדי שהדשבורד יפריד אותו.
+    const aiFormat = linkedContent?.post.isShort ? "short" : (linkedContent?.post.aiFormat ?? null);
     const aiTone = linkedContent?.post.aiTone ?? null;
 
     await prisma.instagramMedia.upsert({

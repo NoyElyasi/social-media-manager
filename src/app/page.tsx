@@ -23,6 +23,7 @@ function firstRealHashtag(hashtagsJson: string): string | null {
 function postTitle(post: {
   hashtags: string;
   aiFormat: string | null;
+  isShort?: boolean;
   platformContents: { type: string; hashtags: string }[];
 }): string {
   const carousel = post.platformContents.find((pc) => pc.type === "instagram_carousel");
@@ -32,6 +33,7 @@ function postTitle(post: {
   if (tag) parts.push(tag);
   if (post.aiFormat === "letter") parts.push("✉️ מכתב");
   if (post.aiFormat === "tip") parts.push("💡 טיפ");
+  if (post.isShort) parts.push("✨ קצר");
   return parts.length > 0 ? parts.join(" · ") : "ללא תיוג";
 }
 

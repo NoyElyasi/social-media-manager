@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Format = "regular" | "letter" | "tip";
+type Format = "regular" | "letter" | "tip" | "short";
 
 const FORMAT_OPTIONS: { value: Format; label: string }[] = [
   { value: "regular", label: "רגיל" },
   { value: "letter", label: "✉️ מכתב" },
   { value: "tip", label: "💡 טיפ" },
+  { value: "short", label: "✨ קצר" },
 ];
 
 export default function InstagramMediaLabelEditor({
@@ -25,7 +26,7 @@ export default function InstagramMediaLabelEditor({
   const router = useRouter();
   const [theme, setTheme] = useState(initialTheme ?? "");
   const [format, setFormat] = useState<Format>(
-    initialFormat === "letter" || initialFormat === "tip" ? initialFormat : "regular"
+    initialFormat === "letter" || initialFormat === "tip" || initialFormat === "short" ? initialFormat : "regular"
   );
   const [saving, setSaving] = useState(false);
 
@@ -56,6 +57,7 @@ export default function InstagramMediaLabelEditor({
           🏷️ {theme}
           {format === "letter" && " · ✉️ מכתב"}
           {format === "tip" && " · 💡 טיפ"}
+          {format === "short" && " · ✨ קצר"}
         </span>
       )}
       <select

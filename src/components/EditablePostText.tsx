@@ -259,55 +259,59 @@ export default function EditablePostText({
     }
   }
 
+  const sectionClass = "flex flex-col gap-3 rounded-lg border border-brand-pink/30 bg-white/60 p-3";
+  const sectionTitle = "text-xs font-semibold text-brand-maroon";
+
   return (
-    <div className="flex flex-col gap-2">
-      <textarea
-        ref={textareaRef}
-        value={rawText}
-        onChange={(e) => setRawText(e.target.value)}
-        rows={6}
-        className="rounded-lg border border-brand-pink/40 p-3 text-base bg-white"
-      />
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium">
-          תגיות (משותפות לכל התוכן של הפוסט. <HashtagBadge text={ALWAYS_FIRST_HASHTAG} /> מתווספת אוטומטית, אין צורך לכתוב
-          אותה) <span className="font-normal text-neutral-400">— ייכנסו לתוקף בלחיצה על &quot;שמור טקסט&quot;</span>
-        </label>
-        <input
-          type="text"
-          value={hashtagsInput}
-          onChange={(e) => setHashtagsInput(e.target.value)}
-          className="rounded-md border border-brand-pink/40 text-sm p-1.5 bg-white"
-          placeholder="#תגית2 #תגית3"
+    <div className="flex flex-col gap-3">
+      <div className={sectionClass}>
+        <span className={sectionTitle}>הטקסט והתגיות</span>
+        <textarea
+          ref={textareaRef}
+          value={rawText}
+          onChange={(e) => setRawText(e.target.value)}
+          rows={6}
+          className="rounded-lg border border-brand-pink/40 p-3 text-base bg-white"
         />
-      </div>
-      {hasSplitTarget && (
-        <div className="flex gap-2 text-xs">
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => insertMarker(MANUAL_SLIDE_BREAK)}
-            title="הציבו את הסמן בטקסט במקום לפצל לעמוד/משפט חדש, ואז לחצו כאן"
-            className="rounded-md border px-2 py-1 hover:bg-neutral-100"
-          >
-            + סימון חילוק ({MANUAL_SLIDE_BREAK})
-          </button>
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => insertMarker(GLUE_MARKER)}
-            title="שני משפטים שחייבים להישאר יחד באותו עמוד/כתובית — הציבו סמן ביניהם ולחצו כאן"
-            className="rounded-md border px-2 py-1 hover:bg-neutral-100"
-          >
-            + סימון הדבקה ({GLUE_MARKER})
-          </button>
-        </div>
-      )}
-      <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/30 bg-white/60 p-3">
+        {hasSplitTarget && (
+          <div className="flex gap-2 text-xs">
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => insertMarker(MANUAL_SLIDE_BREAK)}
+              title="הציבו את הסמן בטקסט במקום לפצל לעמוד/משפט חדש, ואז לחצו כאן"
+              className="rounded-md border px-2 py-1 hover:bg-neutral-100"
+            >
+              + סימון חילוק ({MANUAL_SLIDE_BREAK})
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => insertMarker(GLUE_MARKER)}
+              title="שני משפטים שחייבים להישאר יחד באותו עמוד/כתובית — הציבו סמן ביניהם ולחצו כאן"
+              className="rounded-md border px-2 py-1 hover:bg-neutral-100"
+            >
+              + סימון הדבקה ({GLUE_MARKER})
+            </button>
+          </div>
+        )}
         <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium">סוג הפוסט</span>
-          <PostTypeSelector value={postType} onChange={setPostType} />
+          <label className="text-xs font-medium">
+            תגיות משותפות לכל התוכן <HashtagBadge text={ALWAYS_FIRST_HASHTAG} /> מתווספת אוטומטית
+          </label>
+          <input
+            type="text"
+            value={hashtagsInput}
+            onChange={(e) => setHashtagsInput(e.target.value)}
+            className="rounded-md border border-brand-pink/40 text-sm p-1.5 bg-white"
+            placeholder="#תגית2 #תגית3"
+          />
         </div>
+      </div>
+
+      <div className={sectionClass}>
+        <span className={sectionTitle}>סוג ועיצוב</span>
+        <PostTypeSelector value={postType} onChange={setPostType} />
         {hasCarousel && (
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs">
             <label className="flex items-center gap-1.5">
@@ -320,29 +324,9 @@ export default function EditablePostText({
             </label>
           </div>
         )}
-        <span className="text-[11px] text-neutral-400">שינויים בסוג ובעיצוב ייכנסו לתוקף בלחיצה על &quot;שמור טקסט&quot;</span>
-      </div>
-      {hasCarousel && hasReel && (
-        <div className="flex items-center gap-4 text-xs">
-          <span className="text-neutral-500">עדכן ברענון:</span>
-          <label className="flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              checked={updateCarousel}
-              onChange={(e) => setUpdateCarousel(e.target.checked)}
-            />
-            קרוסלה
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input type="checkbox" checked={updateReel} onChange={(e) => setUpdateReel(e.target.checked)} />
-            ריל
-          </label>
-        </div>
-      )}
-      {hasReel && updateReel && (
-        <div className="flex flex-col gap-2">
+        {hasReel && (
           <label className="flex items-center gap-2 text-xs">
-            <span className="text-neutral-500">אנימציית הריל:</span>
+            <span>אנימציית הריל:</span>
             <select
               value={revealMode}
               onChange={(e) => setRevealMode(e.target.value as "word" | "letter" | "word-center")}
@@ -352,12 +336,68 @@ export default function EditablePostText({
               <option value="letter">אות-אות</option>
               <option value="word-center">מילה במרכז</option>
             </select>
-            <span className="text-neutral-400">(ייכנס לתוקף בלחיצה על &quot;שמור טקסט&quot;)</span>
           </label>
+        )}
+        {(hasCarousel || hasReel) && (
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => setShowBackgroundEditor((v) => !v)}
+              className="self-start text-xs text-brand-red hover:underline"
+            >
+              {showBackgroundEditor ? "סגרי בחירת רקע/שער" : "🎨 החליפי רקע/שער"}
+            </button>
+            {showBackgroundEditor && (
+              <div className="flex flex-col gap-4 rounded-lg border border-brand-pink/40 bg-brand-pink/10 p-3">
+                {hasCarousel && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-medium">רקע לקרוסלה</label>
+                    <BackgroundPicker
+                      items={carouselBackgrounds}
+                      selected={carouselBackgroundPath}
+                      onSelect={setCarouselBackgroundPath}
+                      noneLabel="בלי תבנית (לבן)"
+                      formatFilter={postType}
+                    />
+                  </div>
+                )}
+                {hasCarousel && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-medium">עמוד שער</label>
+                    <BackgroundPicker
+                      items={coverBackgrounds}
+                      selected={coverBackgroundPath}
+                      onSelect={setCoverBackgroundPath}
+                      noneLabel="בלי עמוד שער"
+                      formatFilter={postType}
+                    />
+                  </div>
+                )}
+                {hasReel && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-medium">רקע לריל</label>
+                    <BackgroundPicker
+                      items={reelBackgrounds}
+                      selected={reelBackgroundPath}
+                      onSelect={setReelBackgroundPath}
+                      noneLabel="בלי תבנית (צבע אוטומטי)"
+                      formatFilter={postType}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {hasReel && updateReel && (
+        <div className={sectionClass}>
+          <span className={sectionTitle}>🎙️ הקראה לריל</span>
           {existingNarrationUrl && reelNarration === undefined && (
             <div className="flex flex-col gap-2 rounded-lg border border-green-200 bg-green-50 p-2">
               <p className="text-xs text-green-700">
-                🎙️ יש הקלטה משויכת לריל הזה — היא תישמר אוטומטית. אפשר להאזין לה, להסיר אותה, או להעלות/להקליט אחת חדשה למטה (זה יחליף אותה).
+                יש הקלטה משויכת לריל הזה — היא תישמר אוטומטית. אפשר להאזין לה, להסיר אותה, או להעלות/להקליט אחת חדשה (זה יחליף אותה).
               </p>
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
               <audio src={existingNarrationUrl} controls className="w-full" />
@@ -373,57 +413,7 @@ export default function EditablePostText({
           <NarrationInput key={`${rawText}-${splitMode}`} onCaptured={setReelNarration} />
         </div>
       )}
-      {(hasCarousel || hasReel) && (
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={() => setShowBackgroundEditor((v) => !v)}
-            className="self-start text-xs text-brand-red hover:underline"
-          >
-            {showBackgroundEditor ? "סגרי בחירת רקע/שער" : "החליפי רקע/שער לפני שמירה"}
-          </button>
-          {showBackgroundEditor && (
-            <div className="flex flex-col gap-4 rounded-lg border border-brand-pink/40 bg-brand-pink/10 p-3">
-              {hasCarousel && (
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-medium">רקע לקרוסלה</label>
-                  <BackgroundPicker
-                    items={carouselBackgrounds}
-                    selected={carouselBackgroundPath}
-                    onSelect={setCarouselBackgroundPath}
-                    noneLabel="בלי תבנית (לבן)"
-                  />
-                </div>
-              )}
-              {hasCarousel && (
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-medium">עמוד שער</label>
-                  <BackgroundPicker
-                    items={coverBackgrounds}
-                    selected={coverBackgroundPath}
-                    onSelect={setCoverBackgroundPath}
-                    noneLabel="בלי עמוד שער"
-                  />
-                </div>
-              )}
-              {hasReel && (
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-medium">רקע לריל</label>
-                  <BackgroundPicker
-                    items={reelBackgrounds}
-                    selected={reelBackgroundPath}
-                    onSelect={setReelBackgroundPath}
-                    noneLabel="בלי תבנית (צבע אוטומטי)"
-                  />
-                </div>
-              )}
-              <p className="text-xs text-brand-maroon/60">
-                הבחירה כאן תיכנס לתוקף רק בלחיצה על &quot;שמור טקסט&quot; למטה.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+
       {progress && startedAt && (
         <ReelProgress
           rendered={progress.rendered}
@@ -433,30 +423,49 @@ export default function EditablePostText({
         />
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={handleUpdate}
-          disabled={saving || refreshing}
-          className="self-start rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium hover:bg-brand-red-dark disabled:opacity-50"
-        >
-          {saving ? "מעדכן ומייצר תמונות..." : "שמור טקסט"}
-        </button>
-        {(notionTag || notionUrl) && (
+
+      <div className="flex flex-col gap-2 rounded-lg border border-brand-pink/30 bg-brand-pink/10 p-3">
+        {hasCarousel && hasReel && (
+          <div className="flex items-center gap-4 text-xs">
+            <span className="text-neutral-600">לייצר מחדש:</span>
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={updateCarousel} onChange={(e) => setUpdateCarousel(e.target.checked)} />
+              קרוסלה
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={updateReel} onChange={(e) => setUpdateReel(e.target.checked)} />
+              ריל
+            </label>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={handleRefreshFromNotion}
+            onClick={handleUpdate}
             disabled={saving || refreshing}
-            title={
-              notionTag
-                ? `שולפת את הטקסט העדכני מנושיין (תגית ${notionTag.startsWith("#") ? notionTag : `#${notionTag}`}) ומרנדרת מחדש — לפי קישור העמוד, גם אם התגית שונתה בנושיין`
-                : "שולפת את הטקסט העדכני מנושיין ומרנדרת מחדש"
-            }
-            className="self-start rounded-lg border border-brand-pink/40 bg-white px-4 py-2 text-brand-maroon text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
+            className="rounded-lg bg-brand-red px-4 py-2 text-white text-sm font-medium hover:bg-brand-red-dark disabled:opacity-50"
           >
-            {refreshing ? "מעדכנת מהנושיין..." : "🔄 עדכני טקסט מהנושיין"}
+            {saving ? "מעדכן ומייצר תמונות..." : "שמור טקסט ועיצוב"}
           </button>
-        )}
+          {(notionTag || notionUrl) && (
+            <button
+              type="button"
+              onClick={handleRefreshFromNotion}
+              disabled={saving || refreshing}
+              title={
+                notionTag
+                  ? `שולפת את הטקסט העדכני מנושיין (תגית ${notionTag.startsWith("#") ? notionTag : `#${notionTag}`}) ומרנדרת מחדש — לפי קישור העמוד, גם אם התגית שונתה בנושיין`
+                  : "שולפת את הטקסט העדכני מנושיין ומרנדרת מחדש"
+              }
+              className="rounded-lg border border-brand-pink/40 bg-white px-4 py-2 text-brand-maroon text-sm font-medium hover:bg-brand-pink/10 disabled:opacity-50"
+            >
+              {refreshing ? "מעדכנת מהנושיין..." : "🔄 עדכני טקסט מהנושיין"}
+            </button>
+          )}
+        </div>
+        <span className="text-[11px] text-neutral-500">
+          כל השינויים שלמעלה (טקסט, תגיות, סוג, עיצוב, רקע, אנימציה והקראה) נכנסים לתוקף רק בלחיצה על השמירה.
+        </span>
       </div>
     </div>
   );

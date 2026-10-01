@@ -39,7 +39,7 @@ interface Row {
   avgWatchSeconds: number | null;
   durationSeconds: number | null;
   aiTheme: string | null; // תיוג AI — אופציונלי, רק לפוסטים שנוצרו בכלי וסווגו
-  aiFormat: string | null; // "letter" | "regular"
+  aiFormat: string | null; // "letter" | "tip" | "short" | "regular"
   aiTone: string | null; // "realistic" | "absurd"
   caption: string | null;
   permalink: string;
@@ -507,12 +507,13 @@ export default async function DashboardPage({
   // תיוג AI (אופציונלי — רק לפוסטים שנוצרו בכלי, קושרו, וסווגו)
   const themes = [...new Set(rows.map((r) => r.aiTheme).filter((t): t is string => !!t))];
   const hasLetterPosts = rows.some((r) => r.aiFormat === "letter");
+  const hasShortPosts = rows.some((r) => r.aiFormat === "short");
   const themeBuckets = themes.map((theme) => ({ name: theme, rows: rows.filter((r) => r.aiTheme === theme) }));
   const themeLikesData = bucketBarData(themeBuckets, "likesCount", 2);
   // "מכתב" הוא תיוג ידני יזום (הצ'קבוקס) — כל פוסט שלא סומן ככה נחשב "רגיל"
   // מעצם ההיעדר, בלי צורך לסמן כל פוסט בנפרד כ"לא מכתב".
   const letterRows = rows.filter((r) => r.aiFormat === "letter");
-  const regularRows = rows.filter((r) => r.aiFormat !== "letter");
+  const regularRows = rows.filter((r) => r.aiFormat !== "letter" && r.aiFormat !== "short");
   const formatStyleLikesData = twoGroupBarData(letterRows, "מכתב", regularRows, "פוסט רגיל", "likesCount");
   const formatStyleViewsReachData =
     letterRows.filter((r) => r.reachCount !== null).length >= MIN_PER_GROUP &&
@@ -543,14 +544,27 @@ export default async function DashboardPage({
         ]
       : null;
 
+  // "קצר" הוא סוג בפני עצמו (ראו PostTypeSelector) — מופרד מכל השאר, עם השוואה מקבילה ל"טיפ".
+  const shortRows = rows.filter((r) => r.aiFormat === "short");
+  const nonShortRows = rows.filter((r) => r.aiFormat !== "short");
+  const formatShortViewsReachData =
+    shortRows.filter((r) => r.reachCount !== null).length >= MIN_PER_GROUP &&
+    nonShortRows.filter((r) => r.reachCount !== null).length >= MIN_PER_GROUP
+      ? [
+          { name: "קצר", views: avg(shortRows.map((r) => r.viewsCount)) ?? 0, reach: avg(shortRows.map((r) => r.reachCount)) ?? 0 },
+          { name: "שאר הפוסטים", views: avg(nonShortRows.map((r) => r.viewsCount)) ?? 0, reach: avg(nonShortRows.map((r) => r.reachCount)) ?? 0 },
+        ]
+      : null;
+  const shortLikesData = twoGroupBarData(shortRows, "קצר", nonShortRows, "שאר הפוסטים", "likesCount");
+
   // נושא+פורמט → הגעה, לכל קומבינציה שנבדקה בפועל (לא רק ה-3 המובילות) — כדי
   // לבדוק אם "יום חלש" הוא באמת חלש או שזה צירוף מקרים של תוכן חלש באותו יום
   // (בקשה מפורשת). לא מיובא מ-reachInsights.ts (getTopContentAngles) — אותה
   // קונבנציה כמו שאר הקובץ, לא לשתף קוד עם מנוע התכנון.
   const angleBuckets: { name: string; rows: Row[] }[] = [];
   for (const theme of themes) {
-    for (const format of ["letter", "tip", "regular"] as const) {
-      const formatLabel = format === "letter" ? "מכתב" : format === "tip" ? "טיפ" : "רגיל";
+    for (const format of ["letter", "tip", "short", "regular"] as const) {
+      const formatLabel = format === "letter" ? "מכתב" : format === "tip" ? "טיפ" : format === "short" ? "קצר" : "רגיל";
       const matching = rows.filter((r) => r.aiTheme === theme && (r.aiFormat ?? "regular") === format);
       if (matching.length > 0) angleBuckets.push({ name: `${theme} (${formatLabel})`, rows: matching });
     }
@@ -899,6 +913,15 @@ export default async function DashboardPage({
             ]}
             note="סמני 'פוסט מסוג טיפ' בגלריה למטה"
           />
+          <GroupedBarCard
+            title="קצר לעומת שאר הפוסטים — צפיות והגעה"
+            data={formatShortViewsReachData}
+            bars={[
+              { key: "views", label: "צפיות", color: "#c41e3a" },
+              { key: "reach", label: "הגעה (ייחודי)", color: "#e7a9b8" },
+            ]}
+            note="פוסטים שנוצרו בכלי כ'קצר' מסומנים אוטומטית אחרי סנכרון; אפשר גם לסמן ידנית בגלריה למטה"
+          />
         </ChartScrollRow>
       </div>
 
@@ -972,6 +995,11 @@ export default async function DashboardPage({
                 note="סמני 'פוסט מסוג מכתב' בגלריה למטה — כל פוסט אחר נחשב אוטומטית 'רגיל'"
               />
               <BarComparisonCard
+                title="קצר לעומת שאר הפוסטים → לייקים"
+                data={shortLikesData}
+                note="פוסטים מסוג 'קצר' מול כל השאר"
+              />
+              <BarComparisonCard
                 title="ריאליסטי לעומת אבסורדי → לייקים"
                 data={toneLikesData}
                 note="רק לפוסטים שנוצרו בכלי, קושרו, וסווגו ב-AI"
@@ -1024,7 +1052,7 @@ export default async function DashboardPage({
 
       <div id="gallery" className="flex flex-col gap-3">
         <h2 className="font-semibold text-brand-maroon border-b border-brand-pink/30 pb-2">כל הפוסטים המסונכרנים</h2>
-        {(themes.length > 0 || hasLetterPosts) && (
+        {(themes.length > 0 || hasLetterPosts || hasShortPosts) && (
           <div className="flex items-center gap-2 flex-wrap text-xs">
             <Link
               href={buildGalleryHref({ format: filterFormat, sort: sortBy })}
@@ -1051,6 +1079,18 @@ export default async function DashboardPage({
                 className={`rounded-full px-3 py-1 ${filterFormat === "letter" ? "bg-brand-red text-white" : "bg-brand-pink/10 text-brand-maroon hover:bg-brand-pink/20"}`}
               >
                 ✉️ מכתב
+              </Link>
+            )}
+            {hasShortPosts && (
+              <Link
+                href={buildGalleryHref({
+                  theme: filterTheme,
+                  format: filterFormat === "short" ? undefined : "short",
+                  sort: sortBy,
+                })}
+                className={`rounded-full px-3 py-1 ${filterFormat === "short" ? "bg-brand-red text-white" : "bg-brand-pink/10 text-brand-maroon hover:bg-brand-pink/20"}`}
+              >
+                ✨ קצר
               </Link>
             )}
           </div>
