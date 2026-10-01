@@ -25,13 +25,15 @@ const SHORT_BODY_FONT_SIZE = MIN_FONT_SIZE_CAROUSEL + 34;
 const SHORT_RIGHT_INSET_REDUCTION = 40;
 // תגית קטנה ורחוקה מהטקסט, ופסקאות עם רווח ביניהן אבל שורות צפופות בתוך פסקה (לפי הדוגמה שסופקה).
 const SHORT_HASHTAG_FONT_SIZE = 28;
-const SHORT_HASHTAG_GAP = 70;
+const SHORT_HASHTAG_GAP = 35;
+const SHORT_HASHTAG_TOP_SHIFT = 35;
+const SHORT_BODY_FONT_WEIGHT = 700;
 const SHORT_PARAGRAPH_GAP_RATIO = 0.7;
 const SHORT_DARK_TEXT_COLOR = "#FEF9F4";
 // פוסט קצר תמיד נכנס לעמוד אחד: הפונט קטן בהדרגה מ-SHORT_BODY_FONT_SIZE עד שהטקסט נכנס בגובה הפנוי (אך לא מתחת לרצפה).
 const SHORT_MIN_FIT_FONT_SIZE = 26;
 // בפוסט קצר שואפים ל-5–6 מילים בשורה: הפונט הגדול ביותר שבו ממוצע המילים בשורה מלאה הוא לפחות 5 (ובכל מקרה בלי לחרוג מהעמוד).
-const SHORT_MIN_AVG_WORDS_PER_LINE = 6;
+const SHORT_MIN_AVG_WORDS_PER_LINE = 5.5;
 const SHORT_FIT_LINE_HEIGHT = 1.45;
 const SHORT_FIT_BOTTOM_MARGIN = 60;
 const SHORT_FIT_FOOTER_RESERVE = 150;
@@ -172,13 +174,15 @@ function fitShortFontSize(input: CarouselSlideInput, topOffset: number, availabl
 }
 
 export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
-  const topOffset = input.textTopOffset ?? CONTENT_TOP_OFFSET;
+  const baseTopOffset = input.textTopOffset ?? CONTENT_TOP_OFFSET;
   const rightInset = input.textRightInset ?? CONTENT_RIGHT_INSET;
   const isShort = !!input.isShort;
   const effectiveRightInset = isShort ? Math.max(0, rightInset - SHORT_RIGHT_INSET_REDUCTION) : rightInset;
   const rightOffset = HORIZONTAL_PADDING + effectiveRightInset;
   const availableWidth = CAROUSEL_WIDTH - 2 * HORIZONTAL_PADDING - effectiveRightInset;
   const hashtags = shownHashtags(input);
+  const topOffset =
+    isShort && hashtags.length > 0 && input.pageIndex === 1 ? baseTopOffset + SHORT_HASHTAG_TOP_SHIFT : baseTopOffset;
   const fontSize = isShort ? fitShortFontSize(input, topOffset, availableWidth) : BODY_FONT_SIZE;
   const progress = Math.min(1, Math.max(0, input.pageIndex / input.pageCount));
   const filledWidth = Math.round(PROGRESS_BAR_WIDTH * progress);
@@ -274,7 +278,7 @@ export function buildCarouselSlideNode(input: CarouselSlideInput): SatoriNode {
                 : []),
               ...renderPreparedLines(lines, {
                 fontSize,
-                fontWeight: 400,
+                fontWeight: SHORT_BODY_FONT_WEIGHT,
                 color: input.isDarkBackground ? SHORT_DARK_TEXT_COLOR : FB_TEXT_COLOR,
                 justifyContent: "flex-end",
               }),
