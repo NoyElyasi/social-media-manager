@@ -354,6 +354,8 @@ export async function updatePostRawText(
     isBold?: boolean;
     /** משנה את סוג הפוסט (רגיל/מכתב/טיפ) — "regular" נשמר כ-null. לא סופק = משאירים. */
     aiFormat?: "regular" | "letter" | "tip";
+    /** משנה את נושא הפוסט (מתוך aiThemeOptions) — null = בלי נושא. לא סופק = משאירים. */
+    aiTheme?: string | null;
   }
 ) {
   const storage = getStorageService();
@@ -379,6 +381,7 @@ export async function updatePostRawText(
       hideProgressBar,
       isBold,
       ...(options?.aiFormat !== undefined ? { aiFormat: options.aiFormat === "regular" ? null : options.aiFormat } : {}),
+      ...(options?.aiTheme !== undefined ? { aiTheme: options.aiTheme } : {}),
     },
   });
   await storage.saveTextFile(post.folderPath, "טקסט-מקור.txt", newRawText);

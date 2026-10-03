@@ -31,6 +31,8 @@ export default function EditablePostText({
   initialRevealMode,
   initialIsShort,
   initialAiFormat,
+  initialAiTheme,
+  aiThemeOptions,
   initialIsBold,
   initialHideProgressBar,
   initialHashtags,
@@ -53,6 +55,10 @@ export default function EditablePostText({
   /** פוסט "קצר" (מעט מלל) — קרוסלה בלי לוגו פרופיל ובפונט גדול, ריל בפונט גדול, תגית למעלה ומימין. */
   initialIsShort: boolean;
   initialAiFormat: string | null;
+  /** נושא הפוסט (התגית הסגולה בראש העמוד) — ניתן לשינוי כאן גם אחרי היצירה. */
+  initialAiTheme: string | null;
+  /** רשימת הנושאים מההגדרות. */
+  aiThemeOptions: string[];
   initialIsBold: boolean;
   initialHideProgressBar: boolean;
   initialHashtags: string[];
@@ -76,6 +82,10 @@ export default function EditablePostText({
   const [coverBackgroundPath, setCoverBackgroundPath] = useState<string | null>(initialCoverBackgroundPath);
   const [revealMode, setRevealMode] = useState<"word" | "letter" | "word-center">(initialRevealMode);
   const [postType, setPostType] = useState<PostType>(postTypeOf(initialAiFormat, initialIsShort));
+  const [aiTheme, setAiTheme] = useState<string | null>(initialAiTheme);
+  // נושא שכבר שמור על הפוסט אבל הוסר בינתיים מרשימת הנושאים בהגדרות — נשאר בר-בחירה, כדי שלא ייעלם בשמירה.
+  const themeOptions =
+    initialAiTheme && !aiThemeOptions.includes(initialAiTheme) ? [initialAiTheme, ...aiThemeOptions] : aiThemeOptions;
   const [isBold, setIsBold] = useState(initialIsBold);
   const [hideProgressBar, setHideProgressBar] = useState(initialHideProgressBar);
   const [hashtagsInput, setHashtagsInput] = useState(initialHashtags.join(" "));
@@ -161,6 +171,7 @@ export default function EditablePostText({
           rawText,
           hashtags: hashtagsInput.split(/\s+/).filter(Boolean),
           ...splitPostType(postType),
+          aiTheme,
           isBold,
           hideProgressBar,
           ...(hasCarousel
@@ -311,7 +322,24 @@ export default function EditablePostText({
 
       <div className={sectionClass}>
         <span className={sectionTitle}>סוג ועיצוב</span>
-        <PostTypeSelector value={postType} onChange={setPostType} />
+        <div className="flex flex-wrap items-center gap-3">
+          <PostTypeSelector value={postType} onChange={setPostType} />
+          <label className="flex items-center gap-2 text-xs">
+            <span>נושא:</span>
+            <select
+              value={aiTheme ?? ""}
+              onChange={(e) => setAiTheme(e.target.value || null)}
+              className="rounded border border-brand-pink/40 bg-white px-1.5 py-1 text-xs"
+            >
+              <option value="">בלי נושא</option>
+              {themeOptions.map((theme) => (
+                <option key={theme} value={theme}>
+                  {theme}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         {hasCarousel && (
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs">
             <label className="flex items-center gap-1.5">

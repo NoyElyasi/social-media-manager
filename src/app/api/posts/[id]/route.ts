@@ -40,6 +40,8 @@ const updatePostSchema = z.object({
   hideProgressBar: z.boolean().optional(),
   isBold: z.boolean().optional(),
   aiFormat: z.enum(["regular", "letter", "tip"]).optional(),
+  // undefined = לא לשנות נושא; null = בלי נושא.
+  aiTheme: z.string().nullable().optional(),
 });
 
 /**
@@ -88,6 +90,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           hideProgressBar: parsed.data.hideProgressBar,
           isBold: parsed.data.isBold,
           aiFormat: parsed.data.aiFormat,
+          aiTheme: parsed.data.aiTheme,
         });
         send({ type: "done", post });
       } catch (err) {

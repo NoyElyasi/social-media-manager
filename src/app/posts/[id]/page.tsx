@@ -9,6 +9,7 @@ import DeletePostButton from "@/components/DeletePostButton";
 import AiLabelBadge from "@/components/AiLabelBadge";
 import PrivacyWarningsBadge from "@/components/PrivacyWarningsBadge";
 import { buildFileUrlFromPath } from "@/lib/files";
+import { getProfileSettings } from "@/server/settings/profile";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,9 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
   });
 
   if (!post) notFound();
+
+  const profile = await getProfileSettings();
+  const aiThemeOptions: string[] = JSON.parse(profile.aiThemeOptions || "[]");
 
   const privacyFlags: PrivacyFlag[] = JSON.parse(post.privacyFlags || "[]");
 
@@ -87,6 +91,8 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
             initialRevealMode={post.revealMode as "word" | "letter" | "word-center"}
             initialIsShort={post.isShort}
             initialAiFormat={post.aiFormat}
+            initialAiTheme={post.aiTheme}
+            aiThemeOptions={aiThemeOptions}
             initialIsBold={post.isBold}
             initialHideProgressBar={post.hideProgressBar}
             initialHashtags={JSON.parse(post.hashtags || "[]")}
