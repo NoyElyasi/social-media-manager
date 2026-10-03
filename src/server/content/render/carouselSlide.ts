@@ -2,6 +2,7 @@ import { h, type SatoriNode } from "./h";
 import { MIN_FONT_SIZE_CAROUSEL } from "../accessibility";
 import { ALWAYS_FIRST_HASHTAG } from "@/lib/labels";
 import { prepareRtlWordLines, buildWordRowNode, renderPreparedLines } from "./rtlText";
+import { measureNodeContentWidth } from "./renderImage";
 
 export const CAROUSEL_WIDTH = 1080;
 export const CAROUSEL_HEIGHT = 1350; // יחס 4:5
@@ -73,6 +74,15 @@ const COVER_FONT_SIZE = 120;
 const COVER_FONT_WEIGHT = 900;
 const COVER_HORIZONTAL_PADDING = 90;
 const COVER_UNDERLINE_WIDTH = 220;
+// תיוג ארוך (מילה אחת, אי אפשר לשבור אותה) לא נחתך בקצוות העמוד: אם הוא רחב
+// מ-COVER_MAX_TEXT_WIDTH בגודל הרגיל, הפונט קטן בדיוק עד שהוא נכנס. לפי בקשה
+// מפורשת גודל המילה קודם לשוליים — נשארים רק שוליים מינימליים
+// (COVER_MIN_SIDE_MARGIN מכל צד), ותיוג קצר נשאר ב-COVER_FONT_SIZE.
+const COVER_MIN_SIDE_MARGIN = 40;
+const COVER_MAX_TEXT_WIDTH = CAROUSEL_WIDTH - 2 * COVER_MIN_SIDE_MARGIN;
+// רצפה נמוכה בכוונה: השוליים המינימליים נשמרים גם לתיוג ארוך במיוחד.
+const COVER_MIN_FONT_SIZE = 48;
+const COVER_MEASURE_CANVAS_WIDTH = 4000;
 
 export interface CarouselSlideInput {
   bodyText: string;
@@ -381,6 +391,41 @@ export interface CoverSlideInput {
   backgroundImageDataUri: string;
   /** התיוג הראשי שיוצג גדול במרכז (בלי #אחתביום — היא כבר מוטבעת בתבנית הרקע עצמה). */
   hashtagText: string;
+  /** גודל הפונט של התיוג (ראו fitCoverFontSize) — ברירת מחדל COVER_FONT_SIZE. */
+  fontSize?: number;
+}
+
+function coverHashtagLines(hashtagText: string, fontSize: number): SatoriNode[] {
+  // השבירה לשורות תמיד לפי COVER_FONT_SIZE, כדי שהקטנת הפונט לא תשנה את חלוקת השורות שנמדדה.
+  const lines = prepareRtlWordLines(hashtagText, COVER_FONT_SIZE, CAROUSEL_WIDTH - 2 * COVER_HORIZONTAL_PADDING);
+  return renderPreparedLines(lines, {
+    fontSize,
+    fontWeight: COVER_FONT_WEIGHT,
+    color: COVER_HASHTAG_COLOR,
+    justifyContent: "center",
+  });
+}
+
+/** גודל הפונט לתיוג בעמוד השער: COVER_FONT_SIZE, או קטן יותר אם התיוג רחב מ-COVER_MAX_TEXT_WIDTH. */
+export async function fitCoverFontSize(hashtagText: string): Promise<number> {
+  const width = await measureNodeContentWidth(
+    h(
+      "div",
+      {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          fontFamily: "Noto Sans Hebrew, Noto Sans Hebrew Latin",
+        },
+      },
+      ...coverHashtagLines(hashtagText, COVER_FONT_SIZE)
+    ),
+    COVER_MEASURE_CANVAS_WIDTH,
+    CAROUSEL_HEIGHT
+  );
+  if (width <= COVER_MAX_TEXT_WIDTH) return COVER_FONT_SIZE;
+  return Math.max(COVER_MIN_FONT_SIZE, Math.floor((COVER_FONT_SIZE * COVER_MAX_TEXT_WIDTH) / width));
 }
 
 /**
@@ -389,8 +434,6 @@ export interface CoverSlideInput {
  * (לא נספר ב-pageIndex/pageCount של שאר העמודים, ראו instagramCarousel.ts).
  */
 export function buildCoverSlideNode(input: CoverSlideInput): SatoriNode {
-  const availableWidth = CAROUSEL_WIDTH - 2 * COVER_HORIZONTAL_PADDING;
-
   return h(
     "div",
     {
@@ -422,12 +465,7 @@ export function buildCoverSlideNode(input: CoverSlideInput): SatoriNode {
     h(
       "div",
       { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 16 } },
-      ...renderPreparedLines(prepareRtlWordLines(input.hashtagText, COVER_FONT_SIZE, availableWidth), {
-        fontSize: COVER_FONT_SIZE,
-        fontWeight: COVER_FONT_WEIGHT,
-        color: COVER_HASHTAG_COLOR,
-        justifyContent: "center",
-      }),
+      ...coverHashtagLines(input.hashtagText, input.fontSize ?? COVER_FONT_SIZE),
       h("div", {
         style: { display: "flex", width: COVER_UNDERLINE_WIDTH, height: 6, backgroundColor: COVER_UNDERLINE_COLOR },
       })

@@ -31,3 +31,13 @@ export async function renderNodeToPng(
   const rendered = resvg.render();
   return Buffer.from(rendered.asPng());
 }
+
+/**
+ * רוחב התוכן המצויר בפועל (בפיקסלים) — מדידה אמיתית של הגליפים, לא אומדן לפי
+ * מספר תווים: רוחב אות עברית משתנה מאוד (י׳ צרה, ש׳ רחבה), במיוחד במשקל כבד.
+ * הקנבס חייב להיות רחב מהתוכן, אחרת התוכן נחתך/נשבר והמדידה לא נכונה.
+ */
+export async function measureNodeContentWidth(node: SatoriNode, width: number, height: number): Promise<number> {
+  const svg = await renderNodeToSvg(node, width, height);
+  return new Resvg(svg).innerBBox()?.width ?? 0;
+}
